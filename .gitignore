@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# env files: never commit secrets (only .env.example is tracked)
+.env*
+!.env.example
+
+# frame sampler output and local test videos
+frames-out/
+tools/frames/out/
+tools/frames/test/
+*.mp4
+*.mov
+*.wav
+
+# misc
+.DS_Store
+*.log
+.vercel
