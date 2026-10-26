@@ -1,4 +1,4 @@
-import type { Issue, WorkPlan } from "@/lib/types";
+import { AFTER_IMAGE_LABEL, type Issue, type WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 
@@ -18,6 +18,10 @@ function Section({ title, children, id }: { title: string; children: React.React
       {children}
     </section>
   );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-2xl bg-white p-4 text-sm text-ink/60">{children}</p>;
 }
 
 function SaidBadge({ issue }: { issue: Issue }) {
@@ -67,6 +71,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
       )}
 
       <Section title="Problems, worst first" id="problems">
+        {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
         <ol className="space-y-4">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
@@ -106,6 +111,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
       )}
 
       <Section title="What's there">
+        {plan.inventory.length === 0 && <Empty>Nothing was counted in this video.</Empty>}
         <ul className="grid grid-cols-2 gap-3">
           {plan.inventory.map((item) => (
             <li key={item.label} className="rounded-2xl bg-white p-4">
@@ -115,10 +121,11 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-xs text-ink/50">Approximate, counted from the video.</p>
+        {plan.inventory.length > 0 && <p className="mt-2 text-xs text-ink/50">Approximate, counted from the video.</p>}
       </Section>
 
       <Section title="Do the work in this order">
+        {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
         <ol className="space-y-3">
           {plan.workOrder.map((step) => (
             <li key={step.order} className="flex gap-3 rounded-2xl bg-white p-4">
@@ -138,7 +145,8 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
       </Section>
 
       <Section title="Materials">
-        <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
+        {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
+        <ul className={plan.materials.length ? "divide-y divide-ink/10 rounded-2xl bg-white" : "hidden"}>
           {plan.materials.map((m) => (
             <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
               <div>
@@ -156,6 +164,12 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </ul>
       </Section>
 
+      {!plan.costRange && plan.materials.length > 0 && (
+        <Section title="What it might cost">
+          <Empty>No cost range yet. Add your city or region and we&apos;ll price the materials and labor for your area.</Empty>
+        </Section>
+      )}
+
       {plan.costRange && (
         <Section title="What it might cost">
           <div className="rounded-2xl bg-white p-5">
@@ -171,14 +185,41 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                 <li key={a}>{a}</li>
               ))}
             </ul>
+            {plan.costRange.sources && plan.costRange.sources.length > 0 && (
+              <p className="mt-3 text-xs text-ink/50">
+                Prices from{" "}
+                {plan.costRange.sources.map((src, i) => (
+                  <span key={src.url}>
+                    {i > 0 && ", "}
+                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="underline">
+                      {src.title}
+                    </a>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
         </Section>
       )}
 
       {plan.afterImageUrl && hero && (
         <Section title="Before and after">
-          <BeforeAfter before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? "AI concept, not a render"} />
+          <BeforeAfter before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? AFTER_IMAGE_LABEL} />
         </Section>
+      )}
+
+      {plan.afterImageUrl && !hero && (
+        <Section title="After the work">
+          <figure className="overflow-hidden rounded-xl bg-black">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={plan.afterImageUrl} alt="AI concept of the finished space" className="block w-full object-cover" />
+            <figcaption className="bg-ink px-3 py-1.5 text-xs text-white/80">{plan.afterImageLabel ?? AFTER_IMAGE_LABEL}</figcaption>
+          </figure>
+        </Section>
+      )}
+
+      {!plan.afterImageUrl && !plan.meta?.isExample && plan.workOrder.length > 0 && (
+        <p className="mt-10 text-sm text-ink/50">No after picture this time. The plan above is complete without it.</p>
       )}
     </article>
   );
