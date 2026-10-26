@@ -2,9 +2,9 @@
  * SightWork pipeline step: `estimateCost`.
  *
  * Turns the `reason` output (materials + work steps) into a rough,
- * region-grounded cost range (prompt 05 in the planning repo, owned by
- * Grok Bot: prompt, schema, and math rule). Mosheh owns the call, the
- * math, and the validation in this file.
+ * region-grounded cost range (prompt 05 in the planning repo: prompt,
+ * schema, and math rule). This file implements the call, the math,
+ * and the validation.
  *
  * This module makes no API calls and holds no keys. The model caller is
  * injected by the wiring code (later: src/lib/meta), so the step is
