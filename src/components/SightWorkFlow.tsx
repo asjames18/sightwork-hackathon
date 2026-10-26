@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { PLAN_STEPS, type WorkPlan } from "@/lib/types";
 import { samplePlan } from "@/lib/mock/samplePlan";
-import { mockPlanJob } from "@/lib/client/planJob";
+import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
@@ -14,8 +14,8 @@ type Stage =
   | { kind: "processing"; file: File; run: number }
   | { kind: "plan"; plan: WorkPlan; videoName: string | null };
 
-/** Swap point: the real API runner replaces the mock here once the api route lands. */
-const runPlanJob = mockPlanJob;
+/** Mock by default; NEXT_PUBLIC_SIGHTWORK_RUNNER=api or `?runner=api` switches to POST /api/plan. */
+const runPlanJob = selectedPlanJob;
 
 export function SightWorkFlow() {
   const [stage, setStage] = useState<Stage>({ kind: "upload" });
