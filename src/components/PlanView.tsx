@@ -24,7 +24,14 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="rounded-2xl bg-white p-4 text-sm text-ink/60">{children}</p>;
 }
 
-function SaidBadge({ issue }: { issue: Issue }) {
+/** A walkthrough with no speech: the said-vs-seen framing doesn't apply. */
+export function isNarrated(plan: WorkPlan): boolean {
+  return Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
+}
+
+function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
+  if (!narrated)
+    return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
   if (issue.unmentioned)
     return <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
   if (issue.status === "mentioned_not_seen")
@@ -38,7 +45,8 @@ function SaidBadge({ issue }: { issue: Issue }) {
 
 export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: string | null }) {
   const frames = plan.frames ?? [];
-  const unmentioned = plan.issues.filter((i) => i.unmentioned);
+  const narrated = isNarrated(plan);
+  const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
 
   return (
@@ -63,7 +71,22 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </a>
       )}
 
-      {plan.transcriptSummary && (
+      {!narrated && plan.issues.length > 0 && (
+        <a href="#problems" className="mt-5 block rounded-2xl bg-ink p-5 text-white">
+          <p className="text-4xl font-extrabold text-accent">{plan.issues.length}</p>
+          <p className="text-lg font-semibold">problem{plan.issues.length === 1 ? "" : "s"} found on camera</p>
+          <p className="mt-1 text-sm text-white/70">{plan.issues.map((i) => i.title).join(" · ")}</p>
+        </a>
+      )}
+
+      {!narrated && (
+        <p className="mt-4 rounded-xl bg-white p-4 text-sm text-ink/70">
+          No narration in this video, so everything here comes from what the camera saw. Talk through what you&apos;re worried
+          about next time and SightWork will compare what you said with what it sees.
+        </p>
+      )}
+
+      {narrated && plan.transcriptSummary && (
         <p className="mt-4 rounded-xl bg-white p-4 text-sm">
           <span className="font-semibold">What you asked for: </span>
           {plan.transcriptSummary}
@@ -80,7 +103,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${SEVERITY[issue.severity]}`}>{issue.severity}</span>
-                  <SaidBadge issue={issue} />
+                  <SaidBadge issue={issue} narrated={narrated} />
                 </div>
                 <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
                 <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
@@ -95,7 +118,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </ol>
       </Section>
 
-      {plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
+      {narrated && plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
         <Section title="What you said vs. what we saw">
           <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
             {plan.saidVsSeen.map((row, i) => (
