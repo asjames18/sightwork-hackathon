@@ -121,7 +121,14 @@ export function inlineSchemaRefs(schema: unknown): unknown {
       const next = new Set(seen);
       next.add(ref);
       const { $ref: _ignored, ...rest } = obj;
-      return { ...resolve(defs[match[1]], next), ...resolve(rest, next) };
+      const resolvedDef = resolve(defs[match[1]], next);
+      const resolvedRest = resolve(rest, next);
+      // resolve() returns unknown, which cannot be spread directly
+      // (TS2698); schema defs are objects, anything else inlines to {}.
+      return {
+        ...(isRecord(resolvedDef) ? resolvedDef : {}),
+        ...(isRecord(resolvedRest) ? resolvedRest : {}),
+      };
     }
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
@@ -243,3 +250,4 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   }
   throw new Error(`reason: validation failed after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
+
