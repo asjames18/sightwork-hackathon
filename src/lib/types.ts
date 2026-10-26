@@ -224,6 +224,18 @@ export interface WorkPlan {
 /** UI step labels while a plan is being made. */
 export type PlanStep = "uploading" | "listening" | "looking" | "counting" | "comparing" | "planning" | "picturing" | "done";
 
+/** Steps the processing screen shows, in order ("done" is not shown). */
+export const PLAN_STEPS: Exclude<PlanStep, "done">[] = ["uploading", "listening", "looking", "counting", "comparing", "planning", "picturing"];
+
+/**
+ * Progress of one plan job as the UI sees it. A failed step carries a plain message
+ * (no provider error text); the processing screen shows it as-is.
+ */
+export type PlanJobStatus =
+  | { state: "running"; step: Exclude<PlanStep, "done"> }
+  | { state: "done"; plan: WorkPlan }
+  | { state: "failed"; step: Exclude<PlanStep, "done">; message: string };
+
 // ---------------------------------------------------------------------------
 // Contract checks (no dependencies). Returns a list of problems; [] = valid.
 // ---------------------------------------------------------------------------
