@@ -15,9 +15,15 @@
  *
  * Aggregation rules (prompt 02, enforced here, not trusted to the
  * model):
- * - Hazard concepts run on EVERY frame (a hazard can show up in a
- *   single frame). Count concepts run on an evenly spaced subset of
- *   frames, scene-change frames first, under the request cap.
+ * - Request budget (rule 1, rewritten Oct 26): hazards get 60% of
+ *   the cap on evenly spaced frames, scene-change frames first
+ *   (22 by default); counts run on an evenly spaced subset of those
+ *   hazard frames (17 by default). Short videos whose frames x
+ *   hazard concepts fit in 60% of the cap get hazards on every
+ *   frame and the count pass takes the rest, as before.
+ * - If the count pass still gets fewer than 6 frames, drop plants,
+ *   then screens, before shrinking the hazard share. budgetExceeded
+ *   is set only when the split had to drop concepts.
  * - "exit sign" is in both lists, so it is run once (in the hazard
  *   pass) and the result is reused for the count pass; no second call.
  * - Counts are never summed across frames (frames overlap as the
@@ -164,7 +170,7 @@ export interface SegmentOutput extends SegmentationResult {
   droppedLabels: string[];
   /** Actual SAM calls made (reused "exit sign" results are not re-called). */
   requestsMade: number;
-  /** True when the hazard pass alone exceeds the request cap. */
+  /** True when the split had to drop concepts (or the cap fits no hazard frame). */
   budgetExceeded: boolean;
 }
 
@@ -208,15 +214,15 @@ export function parseInstances(raw: unknown, concept: string, frameIndex: number
 }
 
 export interface SegmentPlan {
-  /** Every frame index, in order (hazard pass). */
+  /** Hazard-pass frames: 60% of the cap, evenly spaced, scene-change frames first. */
   hazardFrames: number[];
-  /** Evenly spaced subset, scene-change frames first (count pass). */
+  /** Count-pass frames: an evenly spaced subset of hazardFrames. */
   countFrames: number[];
   /** Count labels dropped to fit the cap (empty when none). */
   droppedLabels: string[];
   /** Planned SAM calls, counting the shared "exit sign" once. */
   requestsPlanned: number;
-  /** True when the hazard pass alone exceeds maxRequests. */
+  /** True when the split had to drop concepts (or the cap fits no hazard frame). */
   budgetExceeded: boolean;
 }
 
@@ -251,9 +257,15 @@ function evenlySpaced(candidates: number[], count: number): number[] {
 }
 
 /**
- * Plan the SAM request budget for a frame count. Hazard prompts run on
- * every frame; count prompts run on a subset. Count labels are only
- * dropped (plants, then screens) when dropping actually buys a pass.
+ * Plan the SAM request budget for a frame count (prompt 02, rule 1).
+ * Hazards get 60% of the cap on evenly spaced frames, scene-change
+ * frames first; counts run on an evenly spaced subset of those
+ * hazard frames. When frames x hazard prompts fits in 60% of the
+ * cap, hazards run on every frame and the count pass takes the
+ * rest, as before. If the count pass still gets fewer than 6
+ * frames, drop plants, then screens, before shrinking the hazard
+ * share. budgetExceeded is set only when the split had to drop
+ * concepts (or the cap fits no hazard frame at all).
  */
 export function planSegmentFrames(opts: {
   frameCount: number;
@@ -265,8 +277,11 @@ export function planSegmentFrames(opts: {
   if (!Number.isInteger(frameCount) || frameCount < 0) {
     throw new Error(`segment: frameCount must be a whole number >= 0, got ${frameCount}`);
   }
+  if (!Number.isInteger(maxRequests) || maxRequests < 0) {
+    throw new Error(`segment: maxRequests must be a whole number >= 0, got ${maxRequests}`);
+  }
   const scene = validateSceneIndices(opts.sceneFrameIndices ?? [], frameCount);
-  const hazardFrames = Array.from({ length: frameCount }, (_, i) => i);
+  const allFrames = Array.from({ length: frameCount }, (_, i) => i);
 
   const hazardPrompts = dedupePrompts(HAZARD_CONCEPTS.map((c) => c.prompt));
   const countPrompts = dedupePrompts(COUNT_CONCEPTS.map((c) => c.prompt));
@@ -277,36 +292,68 @@ export function planSegmentFrames(opts: {
       (c) => !shared.has(c.prompt) && !droppedLabels.includes(c.label),
     ).length;
 
-  const hazardRequests = hazardPrompts.length * frameCount;
-  const budgetExceeded = hazardRequests > maxRequests;
-  const remaining = maxRequests - hazardRequests;
+  // Scene-change frames first, then evenly spaced fills up to count.
+  const pickFrames = (count: number): number[] => {
+    const rest = allFrames.filter((i) => !scene.includes(i));
+    const fill = evenlySpaced(rest, Math.max(0, count - scene.length));
+    return [...scene.slice(0, count), ...fill]
+      .sort((a, b) => a - b)
+      .slice(0, count);
+  };
+
+  // Hazard share: 60% of the cap. A short video (frames x hazards
+  // fits in 60%) keeps hazards on every frame via the min().
+  let hazardFrames = pickFrames(
+    Math.min(frameCount, Math.floor((0.6 * maxRequests) / hazardPrompts.length)),
+  );
+  if (frameCount > 0 && hazardFrames.length === 0) {
+    // Degenerate cap: no hazard frame fits the 60% share, so run
+    // nothing rather than blow the cap; the caller reports it.
+    return {
+      hazardFrames: [],
+      countFrames: [],
+      droppedLabels: [],
+      requestsPlanned: 0,
+      budgetExceeded: true,
+    };
+  }
+  let hazardRequests = hazardPrompts.length * hazardFrames.length;
+
+  // Count pass on an evenly spaced subset of the hazard frames.
+  // Reusing "exit sign" means it is never run twice on one frame.
+  const countFramesFor = (droppedLabels: string[]): number => {
+    const n = incrementalCount(droppedLabels);
+    if (n === 0) return hazardFrames.length;
+    return Math.min(
+      hazardFrames.length,
+      Math.floor((maxRequests - hazardRequests) / n),
+    );
+  };
 
   let droppedLabels: string[] = [];
-  let countBudget = 0;
-  if (!budgetExceeded && remaining >= 0) {
-    const full = incrementalCount([]);
-    countBudget = Math.min(frameCount, Math.floor(remaining / full));
-    if (countBudget === 0) {
-      // Try dropping plants, then plants + screens, but only keep a
-      // drop when it actually buys at least one count frame.
-      for (const drop of [["Plants"], ["Plants", "Screens"]]) {
-        const n = incrementalCount(drop);
-        const frames = Math.min(frameCount, Math.floor(remaining / n));
-        if (frames > 0) {
-          droppedLabels = drop;
-          countBudget = frames;
-          break;
-        }
+  let countBudget = countFramesFor([]);
+  // Fewer than 6 count frames, on a video with at least 6 frames:
+  // drop plants, then screens, keeping a drop only when it actually
+  // buys count frames. A shorter video already counts on every
+  // frame, so there is nothing to fix and nothing is dropped.
+  if (countBudget < 6 && frameCount >= 6) {
+    for (const drop of [["Plants"], ["Plants", "Screens"]]) {
+      const n = countFramesFor(drop);
+      if (n > countBudget) {
+        droppedLabels = drop;
+        countBudget = n;
       }
+      if (countBudget >= 6) break;
+    }
+    // Still fewer than 6: shrink the hazard share until the count
+    // pass fits, or hazard frames run out.
+    while (countBudget < 6 && hazardFrames.length > 1) {
+      hazardFrames = pickFrames(hazardFrames.length - 1);
+      hazardRequests = hazardPrompts.length * hazardFrames.length;
+      countBudget = countFramesFor(droppedLabels);
     }
   }
-
-  // Scene-change frames first, then evenly spaced fills up to budget.
-  const rest = hazardFrames.filter((i) => !scene.includes(i));
-  const fill = evenlySpaced(rest, Math.max(0, countBudget - scene.length));
-  const countFrames = [...scene.slice(0, countBudget), ...fill]
-    .sort((a, b) => a - b)
-    .slice(0, countBudget);
+  const countFrames = evenlySpaced(hazardFrames, countBudget);
 
   return {
     hazardFrames,
@@ -314,7 +361,7 @@ export function planSegmentFrames(opts: {
     droppedLabels,
     requestsPlanned:
       hazardRequests + incrementalCount(droppedLabels) * countFrames.length,
-    budgetExceeded,
+    budgetExceeded: droppedLabels.length > 0,
   };
 }
 
