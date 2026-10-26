@@ -11,6 +11,21 @@ const LABELS: Record<PlanStep, string> = {
   done: "Done",
 };
 
+/**
+ * What does the work at each step, shown under the label so the run reads as an agent
+ * trace (several models, each doing one job) rather than one black-box call.
+ */
+const ENGINE: Record<PlanStep, string> = {
+  uploading: "Key frames and audio, picked on your device",
+  listening: "Muse Voice Transcribe",
+  looking: "SAM 3.1",
+  counting: "SAM 3.1",
+  comparing: "Muse Spark",
+  planning: "Muse Spark",
+  picturing: "Muse Image",
+  done: "",
+};
+
 /** A step that stopped the run. `message` is shown as-is, so keep it plain and free of provider details. */
 export type StepFailure = { message: string };
 
@@ -52,7 +67,12 @@ export function ProcessingStep({
               >
                 {state === "done" ? "✓" : state === "failed" ? "!" : i + 1}
               </span>
-              <span className={state === "next" ? "text-ink/40" : "font-medium"}>{LABELS[s]}</span>
+              <span className="min-w-0">
+                <span className={`block ${state === "next" ? "text-ink/40" : "font-medium"}`}>{LABELS[s]}</span>
+                {ENGINE[s] && (
+                  <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>{ENGINE[s]}</span>
+                )}
+              </span>
             </li>
           );
         })}
