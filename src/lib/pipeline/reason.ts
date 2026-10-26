@@ -96,7 +96,7 @@ export interface ReasonDeps {
   tracker: UsageTracker;
 }
 
-const SPARK_MODEL = "muse-spark";
+const SPARK_MODEL = "muse-spark-1.3";
 
 /**
  * Inline local `#/$defs/<name>` references and drop `$defs`.
