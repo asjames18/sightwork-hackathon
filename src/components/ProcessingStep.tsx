@@ -45,15 +45,45 @@ export function ProcessingStep({
   onExample?: () => void;
 }) {
   const failed = Boolean(failure);
+  // "done" is the end state, not a step the user waits on, so it doesn't count toward "Step N of M".
+  const work = steps.filter((s) => s !== "done");
+  const total = Math.max(work.length, 1);
+  const position = Math.min(current + 1, total);
+  const percent = Math.round(((failed ? current : current + 0.5) / total) * 100);
   return (
     <section aria-live="polite">
-      <h1 className="text-2xl font-extrabold">{failed ? "We couldn't finish your plan" : "Working on your plan"}</h1>
-      <p className="mt-1 truncate text-sm text-ink/60">{videoName}</p>
-      <ol className="mt-6 space-y-3">
-        {steps.map((s, i) => {
+      <h1 className="text-2xl font-extrabold sm:text-3xl">{failed ? "We couldn't finish your plan" : "Working on your plan"}</h1>
+      <p className="mt-1 truncate text-sm text-ink/60" title={videoName}>
+        {videoName}
+      </p>
+
+      <div className="mt-5">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="font-semibold">
+            Step {position} of {total}
+          </span>
+          {!failed && <span className="text-ink/55">Keep this tab open</span>}
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Plan progress"
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={current}
+          className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink/10"
+        >
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${failed ? "bg-red-600" : "bg-accent"}`}
+            style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
+          />
+        </div>
+      </div>
+
+      <ol className="mt-5 divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
+        {work.map((s, i) => {
           const state = i < current ? "done" : i === current ? (failed ? "failed" : "now") : "next";
           return (
-            <li key={s} className="flex items-center gap-3">
+            <li key={s} aria-current={state === "now" ? "step" : undefined} className="flex min-h-[3.25rem] items-center gap-3 py-2.5">
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                   state === "done"
@@ -67,8 +97,8 @@ export function ProcessingStep({
               >
                 {state === "done" ? "✓" : state === "failed" ? "!" : i + 1}
               </span>
-              <span className="min-w-0">
-                <span className={`block ${state === "next" ? "text-ink/40" : "font-medium"}`}>{LABELS[s]}</span>
+              <span className="min-w-0 flex-1">
+                <span className={`block break-words leading-snug ${state === "next" ? "text-ink/40" : "font-medium"}`}>{LABELS[s]}</span>
                 {ENGINE[s] && (
                   <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>{ENGINE[s]}</span>
                 )}
@@ -84,12 +114,12 @@ export function ProcessingStep({
           <p className="mt-1 text-sm text-ink/70">{failure.message}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             {onRetry && (
-              <button type="button" onClick={onRetry} className="flex-1 rounded-xl bg-ink px-4 py-3 font-semibold text-white active:scale-[.99]">
+              <button type="button" onClick={onRetry} className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 font-semibold text-white active:scale-[.99]">
                 Try again
               </button>
             )}
             {onExample && (
-              <button type="button" onClick={onExample} className="flex-1 rounded-xl border border-ink/20 px-4 py-3 font-semibold active:scale-[.99]">
+              <button type="button" onClick={onExample} className="min-h-11 flex-1 rounded-xl border border-ink/20 px-4 py-3 font-semibold active:scale-[.99]">
                 See the example plan
               </button>
             )}
