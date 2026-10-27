@@ -1,5 +1,5 @@
 import { PLAN_STEPS, type PlanJobStatus, type PlanStep } from "@/lib/types";
-import { samplePlan } from "@/lib/mock/samplePlan";
+import { pickMockPlan } from "@/lib/mock/pickMockPlan";
 
 /** What the UI hands a runner: the picked video, plus where to report progress. */
 export interface PlanJobInput {
@@ -34,7 +34,7 @@ function wait(ms: number, signal: AbortSignal): Promise<boolean> {
   });
 }
 
-/** Mock runner: walks the step labels on a timer and ends on the EXAMPLE plan. No network calls. */
+/** Mock runner: walks the step labels on a timer and ends on the EXAMPLE plan (`?mock=nometa` for the plan-only one). No network calls. */
 export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
   const failAt = mockFailStep();
   for (const step of PLAN_STEPS) {
@@ -50,5 +50,5 @@ export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
       return;
     }
   }
-  if (!signal.aborted) onStatus({ state: "done", plan: samplePlan });
+  if (!signal.aborted) onStatus({ state: "done", plan: pickMockPlan() });
 };
