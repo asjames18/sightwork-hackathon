@@ -13,6 +13,15 @@
 /** Agreed route cap: the browser builder stays under 9 MB, the route rejects over 10 MB. */
 export const MAX_PLAN_BODY_BYTES = 10 * 1024 * 1024;
 
+/**
+ * Agreed frame cap: the browser builder sends at most 48 frames
+ * (prompt 02, under the 50-images-per-request limit), so a request
+ * over 48 is not something the UI produces. Rejecting it here fails
+ * fast on "uploading" before any model call is spent on a run that
+ * would blow the spike cap mid-pipeline.
+ */
+export const MAX_PLAN_FRAMES = 48;
+
 /** True when the raw request text is over the route body cap. */
 export function planBodyTooLarge(bodyText: string): boolean {
   return new TextEncoder().encode(bodyText).length > MAX_PLAN_BODY_BYTES;
@@ -38,6 +47,8 @@ export function validatePlanRequest(body: unknown): string[] {
     problems.push("frames must be an array");
   } else if (req.frames.length === 0) {
     problems.push("frames must not be empty");
+  } else if (req.frames.length > MAX_PLAN_FRAMES) {
+    problems.push(`frames must not exceed ${MAX_PLAN_FRAMES}`);
   } else {
     req.frames.forEach((f, i) => {
       if (f === null || typeof f !== "object" || Array.isArray(f)) {
@@ -72,3 +83,4 @@ export function validatePlanRequest(body: unknown): string[] {
   }
   return problems;
 }
+
