@@ -246,7 +246,11 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
 
       {!plan.costRange && plan.materials.length > 0 && (
         <Section title="What it might cost">
-          <Empty>No cost range yet. Add your city or region and we&apos;ll price the materials and labor for your area.</Empty>
+          <Empty>
+            {plan.meta?.skipped?.cost
+              ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
+              : "No cost range yet. Add your city or region and we\u2019ll price the materials and labor for your area."}
+          </Empty>
         </Section>
       )}
 
