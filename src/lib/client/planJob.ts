@@ -37,9 +37,12 @@ function wait(ms: number, signal: AbortSignal): Promise<boolean> {
 /** Mock runner: walks the step labels on a timer and ends on the EXAMPLE plan (`?mock=nometa` for the plan-only one). No network calls. */
 export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
   const failAt = mockFailStep();
+  // `?mock=nometa` also previews the processing screen with Meta's optional steps skipped.
+  const noMeta = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "nometa";
+  const skipped: Exclude<PlanStep, "done">[] = [];
   for (const step of PLAN_STEPS) {
     if (signal.aborted) return;
-    onStatus({ state: "running", step });
+    onStatus(skipped.length ? { state: "running", step, skipped: [...skipped] } : { state: "running", step });
     if (!(await wait(STEP_MS, signal))) return;
     if (step === failAt) {
       onStatus({
@@ -49,6 +52,7 @@ export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
       });
       return;
     }
+    if (noMeta && (step === "looking" || step === "counting" || step === "picturing")) skipped.push(step);
   }
   if (!signal.aborted) onStatus({ state: "done", plan: pickMockPlan() });
 };
