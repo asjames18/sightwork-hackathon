@@ -256,7 +256,12 @@ export const PLAN_STEPS: Exclude<PlanStep, "done">[] = ["uploading", "listening"
  * (no provider error text); the processing screen shows it as-is.
  */
 export type PlanJobStatus =
-  | { state: "running"; step: Exclude<PlanStep, "done"> }
+  | {
+      state: "running";
+      step: Exclude<PlanStep, "done">;
+      /** Optional steps already skipped this run (cumulative, e.g. ["looking", "counting"] when SAM is unavailable). Omit when none. */
+      skipped?: Exclude<PlanStep, "done">[];
+    }
   | { state: "done"; plan: WorkPlan }
   | { state: "failed"; step: Exclude<PlanStep, "done">; message: string };
 
