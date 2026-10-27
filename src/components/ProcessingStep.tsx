@@ -12,6 +12,15 @@ const LABELS: Record<PlanStep, string> = {
   done: "Done",
 };
 
+/** Spoken state for each step, since the circle icons are visual only ("skipped" already shows as text). */
+const STATE_TEXT = {
+  done: "Done.",
+  skipped: "Skipped this run.",
+  now: "In progress.",
+  failed: "Stopped here.",
+  next: "Up next.",
+} as const;
+
 /** A step that stopped the run. `message` is shown as-is, so keep it plain and free of provider details. */
 export type StepFailure = { message: string };
 
@@ -75,10 +84,11 @@ export function ProcessingStep({
       <ol className="mt-5 divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
         {work.map((s, i) => {
           const passed = i < current ? (skipped?.includes(s) ? "skipped" : "done") : null;
-          const state = passed ?? (i === current ? (failed ? "failed" : "now") : "next");
+          const state: keyof typeof STATE_TEXT = passed ?? (i === current ? (failed ? "failed" : "now") : "next");
           return (
             <li key={s} aria-current={state === "now" ? "step" : undefined} className="flex min-h-[3.25rem] items-center gap-3 py-2.5">
               <span
+                aria-hidden="true"
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                   state === "done"
                     ? "bg-safe text-white"
@@ -101,16 +111,17 @@ export function ProcessingStep({
                 >
                   {LABELS[s]}
                 </span>
-                {ENGINE[s] && (
+                {(ENGINE[s] || state === "skipped") && (
                   <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>
                     {ENGINE[s]}
                     {state === "skipped" ? (
-                      <span className="text-ink/45"> · skipped this run</span>
+                      <span className="text-ink/45">{ENGINE[s] ? " · " : ""}skipped this run</span>
                     ) : (
-                      OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>
+                      ENGINE[s] && OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>
                     )}
                   </span>
                 )}
+                {state !== "skipped" && <span className="sr-only">{STATE_TEXT[state]}</span>}
               </span>
             </li>
           );
