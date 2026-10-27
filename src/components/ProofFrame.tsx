@@ -1,13 +1,23 @@
 import type { Box, PlanFrame } from "@/lib/types";
 
-/** A proof frame with an optional normalized (0-1000) box drawn on top. */
+/**
+ * A proof frame with an optional normalized (0-1000) box drawn on top.
+ * The image keeps its own aspect ratio (phone walkthroughs are usually portrait),
+ * so the box always lines up with what SAM saw. Tall frames are capped in height
+ * and centered on black.
+ */
 export function ProofFrame({ frame, box, caption }: { frame: PlanFrame | undefined; box?: Box; caption?: string }) {
   if (!frame) return null;
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
-      <div className="relative">
+      <div className="relative mx-auto w-fit max-w-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={frame.url} alt={caption ?? `Frame at ${frame.tSec} s`} className="block aspect-video w-full object-cover" />
+        <img
+          src={frame.url}
+          alt={caption ?? `Frame at ${frame.tSec} s`}
+          loading="lazy"
+          className="block h-auto max-h-[60vh] w-auto max-w-full"
+        />
         {box && (
           <span
             aria-hidden
