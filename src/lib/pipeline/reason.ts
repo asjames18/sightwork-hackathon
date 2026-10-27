@@ -28,7 +28,12 @@
  *   same base label's zone rows (prompt 03 rule 7; IMG_9140 double-count guard)
  * - validate with checkWorkPlan from ../types, plus a frameTimeSec check
  *   against the input frames. On failure, retry once with the errors
- *   appended to the prompt, then fail the step.
+ *   appended to the prompt. If neither attempt validates cleanly but
+ *   at least one parsed and passed the shape check, return the better
+ *   result (fewer validation errors, first wins ties) with those
+ *   errors on `warnings` instead of failing the run; throw only when
+ *   neither attempt gives a schema-valid result (Grok Bot, 2026-10-27
+ *   9:55 AM). The runner logs the warnings server-side.
  */
 
 import {
@@ -68,6 +73,13 @@ export interface ReasonInput {
 
 /** The part of WorkPlan this step fills. */
 export interface ReasonOutput {
+  /**
+   * Validation errors kept with a returned-but-imperfect result (see
+   * runReason). Empty/absent on a clean result. The runner decides
+   * whether the full plan can still render with them; they are never
+   * sent to the UI as a plan field.
+   */
+  warnings?: string[];
   spaceName: string;
   generatedFrom: string;
   inventory: InventoryItem[];
@@ -257,6 +269,11 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   const images = input.frames.map((f) => f.dataUrl);
   let prompt = deps.prompt;
   let lastErrors: string[] = [];
+  // Best schema-valid candidate so far: the filtered output plus its
+  // remaining validation errors. Shape failures never become a
+  // candidate, so a returned result always parsed and passed the
+  // shape check, per the Grok Bot 2026-10-27 9:55 AM guard.
+  let best: { output: ReasonOutput; errs: string[] } | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema });
@@ -271,12 +288,14 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
       const errs = validateReason(input, filtered);
       if (errs.length === 0) return filtered;
       lastErrors = errs;
+      if (best === null || errs.length < best.errs.length) {
+        best = { output: filtered, errs };
+      }
     }
     if (attempt === 0) {
       prompt = `${deps.prompt}\n\nThe previous output failed validation. Fix these problems and return the full corrected JSON:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`;
     }
   }
-  throw new Error(`reason: validation failed after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
+  if (best !== null) return { ...best.output, warnings: best.errs };
+  throw new Error(`reason: no schema-valid result after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
-
-
