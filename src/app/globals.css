@@ -13,3 +13,33 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
 }
+
+/* Plan screen "Save PDF": the browser print dialog saves a clean, paper-white plan. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  article h2 {
+    break-after: avoid;
+  }
+  article figure,
+  article li {
+    break-inside: avoid;
+  }
+  /* Smaller proof frames so a problem and its photo share a page. */
+  article figure {
+    max-width: 4.25in;
+  }
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
