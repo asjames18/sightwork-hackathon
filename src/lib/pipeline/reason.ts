@@ -105,7 +105,13 @@ export interface SparkCaller {
     prompt: string;
     images: string[];
     schema: Record<string, unknown>;
-  }): Promise<{ json: unknown; latencyMs: number; costUsd: number }>;
+  }): Promise<{
+    json: unknown;
+    latencyMs: number;
+    costUsd: number;
+    /** Model the caller actually used; omitted means the requested one. */
+    model?: string;
+  }>;
 }
 
 export interface ReasonDeps {
@@ -285,7 +291,12 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema });
     // The tracker enforces the spike cap: a throw here stops the run.
-    deps.tracker.record({ model: SPARK_MODEL, step: "reason", latencyMs: res.latencyMs, costUsd: res.costUsd });
+    // Record the model the caller actually used: the Baseten adapter
+    // reports its configured model, so the route's done log line names
+    // it instead of muse-spark-1.3 in baseten mode (Grok Bot,
+    // 2026-10-27 12:05 PM). The Meta path omits it and keeps the
+    // requested model.
+    deps.tracker.record({ model: res.model ?? SPARK_MODEL, step: "reason", latencyMs: res.latencyMs, costUsd: res.costUsd });
 
     const shapeErrs = shapeProblems(res.json);
     if (shapeErrs.length > 0) {
