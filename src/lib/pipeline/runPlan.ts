@@ -18,6 +18,15 @@
  * internal detail rides on PlanStepError.detail for the server log
  * only, never for the UI. An aborted signal throws an AbortError
  * instead, so the route can just close the stream.
+ *
+ * Per-request prompt seam: prompts 03/05 carry per-request variables
+ * (frames, transcript, region), so a static dep prompt cannot fill
+ * them. The route may pass reasonPrompt / costPrompt builders on
+ * RunPlanDeps instead; when present, the built prompt replaces the
+ * static dep prompt for that run (including the reason retry, which
+ * reuses the step prompt). When absent, the static prompt is used
+ * unchanged. The seam lives here, not in the step deps, because this
+ * runner already assembles both step inputs.
  */
 
 import {
@@ -29,8 +38,8 @@ import {
   type PlanStep,
   type WorkPlan,
 } from "../types";
-import { estimateCost, type CostDeps } from "./cost";
-import { runReason, type ReasonDeps } from "./reason";
+import { estimateCost, type CostDeps, type CostInput } from "./cost";
+import { runReason, type ReasonDeps, type ReasonInput } from "./reason";
 import { runRenderAfter, type RenderAfterDeps } from "./renderAfter";
 import { runSegment, type SegmentDeps } from "./segment";
 import { runTranscribe, type TranscribeDeps } from "./transcribe";
@@ -67,6 +76,14 @@ export interface RunPlanDeps {
   reason: ReasonDeps;
   cost: CostDeps;
   renderAfter: RenderAfterDeps;
+  /**
+   * Per-request prompt builders (see header). When present, the built
+   * prompt replaces the static dep prompt for that run; otherwise the
+   * static prompt is used. costPrompt is only called when the request
+   * has a region, since estimateCost returns null without one.
+   */
+  reasonPrompt?: (input: ReasonInput) => string;
+  costPrompt?: (input: CostInput, spaceType?: string) => string;
   /** Shared with every step dep above; its totals land in plan.meta. */
   tracker: UsageTracker;
   /** Called with each running status, in stage order. */
@@ -145,17 +162,18 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   emit("comparing");
   let reason;
   try {
-    reason = await runReason(
-      {
-        frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })),
-        segmentation,
-        transcript,
-        spaceName: request.spaceName,
-        spaceType: request.spaceType,
-        durationSec: request.durationSec,
-      },
-      deps.reason,
-    );
+    const reasonInput: ReasonInput = {
+      frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })),
+      segmentation,
+      transcript,
+      spaceName: request.spaceName,
+      spaceType: request.spaceType,
+      durationSec: request.durationSec,
+    };
+    const reasonDeps: ReasonDeps = deps.reasonPrompt
+      ? { ...deps.reason, prompt: deps.reasonPrompt(reasonInput) }
+      : deps.reason;
+    reason = await runReason(reasonInput, reasonDeps);
   } catch (err) {
     if (isAbort(err)) throw err;
     throw new PlanStepError("comparing", PLAIN_FAILURE_MESSAGE.comparing, detailOf(err));
@@ -172,19 +190,21 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   }));
   let draft: WorkPlan;
   try {
-    const cost = await estimateCost(
-      {
-        spaceName: reason.spaceName,
-        generatedFrom: reason.generatedFrom,
-        inventory: reason.inventory,
-        issues: reason.issues,
-        materials: reason.materials,
-        workOrder: reason.workOrder,
-        region: request.region,
-        laborBasis: request.laborBasis,
-      },
-      deps.cost,
-    );
+    const costInput: CostInput = {
+      spaceName: reason.spaceName,
+      generatedFrom: reason.generatedFrom,
+      inventory: reason.inventory,
+      issues: reason.issues,
+      materials: reason.materials,
+      workOrder: reason.workOrder,
+      region: request.region,
+      laborBasis: request.laborBasis,
+    };
+    const costDeps: CostDeps =
+      deps.costPrompt && request.region?.trim()
+        ? { ...deps.cost, prompt: deps.costPrompt(costInput, request.spaceType) }
+        : deps.cost;
+    const cost = await estimateCost(costInput, costDeps);
     draft = {
       spaceName: reason.spaceName,
       generatedFrom: reason.generatedFrom,
