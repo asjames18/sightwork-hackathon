@@ -34,6 +34,7 @@ import {
   checkWorkPlan,
   type PlanFrame,
   type PlanJobStatus,
+  type PlanProvider,
   type PlanRequest,
   type PlanStep,
   type WorkPlan,
@@ -86,6 +87,12 @@ export interface RunPlanDeps {
   costPrompt?: (input: CostInput, spaceType?: string) => string;
   /** Shared with every step dep above; its totals land in plan.meta. */
   tracker: UsageTracker;
+  /**
+   * Which engine wrote the reason step (meta or baseten). Lands in
+   * plan.meta alongside the cost total, so the plan itself names its
+   * engine; omitted leaves meta.planProvider unset.
+   */
+  planProvider?: PlanProvider;
   /** Called with each running status, in stage order. */
   onStatus?: (status: PlanJobStatus) => void;
   /** When aborted, the run stops with an AbortError. */
@@ -140,6 +147,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   const emit = (step: Exclude<PlanStep, "done">): void => {
     deps.onStatus?.({ state: "running", step });
   };
+
+  // One meta object for both the draft and the final plan, so the
+  // engine label never drifts between the two contract checks.
+  const planMeta = (): NonNullable<WorkPlan["meta"]> => ({
+    costUsd: deps.tracker.totals().spikeTotalUsd,
+    ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
+  });
 
   // listening: transcribe the narration, or null when there is none.
   assertNotAborted(deps.signal);
@@ -240,7 +254,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       saidVsSeen: reason.saidVsSeen,
       costRange: cost ? cost.costRange : null,
       heroFrameIndex: reason.heroFrameIndex,
-      meta: { costUsd: deps.tracker.totals().spikeTotalUsd },
+      meta: planMeta(),
     };
     const errs = checkWorkPlan(draft);
     // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
@@ -272,7 +286,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     afterImageUrl: rendered.afterImageUrl,
     ...(rendered.afterImageUrl ? { afterImageLabel: AFTER_IMAGE_LABEL } : {}),
     heroFrameIndex: rendered.heroFrameIndex ?? reason.heroFrameIndex,
-    meta: { costUsd: deps.tracker.totals().spikeTotalUsd },
+    meta: planMeta(),
   };
   const errs = checkWorkPlan(plan);
   const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
