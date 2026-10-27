@@ -37,7 +37,10 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * dataUrl must be a data:image URL: the browser builder sends canvas
  * JPEG data URLs, and a non-image string would otherwise pass here
  * and only surface later, when the segment step skips and the plan
- * silently loses segmentation.
+ * silently loses segmentation. A frame's tSec must not exceed
+ * durationSec: the browser builder samples frames from the video
+ * itself, so a later timestamp would mislabel that proof frame's
+ * time on the plan screen.
  */
 export function validatePlanRequest(body: unknown): string[] {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
@@ -68,6 +71,13 @@ export function validatePlanRequest(body: unknown): string[] {
         problems.push(`frames[${i}].tSec must be a number >= 0`);
       } else if (frame.tSec < prevTsec) {
         problems.push(`frames[${i}].tSec must not be earlier than the previous frame`);
+      } else if (
+        typeof req.durationSec === "number" &&
+        Number.isFinite(req.durationSec) &&
+        req.durationSec >= 0 &&
+        frame.tSec > req.durationSec
+      ) {
+        problems.push(`frames[${i}].tSec must not exceed durationSec`);
       } else {
         prevTsec = frame.tSec;
       }
