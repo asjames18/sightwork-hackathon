@@ -225,8 +225,11 @@ export interface WorkPlan {
     isExample?: boolean;
     /** Which engine wrote the plan (reason + work order). Omitted = Meta Muse Spark. */
     planProvider?: PlanProvider;
-    /** Optional steps that did not run this time (e.g. Meta model access off). The plan is still complete. */
-    skipped?: { masks?: boolean; afterImage?: boolean };
+    /**
+     * Optional steps that did not run this time (e.g. Meta model access off). The plan is still complete.
+     * cost: a region was given but the cost step failed, so costRange is null for that reason (not a missing region).
+     */
+    skipped?: { masks?: boolean; afterImage?: boolean; cost?: boolean };
   };
 }
 
