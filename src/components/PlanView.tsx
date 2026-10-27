@@ -93,6 +93,8 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
+  // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
+  const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
 
   return (
@@ -143,7 +145,9 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
         {plan.issues.length > 0 && !masks && (
           <p className="mb-4 rounded-xl border border-ink/10 bg-white/70 px-4 py-3 text-sm text-ink/70">
-            Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in.
+            {roughBoxes
+              ? "Exact outlines are off for this plan, so the dashed boxes are rough highlights from the plan step. Each problem still shows the frame it was found in."
+              : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
         <ol className="grid gap-4 lg:grid-cols-2 lg:items-start">
