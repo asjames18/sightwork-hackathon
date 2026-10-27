@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PLAN_STEPS, type WorkPlan } from "@/lib/types";
 import { samplePlan } from "@/lib/mock/samplePlan";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
@@ -30,19 +30,48 @@ export function SightWorkFlow() {
   const showExample = () => setStage({ kind: "plan", plan: samplePlan, videoName: null });
   const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
 
+  // New stage: back to the top so the next screen starts at its heading, not mid-scroll.
+  const firstStage = useRef(true);
+  useEffect(() => {
+    if (firstStage.current) {
+      firstStage.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0 });
+  }, [stage.kind]);
+
+  // Phones get the full width; tablets and desktops get a readable column, wider for the plan.
+  const width = stage.kind === "plan" ? "max-w-xl md:max-w-2xl lg:max-w-3xl" : "max-w-xl md:max-w-2xl";
+  const startOver = () => setStage({ kind: "upload" });
+
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pb-16 pt-6 sm:px-6">
-      <header className="mb-6 flex items-center justify-between">
-        <button type="button" onClick={() => setStage({ kind: "upload" })} className="text-xl font-extrabold tracking-tight">
-          Sight<span className="text-accent">Work</span>
-        </button>
-        {stage.kind === "plan" && (
-          <button type="button" onClick={() => setStage({ kind: "upload" })} className="rounded-full border border-ink/20 px-3 py-1.5 text-sm font-medium">
-            New walkthrough
+    <>
+      <header className="sticky top-0 z-20 border-b border-ink/10 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
+        <div className={`mx-auto flex min-h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 ${width}`}>
+          <button
+            type="button"
+            onClick={startOver}
+            aria-label="SightWork, start a new walkthrough"
+            className="-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 text-xl font-extrabold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <span>
+              Sight<span className="text-accent">Work</span>
+            </span>
+            <span className="hidden text-sm font-medium tracking-normal text-ink/50 md:inline">Film a walkthrough. Get a work plan.</span>
           </button>
-        )}
+          {stage.kind === "plan" && (
+            <button
+              type="button"
+              onClick={startOver}
+              className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              New walkthrough
+            </button>
+          )}
+        </div>
       </header>
 
+      <main className={`mx-auto w-full px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pt-10 ${width}`}>
       {stage.kind === "upload" && (
         <UploadStep onVideo={(file) => setStage({ kind: "processing", file, run: 1 })} onExample={showExample} />
       )}
@@ -57,6 +86,7 @@ export function SightWorkFlow() {
         />
       )}
       {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} />}
-    </main>
+      </main>
+    </>
   );
 }
