@@ -7,7 +7,8 @@ import type { Box, PlanFrame } from "@/lib/types";
  * and centered on black.
  *
  * `outlineUnavailable`: the outline step (SAM) did not run for this plan, so a frame without a
- * box says so instead of looking broken. A missing frame shows a quiet placeholder.
+ * box says so instead of looking broken, and a box that is there (from the plan step, not SAM) is drawn
+ * dashed so it reads as a rough highlight. A missing frame shows a quiet placeholder.
  */
 export function ProofFrame({
   frame,
@@ -39,7 +40,7 @@ export function ProofFrame({
         {box && (
           <span
             aria-hidden
-            className="absolute rounded-md border-[3px] border-accent shadow-[0_0_0_2px_rgba(0,0,0,.35)]"
+            className={`absolute rounded-md border-[3px] border-accent shadow-[0_0_0_2px_rgba(0,0,0,.35)] ${outlineUnavailable ? "border-dashed" : ""}`}
             style={{
               left: `${box[0] / 10}%`,
               top: `${box[1] / 10}%`,
