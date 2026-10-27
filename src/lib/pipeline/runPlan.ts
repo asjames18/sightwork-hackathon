@@ -109,6 +109,23 @@ function isAbort(err: unknown): boolean {
   );
 }
 
+/**
+ * True when a contract error was already reported as a reason warning.
+ * Compared by field key (issues[0], heroFrameIndex, ...), not exact
+ * text, because validateReason phrases frame errors with values while
+ * checkWorkPlan phrases them without. A costRange error can never be
+ * explained by a reason warning, so a new cost error still throws.
+ */
+function explainedByReasonWarnings(err: string, warnings: string[]): boolean {
+  const key = (text: string): string => {
+    const m = /^(issues\[\d+\]|workOrder\[\d+\]|inventory\[\d+\]|saidVsSeen\[\d+\])/.exec(text);
+    if (m) return m[1];
+    if (text.startsWith("heroFrameIndex")) return "heroFrameIndex";
+    return text;
+  };
+  return warnings.some((w) => key(w) === key(err));
+}
+
 function detailOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -174,6 +191,9 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       ? { ...deps.reason, prompt: deps.reasonPrompt(reasonInput) }
       : deps.reason;
     reason = await runReason(reasonInput, reasonDeps);
+    if (reason.warnings?.length) {
+      console.warn(`runPlan: reason kept with warnings:\n${reason.warnings.join("\n")}`);
+    }
   } catch (err) {
     if (isAbort(err)) throw err;
     throw new PlanStepError("comparing", PLAIN_FAILURE_MESSAGE.comparing, detailOf(err));
@@ -223,8 +243,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       meta: { costUsd: deps.tracker.totals().spikeTotalUsd },
     };
     const errs = checkWorkPlan(draft);
-    if (errs.length > 0) {
-      throw new Error(`runPlan: plan failed contract check:\n${errs.join("\n")}`);
+    // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
+    // may still fail the attached-frames contract check on those same
+    // fields; those errors are logged, not thrown. Any error not
+    // explained by a reason warning still fails the run.
+    const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
+    if (unexplained.length > 0) {
+      throw new Error(`runPlan: plan failed contract check:\n${unexplained.join("\n")}`);
     }
   } catch (err) {
     if (isAbort(err)) throw err;
@@ -250,11 +275,12 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     meta: { costUsd: deps.tracker.totals().spikeTotalUsd },
   };
   const errs = checkWorkPlan(plan);
-  if (errs.length > 0) {
+  const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
+  if (unexplained.length > 0) {
     throw new PlanStepError(
       "planning",
       PLAIN_FAILURE_MESSAGE.planning,
-      `runPlan: final plan failed contract check:\n${errs.join("\n")}`,
+      `runPlan: final plan failed contract check:\n${unexplained.join("\n")}`,
     );
   }
   return plan;
