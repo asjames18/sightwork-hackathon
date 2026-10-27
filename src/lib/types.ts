@@ -234,14 +234,12 @@ export interface WorkPlan {
 export type PlanProvider = "meta" | "baseten";
 
 /**
- * True when proof frames can carry SAM outlines for this plan. False when the masks step was
- * skipped, or when nothing in the plan came from SAM (no boxes, no SAM counts).
+ * True when this plan's outlines and counts came from SAM. False when the masks step was skipped
+ * or failed. Boxes alone don't count: the reason model can draw its own boxes when SAM is off.
  */
 export function masksAvailable(plan: WorkPlan): boolean {
   if (plan.meta?.skipped?.masks) return false;
-  const anyBox = plan.issues.some((i) => i.proofFrames?.some((f) => Boolean(f.box)));
-  const anySam = plan.inventory.some((i) => i.method === "sam" || i.method === "sam+model");
-  return anyBox || anySam;
+  return plan.inventory.some((i) => i.method === "sam" || i.method === "sam+model");
 }
 
 /** UI step labels while a plan is being made. */
