@@ -73,7 +73,7 @@ function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
     ["After picture", plan.afterImageUrl ? "Muse Image" : "Off this run"],
   ];
   return (
-    <footer className="mt-12 border-t border-ink/10 pt-4 text-xs text-ink/55">
+    <footer className="mt-12 border-t border-ink/10 pt-4 text-xs text-ink/65">
       <p className="font-semibold uppercase tracking-wide">How this plan was made</p>
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {rows.map(([k, v]) => (
@@ -179,12 +179,12 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             {plan.saidVsSeen.map((row, i) => (
               <li key={i} className="grid gap-1 p-3 text-sm sm:grid-cols-2 sm:gap-3">
                 <div>
-                  <span className="mr-1 text-xs font-semibold uppercase text-ink/50 sm:hidden">Said</span>
-                  {row.said ? <>&ldquo;{row.said.quote}&rdquo; <span className="text-ink/50">({row.said.atSec.toFixed(0)} s)</span></> : <span className="text-ink/40">Not mentioned</span>}
+                  <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Said</span>
+                  {row.said ? <>&ldquo;{row.said.quote}&rdquo; <span className="text-ink/65">({row.said.atSec.toFixed(0)} s)</span></> : <span className="text-ink/65">Not mentioned</span>}
                 </div>
                 <div className={row.status === "unmentioned" ? "font-semibold text-accent" : ""}>
-                  <span className="mr-1 text-xs font-semibold uppercase text-ink/50 sm:hidden">Seen</span>
-                  {row.seen ? row.seen.summary : <span className="text-ink/40">Not visible in the video</span>}
+                  <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Seen</span>
+                  {row.seen ? row.seen.summary : <span className="text-ink/65">Not visible in the video</span>}
                 </div>
               </li>
             ))}
@@ -199,12 +199,14 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             <li key={item.label} className="min-w-0 rounded-2xl bg-white p-4">
               <p className="text-3xl font-extrabold tabular-nums">{item.range ? range(item.range) : item.count}</p>
               <p className="font-medium break-words">{item.label}</p>
-              {item.zone && <p className="text-xs text-ink/50">{item.zone}</p>}
+              {item.zone && !item.label.toLowerCase().includes(item.zone.toLowerCase()) && (
+                <p className="text-xs text-ink/65">{item.zone}</p>
+              )}
             </li>
           ))}
         </ul>
         {plan.inventory.length > 0 && (
-          <p className="mt-2 text-xs text-ink/50">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
+          <p className="mt-2 text-xs text-ink/65">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
         )}
       </Section>
 
@@ -217,7 +219,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <div className="min-w-0">
                 <p className="font-bold">{step.title}</p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                <p className="mt-1 text-xs text-ink/50">
+                <p className="mt-1 text-xs text-ink/65">
                   {[step.trade, step.hours && `${range(step.hours, " h")}`, step.dependsOn && `after step ${step.dependsOn}`, step.fixes?.length && `fixes #${step.fixes.join(", #")}`]
                     .filter(Boolean)
                     .join(" · ")}
@@ -235,13 +237,13 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium break-words">{m.item}</p>
-                <p className="text-xs text-ink/50">
+                <p className="text-xs text-ink/65">
                   {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
                 </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="font-semibold">{m.qty}</p>
-                {m.unitCost && <p className="text-xs text-ink/50">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
+                {m.unitCost && <p className="text-xs text-ink/65">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
               </div>
             </li>
           ))}
@@ -275,7 +277,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               ))}
             </ul>
             {plan.costRange.sources && plan.costRange.sources.length > 0 && (
-              <p className="mt-3 text-xs text-ink/50">
+              <p className="mt-3 text-xs text-ink/65">
                 Prices from{" "}
                 {plan.costRange.sources.map((src, i) => (
                   <span key={src.url}>
