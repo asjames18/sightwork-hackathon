@@ -61,10 +61,12 @@ export interface BasetenCallResult {
   json: unknown;
   latencyMs: number;
   costUsd: number;
+  /** Model actually used for the call (the configured model). */
+  model: string;
 }
 
 export interface BasetenClient {
-  /** One Chat Completions call. Returns parsed JSON, latency, and cost. */
+  /** One Chat Completions call. Returns parsed JSON, latency, cost, and the model used. */
   callSpark(req: BasetenCallRequest): Promise<BasetenCallResult>;
 }
 
@@ -168,7 +170,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       const inputTokens = usage.prompt_tokens ?? 0;
       const outputTokens = usage.completion_tokens ?? 0;
       const costUsd = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
-      return { json, latencyMs, costUsd };
+      return { json, latencyMs, costUsd, model };
     },
   };
 }
