@@ -176,7 +176,9 @@ export async function POST(req: Request): Promise<Response> {
         });
         push({ state: "done", plan });
         console.log(
-          `plan route: done, spike total $${tracker.totals().spikeTotalUsd}, ` +
+          `plan route: done, provider ${plan.meta?.planProvider ?? "unset"}, ` +
+            `skipped ${JSON.stringify(plan.meta?.skipped ?? {})}, ` +
+            `spike total $${tracker.totals().spikeTotalUsd}, ` +
             `${tracker.records().length} calls: ` +
             tracker
               .records()
