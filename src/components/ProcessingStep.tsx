@@ -1,4 +1,5 @@
 import type { PlanStep } from "@/lib/types";
+import { currentStepEngines, OPTIONAL_STEPS } from "@/lib/client/engines";
 
 const LABELS: Record<PlanStep, string> = {
   uploading: "Uploading",
@@ -11,21 +12,6 @@ const LABELS: Record<PlanStep, string> = {
   done: "Done",
 };
 
-/**
- * What does the work at each step, shown under the label so the run reads as an agent
- * trace (several models, each doing one job) rather than one black-box call.
- */
-const ENGINE: Record<PlanStep, string> = {
-  uploading: "Key frames and audio, picked on your device",
-  listening: "Muse Voice Transcribe",
-  looking: "SAM 3.1",
-  counting: "SAM 3.1",
-  comparing: "Muse Spark",
-  planning: "Muse Spark",
-  picturing: "Muse Image",
-  done: "",
-};
-
 /** A step that stopped the run. `message` is shown as-is, so keep it plain and free of provider details. */
 export type StepFailure = { message: string };
 
@@ -36,6 +22,7 @@ export function ProcessingStep({
   failure,
   onRetry,
   onExample,
+  engines,
 }: {
   steps: PlanStep[];
   current: number;
@@ -43,7 +30,10 @@ export function ProcessingStep({
   failure?: StepFailure | null;
   onRetry?: () => void;
   onExample?: () => void;
+  /** Engine named under each step. Defaults to this page's plan provider (see src/lib/client/engines.ts). */
+  engines?: Record<PlanStep, string>;
 }) {
+  const ENGINE = engines ?? currentStepEngines();
   const failed = Boolean(failure);
   // "done" is the end state, not a step the user waits on, so it doesn't count toward "Step N of M".
   const work = steps.filter((s) => s !== "done");
@@ -100,7 +90,10 @@ export function ProcessingStep({
               <span className="min-w-0 flex-1">
                 <span className={`block break-words leading-snug ${state === "next" ? "text-ink/40" : "font-medium"}`}>{LABELS[s]}</span>
                 {ENGINE[s] && (
-                  <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>{ENGINE[s]}</span>
+                  <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>
+                    {ENGINE[s]}
+                    {OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>}
+                  </span>
                 )}
               </span>
             </li>
