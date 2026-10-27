@@ -140,8 +140,10 @@ function detailOf(err: unknown): string {
 /**
  * Run the full pipeline for one request. The segment stage covers both
  * the "looking" and "counting" UI steps (one SAM pass does hazards and
- * counts), so both statuses are emitted around it; a segment failure
- * reports as "looking", the first of the two.
+ * counts), so both statuses are emitted around it. A segment failure
+ * no longer stops the run: it is logged server-side and the reason
+ * step continues with no segmentation counts, so a blocked SAM step
+ * never kills a real plan run (Grok Bot, 2026-10-27 11:20 AM).
  */
 export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<WorkPlan> {
   const emit = (step: Exclude<PlanStep, "done">): void => {
@@ -173,10 +175,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   }
 
   // looking + counting: SAM hazards and counts on the request frames.
+  // Optional like picturing: on a SAM failure, log it, mark masks
+  // unavailable (segmentation null), and continue to reason with no
+  // segmentation counts instead of failing the run.
   assertNotAborted(deps.signal);
   emit("looking");
   emit("counting");
-  let segmentation;
+  let segmentation: Awaited<ReturnType<typeof runSegment>> | null = null;
   try {
     segmentation = await runSegment(
       { frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })) },
@@ -184,7 +189,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     );
   } catch (err) {
     if (isAbort(err)) throw err;
-    throw new PlanStepError("looking", PLAIN_FAILURE_MESSAGE.looking, detailOf(err));
+    console.warn(`runPlan: segment failed, continuing without segmentation: ${detailOf(err)}`);
+    segmentation = null;
   }
 
   // comparing: Spark turns frames + segmentation + transcript into
