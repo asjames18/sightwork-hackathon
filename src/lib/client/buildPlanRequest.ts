@@ -204,10 +204,17 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       if (!Number.isFinite(durationSec) || durationSec <= 0)
         throw new BuildRequestError("This video has no length we can read. Try recording it again.");
 
+      // A file the browser can play as sound but not decode as picture (some HEVC phone videos on
+      // desktop Chrome) reports a 0x0 size, which would send blank frames to the model.
+      if (!video.videoWidth || !video.videoHeight)
+        throw new BuildRequestError("This browser can't show this video's picture. Try Safari, or export it as an MP4 and try again.");
+
       const wav = await extractNarration(file, o.audioSampleRate, signal);
       const audioWavBase64 = wav ? bytesToBase64(wav) : undefined;
 
       const times = pickFrameTimes(durationSec, o.maxFrames, o.intervalSec);
+      if (times.length === 0)
+        throw new BuildRequestError("This video has no length we can read. Try recording it again.");
       const frameBudget = o.maxRequestBytes - (audioWavBase64?.length ?? 0) - 64 * 1024;
       if (frameBudget < times.length * 20 * 1024)
         throw new BuildRequestError("That video is too long to send. Try a walkthrough of 90 seconds or less.");
