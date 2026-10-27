@@ -40,7 +40,12 @@ import {
   type WorkPlan,
 } from "../types";
 import { estimateCost, type CostDeps, type CostInput } from "./cost";
-import { runReason, type ReasonDeps, type ReasonInput } from "./reason";
+import {
+  runReason,
+  type ReasonDeps,
+  type ReasonInput,
+  type ReasonOutput,
+} from "./reason";
 import { runRenderAfter, type RenderAfterDeps } from "./renderAfter";
 import { runSegment, type SegmentDeps } from "./segment";
 import { runTranscribe, type TranscribeDeps } from "./transcribe";
@@ -93,6 +98,16 @@ export interface RunPlanDeps {
    * engine; omitted leaves meta.planProvider unset.
    */
   planProvider?: PlanProvider;
+  /**
+   * Cap on frames handed to the reason step (Grok Bot, 2026-10-27
+   * 11:43 AM: the Baseten reason call takes at most 8 images). The
+   * route sets it in baseten mode only; the meta path is untouched.
+   * When set, runPlan picks a subset (pickReasonFrames), the reason
+   * step sees subset positions, and its output is remapped back to
+   * plan frames (remapReasonOutput) before assembly. Unset means no
+   * subsetting: the reason step sees every request frame.
+   */
+  reasonMaxFrames?: number;
   /** Called with each running status, in stage order. */
   onStatus?: (status: PlanJobStatus) => void;
   /** When aborted, the run stops with an AbortError. */
@@ -135,6 +150,144 @@ function explainedByReasonWarnings(err: string, warnings: string[]): boolean {
 
 function detailOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Baseten reason-call image cap (Grok Bot, 2026-10-27 11:43 AM). */
+export const REASON_MAX_FRAMES = 8;
+
+/**
+ * Pick the subset of request frames handed to the reason step when it
+ * is capped (Baseten mode). Evenly spaced across the walkthrough,
+ * always including the first and last frame; any frame that holds a
+ * hazard or mask hit (segmentation.flaggedFrames) is swapped in
+ * before a plain frame, displacing the plain, non-endpoint subset
+ * member nearest to it. First and last frames are never displaced.
+ * A flagged frame is left out only when every subset member is
+ * already an endpoint or a flagged frame. Returns original frame
+ * indices, ascending. With no cap pressure (frameCount <= maxFrames)
+ * the subset is every frame, so the remap below is the identity.
+ */
+export function pickReasonFrames(
+  frameCount: number,
+  flaggedFrames: number[],
+  maxFrames: number,
+): number[] {
+  if (frameCount <= 0 || maxFrames <= 0) return [];
+  if (frameCount <= maxFrames) {
+    return Array.from({ length: frameCount }, (_, i) => i);
+  }
+  const subset: number[] = [];
+  const inSubset = new Set<number>();
+  for (let i = 0; i < maxFrames; i++) {
+    const idx = Math.round((i * (frameCount - 1)) / (maxFrames - 1));
+    if (!inSubset.has(idx)) {
+      inSubset.add(idx);
+      subset.push(idx);
+    }
+  }
+  // Rounding cannot collide when frameCount > maxFrames (step > 1),
+  // but fill defensively so the subset is never short.
+  for (let i = 0; subset.length < maxFrames && i < frameCount; i++) {
+    if (!inSubset.has(i)) {
+      inSubset.add(i);
+      subset.push(i);
+    }
+  }
+  const flagged = [...new Set(flaggedFrames)]
+    .filter((f) => Number.isInteger(f) && f >= 0 && f < frameCount)
+    .sort((a, b) => a - b);
+  const flaggedSet = new Set(flagged);
+  for (const f of flagged) {
+    if (inSubset.has(f)) continue;
+    let best: number | null = null;
+    let bestDist = Infinity;
+    for (const m of subset) {
+      if (m === 0 || m === frameCount - 1) continue;
+      if (flaggedSet.has(m)) continue;
+      const dist = Math.abs(m - f);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = m;
+      }
+    }
+    if (best === null) continue;
+    inSubset.delete(best);
+    inSubset.add(f);
+    subset[subset.indexOf(best)] = f;
+  }
+  subset.sort((a, b) => a - b);
+  return subset;
+}
+
+/**
+ * Remap a reason result from subset positions back to plan-frame
+ * indices (Grok Bot, 2026-10-27 11:43 AM). `subset` maps a subset
+ * position to its original frame index; frameTimeSec values need no
+ * change, because a subset frame is the same frame (same tSec) as
+ * its original. Any index outside the subset is dropped rather
+ * than guessed: an issue whose primary frame is outside the subset
+ * is dropped (with rank renumbering and rank-reference remapping,
+ * as in filterAndRenumber), a stray proof frame is dropped, and a
+ * said-vs-seen seen frame outside the subset is dropped to null.
+ * An unmentioned issue left with no proof frames is dropped too,
+ * or the plan contract would fail it for having none. The hero
+ * frame is the one index that cannot be dropped: when it falls
+ * outside the subset, it falls back to the first subset frame and
+ * the fallback is logged server-side, so the render step still has
+ * a real frame (flagged for Grok Bot to confirm or replace with a
+ * run failure).
+ */
+export function remapReasonOutput(output: ReasonOutput, subset: number[]): ReasonOutput {
+  if (subset.length === 0) return output;
+  const toOriginal = (subsetPos: number): number | null =>
+    Number.isInteger(subsetPos) && subsetPos >= 0 && subsetPos < subset.length
+      ? subset[subsetPos]
+      : null;
+  const keptIssues: (typeof output.issues)[number][] = [];
+  for (const issue of output.issues) {
+    const frameIndex = toOriginal(issue.frameIndex);
+    if (frameIndex === null) continue;
+    const proofFrames = issue.proofFrames
+      ?.map((pf) => {
+        const mapped = toOriginal(pf.frameIndex);
+        return mapped === null ? null : { ...pf, frameIndex: mapped };
+      })
+      .filter((pf): pf is NonNullable<typeof pf> => pf !== null);
+    if (issue.unmentioned && proofFrames !== undefined && proofFrames.length === 0) {
+      continue;
+    }
+    keptIssues.push({ ...issue, frameIndex, proofFrames });
+  }
+  const rankRemap = new Map<number, number>();
+  keptIssues.forEach((issue, i) => rankRemap.set(issue.rank, i + 1));
+  const remapRanks = (ranks: number[] | undefined): number[] | undefined =>
+    ranks === undefined
+      ? undefined
+      : ranks.filter((r) => rankRemap.has(r)).map((r) => rankRemap.get(r) as number);
+  const hero = toOriginal(output.heroFrameIndex);
+  if (hero === null) {
+    console.warn(
+      `runPlan: reason heroFrameIndex ${output.heroFrameIndex} outside the reason subset, falling back to subset frame ${subset[0]}`,
+    );
+  }
+  return {
+    ...output,
+    issues: keptIssues.map((issue) => ({ ...issue, rank: rankRemap.get(issue.rank) as number })),
+    materials: output.materials.map((m) => ({ ...m, forIssues: remapRanks(m.forIssues) })),
+    workOrder: output.workOrder.map((s) => ({ ...s, fixes: remapRanks(s.fixes) })),
+    saidVsSeen: output.saidVsSeen
+      .filter((row) => row.issueRank === undefined || rankRemap.has(row.issueRank))
+      .map((row) => {
+        if (!row.seen) return { ...row, issueRank: row.issueRank === undefined ? undefined : rankRemap.get(row.issueRank) };
+        const seenIndex = toOriginal(row.seen.frameIndex);
+        return {
+          ...row,
+          issueRank: row.issueRank === undefined ? undefined : rankRemap.get(row.issueRank),
+          seen: seenIndex === null ? null : { ...row.seen, frameIndex: seenIndex },
+        };
+      }),
+    heroFrameIndex: hero ?? subset[0],
+  };
 }
 
 /**
@@ -208,14 +361,50 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   }
 
   // comparing: Spark turns frames + segmentation + transcript into
-  // issues, materials, and work steps.
+  // issues, materials, and work steps. When the reason step is
+  // capped (Baseten mode), it sees only the picked subset, in
+  // subset positions, and its output is remapped back to plan
+  // frames before assembly; the meta path is untouched.
   assertNotAborted(deps.signal);
   emit("comparing");
+  const reasonSubset = deps.reasonMaxFrames
+    ? pickReasonFrames(
+        request.frames.length,
+        segmentation?.flaggedFrames ?? [],
+        deps.reasonMaxFrames,
+      )
+    : null;
+  // Segmentation indices are subset positions too, so the prompt's
+  // flaggedFrames, hazardHits, and rawLog stay consistent with the
+  // subset frame list; entries outside the subset are dropped.
+  const reasonSegmentation =
+    segmentation && reasonSubset
+      ? {
+          ...segmentation,
+          flaggedFrames: segmentation.flaggedFrames
+            .map((f) => reasonSubset.indexOf(f))
+            .filter((p) => p >= 0),
+          hazardHits: segmentation.hazardHits
+            ?.map((hit) => {
+              const pos = reasonSubset.indexOf(hit.frameIndex);
+              return pos < 0 ? null : { ...hit, frameIndex: pos };
+            })
+            .filter((hit): hit is NonNullable<typeof hit> => hit !== null),
+          rawLog: segmentation.rawLog
+            .map((entry) => {
+              const pos = reasonSubset.indexOf(entry.frameIndex);
+              return pos < 0 ? null : { ...entry, frameIndex: pos };
+            })
+            .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
+        }
+      : segmentation;
   let reason;
   try {
     const reasonInput: ReasonInput = {
-      frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })),
-      segmentation,
+      frames: (reasonSubset ? reasonSubset.map((i) => request.frames[i]) : request.frames).map(
+        (f) => ({ tSec: f.tSec, dataUrl: f.dataUrl }),
+      ),
+      segmentation: reasonSegmentation,
       transcript,
       spaceName: request.spaceName,
       spaceType: request.spaceType,
@@ -224,7 +413,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     const reasonDeps: ReasonDeps = deps.reasonPrompt
       ? { ...deps.reason, prompt: deps.reasonPrompt(reasonInput) }
       : deps.reason;
-    reason = await runReason(reasonInput, reasonDeps);
+    const rawReason = await runReason(reasonInput, reasonDeps);
+    reason = reasonSubset ? remapReasonOutput(rawReason, reasonSubset) : rawReason;
     if (reason.warnings?.length) {
       console.warn(`runPlan: reason kept with warnings:\n${reason.warnings.join("\n")}`);
     }
