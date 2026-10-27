@@ -152,10 +152,24 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
 
   // One meta object for both the draft and the final plan, so the
   // engine label never drifts between the two contract checks.
-  const planMeta = (): NonNullable<WorkPlan["meta"]> => ({
-    costUsd: deps.tracker.totals().spikeTotalUsd,
-    ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
-  });
+  // Skipped-step flags for the plan screen (Grok Bot, 2026-10-27
+  // 12:05 PM): masks when the segment step failed or was skipped
+  // (segmentation null), afterImage when the render step produced no
+  // image. Callers pass the flags; this helper only assembles them,
+  // so no step result is read before it exists.
+  const planMeta = (
+    masksSkipped: boolean,
+    afterImageSkipped: boolean,
+  ): NonNullable<WorkPlan["meta"]> => {
+    const skipped: { masks?: boolean; afterImage?: boolean } = {};
+    if (masksSkipped) skipped.masks = true;
+    if (afterImageSkipped) skipped.afterImage = true;
+    return {
+      costUsd: deps.tracker.totals().spikeTotalUsd,
+      ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
+      ...(Object.keys(skipped).length > 0 ? { skipped } : {}),
+    };
+  };
 
   // listening: transcribe the narration, or null when there is none.
   assertNotAborted(deps.signal);
@@ -260,7 +274,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       saidVsSeen: reason.saidVsSeen,
       costRange: cost ? cost.costRange : null,
       heroFrameIndex: reason.heroFrameIndex,
-      meta: planMeta(),
+      meta: planMeta(segmentation === null, false),
     };
     const errs = checkWorkPlan(draft);
     // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
@@ -292,7 +306,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     afterImageUrl: rendered.afterImageUrl,
     ...(rendered.afterImageUrl ? { afterImageLabel: AFTER_IMAGE_LABEL } : {}),
     heroFrameIndex: rendered.heroFrameIndex ?? reason.heroFrameIndex,
-    meta: planMeta(),
+    meta: planMeta(segmentation === null, rendered.skipped !== undefined),
   };
   const errs = checkWorkPlan(plan);
   const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
