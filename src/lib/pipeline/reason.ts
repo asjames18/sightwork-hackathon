@@ -24,6 +24,8 @@
  * - re-number ranks 1..n with no gaps, remapping every rank reference
  *   (materials forIssues, workOrder fixes, saidVsSeen issueRank)
  * - drop saidVsSeen rows for dropped issues
+ * - drop total/subtotal inventory rows whose count equals the sum of the
+ *   same base label's zone rows (prompt 03 rule 7; IMG_9140 double-count guard)
  * - validate with checkWorkPlan from ../types, plus a frameTimeSec check
  *   against the input frames. On failure, retry once with the errors
  *   appended to the prompt, then fail the step.
@@ -145,6 +147,31 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+
+/**
+ * Prompt 03 rule 7 guard (IMG_9140: a "(total)" row double-counted the
+ * zone rows). Drop an inventory row whose label names a total or subtotal
+ * when its count equals the sum of the other rows sharing its base label
+ * (the label with the trailing parenthetical removed). A total row whose
+ * count does not match the zone sum is kept: it may carry real information,
+ * and dropping it would lose a count the model actually asserted.
+ */
+export function dropTotalInventoryRows(inventory: InventoryItem[]): InventoryItem[] {
+  const baseLabel = (label: string): string => label.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const isTotalRow = (label: string): boolean => /total/i.test(label);
+  const sums = new Map<string, number>();
+  for (const item of inventory) {
+    if (isTotalRow(item.label)) continue;
+    const base = baseLabel(item.label);
+    sums.set(base, (sums.get(base) ?? 0) + item.count);
+  }
+  return inventory.filter((item) => {
+    if (!isTotalRow(item.label)) return true;
+    const sum = sums.get(baseLabel(item.label));
+    return sum === undefined || sum !== item.count;
+  });
+}
+
 /** Confidence filter + rank renumber, with rank references remapped. */
 export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
   const kept: Issue[] = [];
@@ -162,6 +189,7 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       : ranks.filter((r) => remap.has(r)).map((r) => remap.get(r) as number);
   return {
     ...output,
+    inventory: dropTotalInventoryRows(output.inventory),
     issues: kept,
     materials: output.materials.map((m) => ({ ...m, forIssues: remapList(m.forIssues) })),
     workOrder: output.workOrder.map((s) => ({ ...s, fixes: remapList(s.fixes) })),
@@ -250,4 +278,5 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   }
   throw new Error(`reason: validation failed after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
+
 
