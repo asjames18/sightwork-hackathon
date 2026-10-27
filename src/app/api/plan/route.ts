@@ -7,10 +7,18 @@
  * This route emits the first "uploading" status itself, right after
  * it parses the body; runPlan starts at "listening".
  *
- * Wiring: runPlan's step deps get the real Meta callers (ASR, SAM 3.1,
- * Muse Spark for reason + cost, Muse Image for the after image) plus
- * the per-request prompt builders from planPrompts.ts, so prompts 03
+ * Wiring: runPlan's step deps get the real callers plus the
+ * per-request prompt builders from planPrompts.ts, so prompts 03
  * and 05 are filled with this request's frames, transcript, and region.
+ * Provider switch (PLAN_PROVIDER, default "baseten"): the reason step
+ * — the main plan engine per Antonio's Oct 27 decision — runs on
+ * Baseten Muse Spark Open, or on Meta Muse Spark when
+ * PLAN_PROVIDER=meta. The other steps stay on Meta for now: the cost
+ * step's prompt 05 needs web search, which the Baseten caller does
+ * not offer, and SAM 3.1 / Muse Image are Meta-only steps that skip
+ * cleanly when Meta is blocked. So a Meta key is still needed at
+ * wiring time even in baseten mode; the reason engine is the only
+ * step that moves.
  * The shared usage tracker enforces the $10 spike cap in code, and
  * every call it records is logged server-side when the run finishes.
  *
@@ -21,6 +29,7 @@
  * server log only. Aborting the request stops the run.
  */
 
+import { createBasetenClient, createReasonBasetenCaller } from "../../../lib/meta/baseten";
 import {
   createCostSparkCaller,
   createMetaClient,
@@ -46,6 +55,24 @@ import { PlanStepError, runPlan } from "../../../lib/pipeline/runPlan";
 import type { PlanJobStatus, PlanRequest, PlanStep } from "../../../lib/types";
 
 export const runtime = "nodejs";
+
+/**
+ * The reason step's provider, from PLAN_PROVIDER. Default "baseten"
+ * (the main plan engine per Antonio's Oct 27 decision); "meta" runs
+ * the reason step on Meta Muse Spark instead. Anything else fails
+ * fast here, before any step runs, so a typo never silently picks
+ * an engine. Takes an env record so tests can pass one in; defaults
+ * to process.env.
+ */
+export function resolvePlanProvider(
+  env: Record<string, string | undefined> = process.env,
+): "baseten" | "meta" {
+  const raw = env.PLAN_PROVIDER?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return "baseten";
+  if (raw === "baseten" || raw === "meta") return raw;
+  throw new Error(`plan route: unknown PLAN_PROVIDER "${env.PLAN_PROVIDER}" (want baseten or meta)`);
+}
+
 export const dynamic = "force-dynamic";
 
 const NDJSON = { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" };
@@ -110,13 +137,18 @@ export async function POST(req: Request): Promise<Response> {
         // keyless deploy fails fast on "uploading", before any step.
         const meta = createMetaClient();
         tracker = createUsageTracker();
+        const provider = resolvePlanProvider();
+        const reasonCaller =
+          provider === "baseten"
+            ? createReasonBasetenCaller(createBasetenClient())
+            : createReasonSparkCaller(meta);
         const deps = {
           transcribe: { callTranscribe: createAsrTranscribeCaller(), tracker },
           segment: { callSegment: createSamSegmentCaller(), tracker },
           reason: {
             prompt: REASON_PROMPT_TEMPLATE,
             schema: REASON_SCHEMA,
-            callSpark: createReasonSparkCaller(meta),
+            callSpark: reasonCaller,
             tracker,
           },
           cost: {
