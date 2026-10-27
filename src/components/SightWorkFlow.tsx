@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PLAN_STEPS, type WorkPlan } from "@/lib/types";
+import { PLAN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { pickMockPlan } from "@/lib/mock/pickMockPlan";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
@@ -44,6 +44,15 @@ export function SightWorkFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
+
+  // Steps the server reported as skipped this run. The list is cumulative, so keep the latest one
+  // through a failure (failed lines don't carry it); a new run starts empty.
+  const [skipped, setSkipped] = useState<PlanStep[]>([]);
+  const runKey = stage.kind === "processing" ? stage.run : 0;
+  useEffect(() => setSkipped([]), [runKey]);
+  useEffect(() => {
+    if (job?.state === "running" && job.skipped?.length) setSkipped(job.skipped);
+  }, [job]);
 
   // New stage: back to the top so the next screen starts at its heading, not mid-scroll.
   const firstStage = useRef(true);
@@ -109,6 +118,7 @@ export function SightWorkFlow() {
           failure={job?.state === "failed" ? { message: job.message } : null}
           onRetry={() => setStage({ kind: "processing", file: stage.file, run: stage.run + 1 })}
           onExample={showExample}
+          skipped={skipped}
         />
       )}
       {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} />}
