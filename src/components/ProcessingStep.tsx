@@ -23,6 +23,7 @@ export function ProcessingStep({
   onRetry,
   onExample,
   engines,
+  skipped,
 }: {
   steps: PlanStep[];
   current: number;
@@ -32,6 +33,8 @@ export function ProcessingStep({
   onExample?: () => void;
   /** Engine named under each step. Defaults to this page's plan provider (see src/lib/client/engines.ts). */
   engines?: Record<PlanStep, string>;
+  /** Optional steps the server skipped this run (e.g. Meta access off). Shown as skipped, not done. */
+  skipped?: readonly PlanStep[];
 }) {
   const ENGINE = engines ?? currentStepEngines();
   const failed = Boolean(failure);
@@ -71,13 +74,16 @@ export function ProcessingStep({
 
       <ol className="mt-5 divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
         {work.map((s, i) => {
-          const state = i < current ? "done" : i === current ? (failed ? "failed" : "now") : "next";
+          const passed = i < current ? (skipped?.includes(s) ? "skipped" : "done") : null;
+          const state = passed ?? (i === current ? (failed ? "failed" : "now") : "next");
           return (
             <li key={s} aria-current={state === "now" ? "step" : undefined} className="flex min-h-[3.25rem] items-center gap-3 py-2.5">
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                   state === "done"
                     ? "bg-safe text-white"
+                    : state === "skipped"
+                      ? "border border-dashed border-ink/30 bg-white text-ink/45"
                     : state === "now"
                       ? "animate-pulse bg-accent text-white"
                       : state === "failed"
@@ -85,14 +91,24 @@ export function ProcessingStep({
                         : "bg-ink/10 text-ink/40"
                 }`}
               >
-                {state === "done" ? "✓" : state === "failed" ? "!" : i + 1}
+                {state === "done" ? "✓" : state === "failed" ? "!" : state === "skipped" ? "–" : i + 1}
               </span>
               <span className="min-w-0 flex-1">
-                <span className={`block break-words leading-snug ${state === "next" ? "text-ink/40" : "font-medium"}`}>{LABELS[s]}</span>
+                <span
+                  className={`block break-words leading-snug ${
+                    state === "next" ? "text-ink/40" : state === "skipped" ? "font-medium text-ink/50" : "font-medium"
+                  }`}
+                >
+                  {LABELS[s]}
+                </span>
                 {ENGINE[s] && (
                   <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>
                     {ENGINE[s]}
-                    {OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>}
+                    {state === "skipped" ? (
+                      <span className="text-ink/45"> · skipped this run</span>
+                    ) : (
+                      OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>
+                    )}
                   </span>
                 )}
               </span>
