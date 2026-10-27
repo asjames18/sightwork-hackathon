@@ -150,11 +150,11 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
-        <ol className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <ol className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
             return (
-              <li key={issue.rank} className="rounded-2xl bg-white p-4 shadow-sm">
+              <li key={issue.rank} className="min-w-0 rounded-2xl bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${SEVERITY[issue.severity]}`}>{issue.severity}</span>
