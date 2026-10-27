@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PLAN_STEPS, type WorkPlan } from "@/lib/types";
-import { samplePlan } from "@/lib/mock/samplePlan";
+import { pickMockPlan } from "@/lib/mock/pickMockPlan";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { UploadStep } from "./UploadStep";
@@ -27,7 +27,7 @@ export function SightWorkFlow() {
     }
   }, [job, stage]);
 
-  const showExample = () => setStage({ kind: "plan", plan: samplePlan, videoName: null });
+  const showExample = () => setStage({ kind: "plan", plan: pickMockPlan(), videoName: null });
   const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
 
   // New stage: back to the top so the next screen starts at its heading, not mid-scroll.
