@@ -3,7 +3,8 @@
  *
  * This is the caller the pipeline steps inject (see src/lib/pipeline):
  * `reason.ts` calls it with frames attached, `cost.ts` calls it with the
- * web_search tool for grounded prices. The steps themselves record every
+ * web_search tool for grounded prices, and `renderAfter.ts` calls it for
+ * the generate-2-keep-1 judge (original + two candidates, in order). The steps themselves record every
  * call on the usage tracker, so the $10 spike cap is still enforced there.
  *
  * - Base URL: https://api.meta.ai/v1 (Responses API, POST /responses).
@@ -164,4 +165,31 @@ export function createReasonSparkCaller(client: MetaClient) {
 export function createCostSparkCaller(client: MetaClient) {
   return (req: { model: string; prompt: string; schema: Record<string, unknown> }) =>
     client.callSpark({ model: req.model, prompt: req.prompt, schema: req.schema, tools: [{ type: "web_search" }] });
+}
+
+/**
+ * Judge schema for the renderAfter generate-2-keep-1 path (prompt 04's
+ * judge prompt). The judge answers {"pick": 2 or 3, "reason": "..."}; the
+ * step keeps the first candidate on any other answer, so the schema pins
+ * pick to 2 or 3 and requires the reason.
+ */
+const JUDGE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    pick: { type: "integer", enum: [2, 3] },
+    reason: { type: "string" },
+  },
+  required: ["pick", "reason"],
+  additionalProperties: false,
+};
+
+/** Adapter for the renderAfter step's JudgeCaller (original + 2 candidates, in order). */
+export function createJudgeSparkCaller(client: MetaClient) {
+  return (req: { model: string; prompt: string; images: [string, string, string] }) =>
+    client.callSpark({
+      model: req.model,
+      prompt: req.prompt,
+      images: [...req.images],
+      schema: JUDGE_SCHEMA,
+    });
 }
