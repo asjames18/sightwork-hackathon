@@ -52,7 +52,7 @@ import {
   validatePlanRequest,
 } from "../../../lib/pipeline/planRequest";
 import { createUsageTracker } from "../../../lib/pipeline/usage";
-import { PlanStepError, runPlan } from "../../../lib/pipeline/runPlan";
+import { PlanStepError, REASON_MAX_FRAMES, runPlan } from "../../../lib/pipeline/runPlan";
 import type { PlanJobStatus, PlanRequest, PlanStep } from "../../../lib/types";
 
 export const runtime = "nodejs";
@@ -167,6 +167,10 @@ export async function POST(req: Request): Promise<Response> {
           ...deps,
           tracker,
           planProvider: provider,
+          // Baseten reason cap (Grok Bot, 2026-10-27 11:43 AM): the
+          // reason step takes at most 8 images in baseten mode;
+          // runPlan subsets and remaps. Meta mode is untouched.
+          reasonMaxFrames: provider === "baseten" ? REASON_MAX_FRAMES : undefined,
           onStatus: (status) => push(status),
           signal: req.signal,
         });
