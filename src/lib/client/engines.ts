@@ -1,0 +1,36 @@
+import type { PlanProvider, PlanStep } from "@/lib/types";
+
+/**
+ * Which plan engine the processing screen names. Build-time default comes from
+ * NEXT_PUBLIC_SIGHTWORK_PLAN_PROVIDER ("baseten" or "meta"); `?plan=baseten|meta` overrides it in a preview.
+ * Labels only: the server decides what actually runs.
+ */
+export function pickPlanProvider(search: string | null, envValue: string | undefined): PlanProvider {
+  const q = search ? new URLSearchParams(search).get("plan") : null;
+  if (q === "baseten" || q === "meta") return q;
+  return envValue === "baseten" ? "baseten" : "meta";
+}
+
+/** Steps that need Meta model access and may be skipped; the plan still finishes without them. */
+export const OPTIONAL_STEPS: ReadonlySet<PlanStep> = new Set<PlanStep>(["looking", "counting", "picturing"]);
+
+/** What does the work at each step, shown under the step label as an agent trace. */
+export function stepEngines(provider: PlanProvider): Record<PlanStep, string> {
+  const plan = provider === "baseten" ? "Muse Spark Open (open weights, on Baseten)" : "Muse Spark";
+  return {
+    uploading: "Key frames and audio, picked on your device",
+    listening: "Muse Voice Transcribe",
+    looking: "SAM 3.1",
+    counting: "SAM 3.1",
+    comparing: plan,
+    planning: plan,
+    picturing: "Muse Image",
+    done: "",
+  };
+}
+
+/** Engines for this page load, read in the browser. */
+export function currentStepEngines(): Record<PlanStep, string> {
+  const search = typeof window === "undefined" ? null : window.location.search;
+  return stepEngines(pickPlanProvider(search, process.env.NEXT_PUBLIC_SIGHTWORK_PLAN_PROVIDER));
+}
