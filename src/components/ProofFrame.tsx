@@ -5,9 +5,27 @@ import type { Box, PlanFrame } from "@/lib/types";
  * The image keeps its own aspect ratio (phone walkthroughs are usually portrait),
  * so the box always lines up with what SAM saw. Tall frames are capped in height
  * and centered on black.
+ *
+ * `outlineUnavailable`: the outline step (SAM) did not run for this plan, so a frame without a
+ * box says so instead of looking broken. A missing frame shows a quiet placeholder.
  */
-export function ProofFrame({ frame, box, caption }: { frame: PlanFrame | undefined; box?: Box; caption?: string }) {
-  if (!frame) return null;
+export function ProofFrame({
+  frame,
+  box,
+  caption,
+  outlineUnavailable = false,
+}: {
+  frame: PlanFrame | undefined;
+  box?: Box;
+  caption?: string;
+  outlineUnavailable?: boolean;
+}) {
+  if (!frame)
+    return (
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/50">
+        Proof frame not available for this problem
+      </div>
+    );
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
       <div className="relative mx-auto w-fit max-w-full">
@@ -29,6 +47,11 @@ export function ProofFrame({ frame, box, caption }: { frame: PlanFrame | undefin
               height: `${(box[3] - box[1]) / 10}%`,
             }}
           />
+        )}
+        {!box && outlineUnavailable && (
+          <span className="absolute right-2 top-2 whitespace-nowrap rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">
+            Frame only, outline coming soon
+          </span>
         )}
       </div>
       <figcaption className="flex justify-between gap-2 bg-ink px-3 py-1.5 text-xs text-white/80">
