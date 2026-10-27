@@ -28,6 +28,13 @@ export function SightWorkFlow() {
   }, [job, stage]);
 
   const showExample = () => setStage({ kind: "plan", plan: pickMockPlan(), videoName: null });
+
+  // `?view=example` opens straight on the example plan: a direct link for screen checks at
+  // phone, tablet and desktop widths, and a one-tap fallback during the demo.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "example") showExample();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
 
   // New stage: back to the top so the next screen starts at its heading, not mid-scroll.
