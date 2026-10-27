@@ -31,7 +31,10 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
   }
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
-  if (o.state === "running" && isRunStep(o.step)) return { state: "running", step: o.step };
+  if (o.state === "running" && isRunStep(o.step)) {
+    const skipped = Array.isArray(o.skipped) ? o.skipped.filter(isRunStep) : [];
+    return skipped.length ? { state: "running", step: o.step, skipped } : { state: "running", step: o.step };
+  }
   if (o.state === "failed" && isRunStep(o.step))
     return { state: "failed", step: o.step, message: typeof o.message === "string" && o.message ? o.message : GENERIC_FAIL };
   if (o.state === "done" && o.plan && typeof o.plan === "object")
