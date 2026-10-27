@@ -1,4 +1,4 @@
-import { AFTER_IMAGE_LABEL, type Issue, type WorkPlan } from "@/lib/types";
+import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 
@@ -43,11 +43,57 @@ function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
   );
 }
 
+/** Where the after picture goes when there isn't one yet: the real frame, dimmed, with a plain note. */
+function AfterSlot({ frame }: { frame: PlanFrame | undefined }) {
+  return (
+    <figure className="relative overflow-hidden rounded-2xl bg-ink">
+      {frame ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={frame.url} alt="" aria-hidden className="block aspect-video w-full object-cover opacity-30 blur-[2px]" />
+      ) : (
+        <div aria-hidden className="aspect-video w-full bg-gradient-to-br from-ink to-ink/70" />
+      )}
+      <figcaption className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-4 text-center text-white">
+        <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">Coming soon</span>
+        <span className="text-lg font-bold sm:text-xl">After picture</span>
+        <span className="max-w-sm text-sm text-white/75">
+          An AI concept of the finished space will show here. The plan above is complete without it.
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Small "how this plan was made" line, so the agent trace is visible on the result too. */
+function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
+  const planEngine = plan.meta?.planProvider === "baseten" ? "Muse Spark Open (Meta open weights, on Baseten)" : "Muse Spark";
+  const rows: [string, string][] = [
+    ["Plan", planEngine],
+    ["Outlines", masks ? "SAM 3.1" : "Off this run"],
+    ["After picture", plan.afterImageUrl ? "Muse Image" : "Off this run"],
+  ];
+  return (
+    <footer className="mt-12 border-t border-ink/10 pt-4 text-xs text-ink/55">
+      <p className="font-semibold uppercase tracking-wide">How this plan was made</p>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt>{k}</dt>
+            <dd className="text-ink/75">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </footer>
+  );
+}
+
 export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: string | null }) {
   const frames = plan.frames ?? [];
   const narrated = isNarrated(plan);
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
+  const masks = masksAvailable(plan);
+  const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
 
   return (
     <article>
@@ -95,6 +141,11 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
 
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
+        {plan.issues.length > 0 && !masks && (
+          <p className="mb-4 rounded-xl border border-ink/10 bg-white/70 px-4 py-3 text-sm text-ink/70">
+            Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in.
+          </p>
+        )}
         <ol className="space-y-4">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
@@ -109,7 +160,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                 <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
                 {issue.status !== "mentioned_not_seen" && (
                   <div className="mt-3">
-                    <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} />
+                    <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} outlineUnavailable={!masks} />
                   </div>
                 )}
               </li>
@@ -148,7 +199,9 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             </li>
           ))}
         </ul>
-        {plan.inventory.length > 0 && <p className="mt-2 text-xs text-ink/50">Approximate, counted from the video.</p>}
+        {plan.inventory.length > 0 && (
+          <p className="mt-2 text-xs text-ink/50">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
+        )}
       </Section>
 
       <Section title="Do the work in this order">
@@ -246,9 +299,13 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </Section>
       )}
 
-      {!plan.afterImageUrl && !plan.meta?.isExample && plan.workOrder.length > 0 && (
-        <p className="mt-10 text-sm text-ink/50">No after picture this time. The plan above is complete without it.</p>
+      {!plan.afterImageUrl && plan.workOrder.length > 0 && (
+        <Section title="After the work">
+          <AfterSlot frame={slotFrame} />
+        </Section>
       )}
+
+      <MadeWith plan={plan} masks={masks} />
     </article>
   );
 }
