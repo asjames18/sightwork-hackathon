@@ -58,7 +58,7 @@ function scene(view: MockScene["view"], seed: number, after = false): string {
 }
 
 function svgUrl(body: string, label: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">${body}<rect x="8" y="8" width="128" height="26" rx="4" fill="#000" opacity=".55"/><text x="72" y="26" font-size="14" text-anchor="middle" fill="#fff" font-family="sans-serif">${label}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">${body}<rect x="8" y="8" width="128" height="26" rx="4" fill="#000" opacity=".55"/><text x="72" y="26" font-size="14" text-anchor="middle" fill="#fff" font-family="sans-serif">${label}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
