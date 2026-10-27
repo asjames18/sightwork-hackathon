@@ -34,10 +34,10 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * in walkthrough order (non-decreasing tSec): the reason subset
  * picks evenly spaced frames by position, so an out-of-order request
  * would silently mislabel times and subset positions. Each frame's
- * dataUrl must be a data:image URL: the browser builder sends canvas
- * JPEG data URLs, and a non-image string would otherwise pass here
- * and only surface later, when the segment step skips and the plan
- * silently loses segmentation. A frame's tSec must not exceed
+ * dataUrl must be a data:image base64 URL: the browser builder sends
+ * canvas JPEG data URLs, and a bare data:image string (or a non-image
+ * string) would otherwise pass here and only surface later, when the
+ * segment step skips and the plan silently loses segmentation. A frame's tSec must not exceed
  * durationSec: the browser builder samples frames from the video
  * itself, so a later timestamp would mislabel that proof frame's
  * time on the plan screen.
@@ -81,8 +81,12 @@ export function validatePlanRequest(body: unknown): string[] {
       } else {
         prevTsec = frame.tSec;
       }
-      if (typeof frame.dataUrl !== "string" || !frame.dataUrl.startsWith("data:image/")) {
-        problems.push(`frames[${i}].dataUrl must be a data:image URL`);
+      if (
+        typeof frame.dataUrl !== "string" ||
+        !frame.dataUrl.startsWith("data:image/") ||
+        !frame.dataUrl.includes(";base64,")
+      ) {
+        problems.push(`frames[${i}].dataUrl must be a data:image base64 URL`);
       }
     });
   }
