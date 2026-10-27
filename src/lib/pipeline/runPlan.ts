@@ -108,7 +108,11 @@ export interface RunPlanDeps {
    * subsetting: the reason step sees every request frame.
    */
   reasonMaxFrames?: number;
-  /** Called with each running status, in stage order. */
+  /** Called with each running status, in stage order. When optional
+   * steps were skipped earlier in the run, the status carries the
+   * cumulative skipped list (Grok Bot, 2026-10-27 5:45 PM: the
+   * processing screen shows those steps as skipped this run); the
+   * field is omitted when nothing was skipped. */
   onStatus?: (status: PlanJobStatus) => void;
   /** When aborted, the run stops with an AbortError. */
   signal?: AbortSignal;
@@ -294,13 +298,25 @@ export function remapReasonOutput(output: ReasonOutput, subset: number[]): Reaso
  * Run the full pipeline for one request. The segment stage covers both
  * the "looking" and "counting" UI steps (one SAM pass does hazards and
  * counts), so both statuses are emitted around it. A segment failure
- * no longer stops the run: it is logged server-side and the reason
- * step continues with no segmentation counts, so a blocked SAM step
- * never kills a real plan run (Grok Bot, 2026-10-27 11:20 AM).
+ * no longer stops the run: it is logged server-side, looking and
+ * counting are reported as skipped on every later running status, and
+ * the reason step continues with no segmentation counts, so a blocked
+ * SAM step never kills a real plan run (Grok Bot, 2026-10-27 11:20 AM).
  */
 export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<WorkPlan> {
+  // Optional steps skipped so far this run, in stage order. Attached
+  // to every later running status (Grok Bot, 2026-10-27 5:45 PM), so
+  // the processing screen can mark them skipped live instead of
+  // waiting for the finished plan's meta.skipped. Picturing is last,
+  // so its skip has no later running line and still arrives only via
+  // the done plan's meta.skipped.
+  const skippedSteps: Exclude<PlanStep, "done">[] = [];
   const emit = (step: Exclude<PlanStep, "done">): void => {
-    deps.onStatus?.({ state: "running", step });
+    deps.onStatus?.(
+      skippedSteps.length > 0
+        ? { state: "running", step, skipped: [...skippedSteps] }
+        : { state: "running", step },
+    );
   };
 
   // One meta object for both the draft and the final plan, so the
@@ -362,6 +378,9 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     if (isAbort(err)) throw err;
     console.warn(`runPlan: segment failed, continuing without segmentation: ${detailOf(err)}`);
     segmentation = null;
+    // The segment stage covers both UI steps, so both read as
+    // skipped from here on; the next running line carries them.
+    skippedSteps.push("looking", "counting");
   }
 
   // comparing: Spark turns frames + segmentation + transcript into
