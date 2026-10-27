@@ -34,7 +34,7 @@ export function ProofFrame({
           src={frame.url}
           alt={caption ?? `Frame at ${frame.tSec} s`}
           loading="lazy"
-          className="block h-auto max-h-[60vh] w-auto max-w-full"
+          className="block h-auto max-h-[60vh] w-auto max-w-full lg:max-h-[45vh]"
         />
         {box && (
           <span

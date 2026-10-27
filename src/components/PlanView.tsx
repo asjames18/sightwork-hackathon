@@ -146,7 +146,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in.
           </p>
         )}
-        <ol className="space-y-4">
+        <ol className="grid gap-4 lg:grid-cols-2 lg:items-start">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
             return (
