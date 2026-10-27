@@ -33,7 +33,11 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * the first problem to a plain failure message. Frames must also be
  * in walkthrough order (non-decreasing tSec): the reason subset
  * picks evenly spaced frames by position, so an out-of-order request
- * would silently mislabel times and subset positions.
+ * would silently mislabel times and subset positions. Each frame's
+ * dataUrl must be a data:image URL: the browser builder sends canvas
+ * JPEG data URLs, and a non-image string would otherwise pass here
+ * and only surface later, when the segment step skips and the plan
+ * silently loses segmentation.
  */
 export function validatePlanRequest(body: unknown): string[] {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
@@ -67,8 +71,8 @@ export function validatePlanRequest(body: unknown): string[] {
       } else {
         prevTsec = frame.tSec;
       }
-      if (typeof frame.dataUrl !== "string" || frame.dataUrl.length === 0) {
-        problems.push(`frames[${i}].dataUrl must be a non-empty string`);
+      if (typeof frame.dataUrl !== "string" || !frame.dataUrl.startsWith("data:image/")) {
+        problems.push(`frames[${i}].dataUrl must be a data:image URL`);
       }
     });
   }
