@@ -46,7 +46,11 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * time on the plan screen. audioWavBase64 must be valid base64 when
  * present: the transcribe step rejects anything else, so a malformed
  * string would otherwise fail the run at "listening" instead of here
- * on "uploading", before any model call is spent.
+ * on "uploading", before any model call is spent. It must also carry
+ * a WAV header: the transcribe step throws on a non-WAV payload with
+ * the same RIFF/WAVE rule, so a valid-base64 MP3 (or any other blob)
+ * would otherwise pass here and fail at "listening" instead of here
+ * on "uploading".
  */
 
 /**
@@ -59,6 +63,22 @@ export function planBodyTooLarge(bodyText: string): boolean {
 function isBase64(value: string): boolean {
   const stripped = value.replace(/\s/g, "");
   return /^[A-Za-z0-9+/]*={0,2}$/.test(stripped) && stripped.length % 4 === 0;
+}
+
+/**
+ * True when the base64 string decodes to a WAV header, by the same
+ * rule the transcribe step enforces (src/lib/pipeline/transcribe.ts):
+ * the first four bytes are "RIFF" and bytes 8-11 are "WAVE". An empty
+ * string passes here because the transcribe step treats it as no
+ * audio, not as malformed audio. Decoded with atob (not Buffer) so
+ * this pure module stays free of node types.
+ */
+function isWavBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  if (stripped.length === 0) return true;
+  if (stripped.length < 16) return false;
+  const head = atob(stripped.slice(0, 16));
+  return head.length >= 12 && head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WAVE";
 }
 
 export function validatePlanRequest(body: unknown): string[] {
@@ -125,6 +145,8 @@ export function validatePlanRequest(body: unknown): string[] {
       problems.push("audioWavBase64 must be a string");
     } else if (!isBase64(req.audioWavBase64)) {
       problems.push("audioWavBase64 must be valid base64");
+    } else if (!isWavBase64(req.audioWavBase64)) {
+      problems.push("audioWavBase64 must be a WAV file (RIFF/WAVE header)");
     }
   }
   if (
