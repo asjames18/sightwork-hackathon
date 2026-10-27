@@ -308,15 +308,19 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // Skipped-step flags for the plan screen (Grok Bot, 2026-10-27
   // 12:05 PM): masks when the segment step failed or was skipped
   // (segmentation null), afterImage when the render step produced no
-  // image. Callers pass the flags; this helper only assembles them,
+  // image, cost when a regioned cost call failed (Grok Bot,
+  // 2026-10-27 2:15 PM; a run with no region sets no cost flag).
+  // Callers pass the flags; this helper only assembles them,
   // so no step result is read before it exists.
   const planMeta = (
     masksSkipped: boolean,
     afterImageSkipped: boolean,
+    costSkipped = false,
   ): NonNullable<WorkPlan["meta"]> => {
-    const skipped: { masks?: boolean; afterImage?: boolean } = {};
+    const skipped: { masks?: boolean; afterImage?: boolean; cost?: boolean } = {};
     if (masksSkipped) skipped.masks = true;
     if (afterImageSkipped) skipped.afterImage = true;
+    if (costSkipped) skipped.cost = true;
     return {
       costUsd: deps.tracker.totals().spikeTotalUsd,
       ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
@@ -425,6 +429,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
 
   // planning: region-grounded cost range (null without a region),
   // then assemble the plan shell the render step edits from.
+  // Cost is optional (Grok Bot, 2026-10-27 2:15 PM): when a region
+  // was given but the cost call fails, log a server warning, keep
+  // costRange null, and set meta.skipped.cost, instead of failing
+  // the run. A run with no region sets no flag, and a contract-
+  // check failure still fails the run.
   assertNotAborted(deps.signal);
   emit("planning");
   const frames: PlanFrame[] = request.frames.map((f, i) => ({
@@ -432,7 +441,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     tSec: f.tSec,
     url: f.dataUrl,
   }));
-  let draft: WorkPlan;
+  let cost: Awaited<ReturnType<typeof estimateCost>> = null;
+  let costSkipped = false;
   try {
     const costInput: CostInput = {
       spaceName: reason.spaceName,
@@ -448,7 +458,20 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       deps.costPrompt && request.region?.trim()
         ? { ...deps.cost, prompt: deps.costPrompt(costInput, request.spaceType) }
         : deps.cost;
-    const cost = await estimateCost(costInput, costDeps);
+    cost = await estimateCost(costInput, costDeps);
+  } catch (err) {
+    if (isAbort(err)) throw err;
+    // No-region estimateCost returns null without calling, so a throw
+    // here is unexpected: keep the old planning failure, don't mask it.
+    if (!request.region?.trim()) {
+      throw new PlanStepError("planning", PLAIN_FAILURE_MESSAGE.planning, detailOf(err));
+    }
+    console.warn(`runPlan: cost failed, continuing without cost range: ${detailOf(err)}`);
+    costSkipped = true;
+    cost = null;
+  }
+  let draft: WorkPlan;
+  try {
     draft = {
       spaceName: reason.spaceName,
       generatedFrom: reason.generatedFrom,
@@ -464,7 +487,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       saidVsSeen: reason.saidVsSeen,
       costRange: cost ? cost.costRange : null,
       heroFrameIndex: reason.heroFrameIndex,
-      meta: planMeta(segmentation === null, false),
+      meta: planMeta(segmentation === null, false, costSkipped),
     };
     const errs = checkWorkPlan(draft);
     // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
@@ -496,7 +519,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     afterImageUrl: rendered.afterImageUrl,
     ...(rendered.afterImageUrl ? { afterImageLabel: AFTER_IMAGE_LABEL } : {}),
     heroFrameIndex: rendered.heroFrameIndex ?? reason.heroFrameIndex,
-    meta: planMeta(segmentation === null, rendered.skipped !== undefined),
+    meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped),
   };
   const errs = checkWorkPlan(plan);
   const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
