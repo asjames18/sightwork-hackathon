@@ -74,12 +74,16 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="mt-8 flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-ink/25 bg-white px-6 py-10 text-center active:scale-[.99]"
+          className="mt-8 flex min-h-[176px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink/25 bg-white px-6 py-10 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink active:scale-[.99]"
         >
           <span aria-hidden className="text-4xl">🎥</span>
           <span className="text-lg font-semibold">Record or choose a video</span>
           <span className="text-sm text-ink/60">MP4 or MOV, about 60 to 90 seconds</span>
         </button>
+      ) : null}
+
+      {!preview ? (
+        <FilmingTips />
       ) : (
         <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm">
           {/* Phone walkthroughs are usually portrait: cap the height and letterbox instead of forcing 16:9. */}
@@ -100,7 +104,11 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
               {preview.file.name}
               {durationSec !== null && <span className="text-ink/50"> · {formatDuration(durationSec)}</span>}
             </p>
-            <button type="button" onClick={() => input.current?.click()} className="shrink-0 text-sm font-medium underline">
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              className="-my-2 min-h-[44px] shrink-0 px-2 text-sm font-medium underline"
+            >
               Change
             </button>
           </div>
@@ -132,9 +140,41 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
         </div>
       )}
 
-      <button type="button" onClick={onExample} className="mt-6 w-full text-center text-sm font-medium text-accent underline">
+      <button
+        type="button"
+        onClick={onExample}
+        className="mt-4 min-h-[44px] w-full text-center text-sm font-medium text-accent underline"
+      >
         See an example plan first
       </button>
     </section>
+  );
+}
+
+/** What makes a walkthrough read well. Shown before a video is picked; no narration is needed. */
+export const FILMING_TIPS: { title: string; detail: string }[] = [
+  { title: "Walk slowly, edge to edge", detail: "Pan across every wall, row and corner so nothing is counted twice or missed." },
+  { title: "Pause on problems", detail: "Hold for a second on damage, stains or broken items so they get a clear proof frame." },
+  { title: "Talking is optional", detail: "Say what needs work if you like. A silent walkthrough still gets a full plan." },
+];
+
+function FilmingTips() {
+  return (
+    <ul aria-label="Tips for a good walkthrough" className="mt-4 grid gap-2 sm:grid-cols-3">
+      {FILMING_TIPS.map((t, i) => (
+        <li key={t.title} className="flex gap-3 rounded-xl bg-white/70 p-3 sm:flex-col sm:gap-1">
+          <span
+            aria-hidden
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink/10 text-xs font-bold"
+          >
+            {i + 1}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">{t.title}</span>
+            <span className="block text-xs text-ink/60">{t.detail}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
