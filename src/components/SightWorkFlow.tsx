@@ -5,6 +5,7 @@ import { PLAN_STEPS, type WorkPlan } from "@/lib/types";
 import { pickMockPlan } from "@/lib/mock/pickMockPlan";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
+import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
 import { PlanView } from "./PlanView";
@@ -24,6 +25,7 @@ export function SightWorkFlow() {
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
       setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name });
+      saveLastPlan(job.plan, stage.file.name);
     }
   }, [job, stage]);
 
@@ -31,8 +33,14 @@ export function SightWorkFlow() {
 
   // `?view=example` opens straight on the example plan: a direct link for screen checks at
   // phone, tablet and desktop widths, and a one-tap fallback during the demo.
+  // `?view=last` reopens the last finished plan on this device (falls back to the upload screen).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("view") === "example") showExample();
+    const view = new URLSearchParams(window.location.search).get("view");
+    if (view === "example") showExample();
+    if (view === "last") {
+      const saved = loadLastPlan();
+      if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
