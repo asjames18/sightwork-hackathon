@@ -5,8 +5,8 @@
  * pipeline step so a malformed body fails fast on "uploading" with a
  * plain message instead of halfway through a model run. Shape only:
  * it does not judge whether the frames or audio will produce a good
- * plan (an empty frames array passes here and fails later in the
- * pipeline, where the step is known). No API calls, no keys, and no
+ * plan (an empty frames array is rejected here, before any model
+ * call is spent on a run that cannot produce a plan). No API calls, no keys, and no
  * provider text in the problems it returns.
  */
 
@@ -36,6 +36,8 @@ export function validatePlanRequest(body: unknown): string[] {
 
   if (!Array.isArray(req.frames)) {
     problems.push("frames must be an array");
+  } else if (req.frames.length === 0) {
+    problems.push("frames must not be empty");
   } else {
     req.frames.forEach((f, i) => {
       if (f === null || typeof f !== "object" || Array.isArray(f)) {
