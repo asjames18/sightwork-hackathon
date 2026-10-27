@@ -529,7 +529,15 @@ export function buildReasonPrompt(input: ReasonInput): string {
   prompt = fill(prompt, "duration_sec", String(input.durationSec));
   prompt = fill(prompt, "frame_count", String(input.frames.length));
   prompt = fill(prompt, "frame_list", frameList);
-  prompt = fill(prompt, "segmentation_json", JSON.stringify(input.segmentation));
+  // No segmentation (the segment step failed): say so explicitly in
+  // the SEGMENTATION section, so the model counts from the frames
+  // instead of trusting counts that are not there. The template text
+  // itself is Grok Bot's wording and stays untouched; only this
+  // placeholder fill changes.
+  const segmentationJson = input.segmentation
+    ? JSON.stringify(input.segmentation)
+    : "(no segmentation data: the segmentation step failed, so there are no SAM counts and no flaggedFrames; count objects yourself from the frames, and use method \"model\" for every inventory item)";
+  prompt = fill(prompt, "segmentation_json", segmentationJson);
   prompt = fill(prompt, "transcript", input.transcript ?? "(no narration)");
   return prompt;
 }
