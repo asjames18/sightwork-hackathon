@@ -18,7 +18,8 @@
  * not offer, and SAM 3.1 / Muse Image are Meta-only steps that skip
  * cleanly when Meta is blocked. So a Meta key is still needed at
  * wiring time even in baseten mode; the reason engine is the only
- * step that moves.
+ * step that moves. The plan's meta.planProvider records which engine
+ * wrote the reason step, so a finished plan names its own engine.
  * The shared usage tracker enforces the $10 spike cap in code, and
  * every call it records is logged server-side when the run finishes.
  *
@@ -165,6 +166,7 @@ export async function POST(req: Request): Promise<Response> {
         const plan = await runPlan(request, {
           ...deps,
           tracker,
+          planProvider: provider,
           onStatus: (status) => push(status),
           signal: req.signal,
         });
