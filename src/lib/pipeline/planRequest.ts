@@ -40,8 +40,24 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * segment step skips and the plan silently loses segmentation. A frame's tSec must not exceed
  * durationSec: the browser builder samples frames from the video
  * itself, so a later timestamp would mislabel that proof frame's
- * time on the plan screen.
+ * time on the plan screen. audioWavBase64 must be valid base64 when
+ * present: the transcribe step rejects anything else, so a malformed
+ * string would otherwise fail the run at "listening" instead of here
+ * on "uploading", before any model call is spent.
  */
+
+/**
+ * True when the string is valid base64, by the same rule the
+ * transcribe step enforces (src/lib/pipeline/transcribe.ts):
+ * whitespace ignored, alphabet plus up to two padding chars, length
+ * a multiple of 4. An empty string passes here because the transcribe
+ * step treats it as no audio, not as malformed audio.
+ */
+function isBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  return /^[A-Za-z0-9+/]*={0,2}$/.test(stripped) && stripped.length % 4 === 0;
+}
+
 export function validatePlanRequest(body: unknown): string[] {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     return ["plan request must be a JSON object"];
@@ -96,8 +112,12 @@ export function validatePlanRequest(body: unknown): string[] {
       problems.push(`${key} must be a string`);
     }
   }
-  if (req.audioWavBase64 !== undefined && typeof req.audioWavBase64 !== "string") {
-    problems.push("audioWavBase64 must be a string");
+  if (req.audioWavBase64 !== undefined) {
+    if (typeof req.audioWavBase64 !== "string") {
+      problems.push("audioWavBase64 must be a string");
+    } else if (!isBase64(req.audioWavBase64)) {
+      problems.push("audioWavBase64 must be valid base64");
+    }
   }
   if (
     req.laborBasis !== undefined &&
@@ -109,4 +129,5 @@ export function validatePlanRequest(body: unknown): string[] {
   }
   return problems;
 }
+
 
