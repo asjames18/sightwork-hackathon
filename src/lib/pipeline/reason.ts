@@ -63,7 +63,14 @@ export interface ReasonFrame {
 
 export interface ReasonInput {
   frames: ReasonFrame[];
-  segmentation: SegmentationResult;
+  /**
+   * SAM segmentation result, or null when the segment step failed.
+   * runPlan logs the failure and continues with null, so the reason
+   * step counts from the frames with no SAM floor. runReason never
+   * reads this field itself — it rides into the prompt through
+   * buildReasonPrompt — so null only changes the prompt text.
+   */
+  segmentation: SegmentationResult | null;
   /** Transcript string, or null when there is no narration. */
   transcript: string | null;
   spaceName?: string;
