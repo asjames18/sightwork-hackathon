@@ -25,3 +25,18 @@ export const planNoMeta: WorkPlan = {
     models: { plan: "meta-models/muse-spark-open-1026" },
   },
 };
+
+/**
+ * EXAMPLE DATA ONLY. The plan-only example on a run where a region was given but the cost
+ * step failed: no cost range, and meta.skipped.cost set so the screen says the cost couldn't
+ * be worked out instead of asking for a region. Open it with `?mock=nocost`.
+ */
+export const planNoCost: WorkPlan = {
+  ...planNoMeta,
+  generatedFrom: "EXAMPLE: walkthrough video, 12 frames, 78 s, narrated (plan only, cost step failed)",
+  costRange: null,
+  meta: {
+    ...planNoMeta.meta,
+    skipped: { masks: true, afterImage: true, cost: true },
+  },
+};
