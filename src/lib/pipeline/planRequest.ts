@@ -30,7 +30,10 @@ export function planBodyTooLarge(bodyText: string): boolean {
 /**
  * Problems with a parsed /api/plan body; [] = valid. Follows the
  * checkWorkPlan convention (a list, not a throw) so the route can map
- * the first problem to a plain failure message.
+ * the first problem to a plain failure message. Frames must also be
+ * in walkthrough order (non-decreasing tSec): the reason subset
+ * picks evenly spaced frames by position, so an out-of-order request
+ * would silently mislabel times and subset positions.
  */
 export function validatePlanRequest(body: unknown): string[] {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
@@ -50,6 +53,7 @@ export function validatePlanRequest(body: unknown): string[] {
   } else if (req.frames.length > MAX_PLAN_FRAMES) {
     problems.push(`frames must not exceed ${MAX_PLAN_FRAMES}`);
   } else {
+    let prevTsec = -Infinity;
     req.frames.forEach((f, i) => {
       if (f === null || typeof f !== "object" || Array.isArray(f)) {
         problems.push(`frames[${i}] must be an object`);
@@ -58,6 +62,10 @@ export function validatePlanRequest(body: unknown): string[] {
       const frame = f as Record<string, unknown>;
       if (typeof frame.tSec !== "number" || !Number.isFinite(frame.tSec) || frame.tSec < 0) {
         problems.push(`frames[${i}].tSec must be a number >= 0`);
+      } else if (frame.tSec < prevTsec) {
+        problems.push(`frames[${i}].tSec must not be earlier than the previous frame`);
+      } else {
+        prevTsec = frame.tSec;
       }
       if (typeof frame.dataUrl !== "string" || frame.dataUrl.length === 0) {
         problems.push(`frames[${i}].dataUrl must be a non-empty string`);
