@@ -23,11 +23,20 @@ SightWork is a multi-step agent built on Meta's Muse models through the Meta Mod
 5. **Muse Spark** turns the findings into materials, an ordered work plan and a rough cost range.
 6. **Muse Image** generates the "after" image.
 
+The planning steps (4 and 5) are moving to **Muse Spark Open**, Meta's open-weights model, served on Baseten. SAM 3.1 outlines and the Muse Image "after" picture are optional: when either one is unavailable, the plan still comes back complete, and the screen marks those parts as coming soon.
+
 ## Built during the hackathon
 Everything in this repository was written during the event (Oct 26 – Nov 4, 2026). The idea and planning came before; no earlier code is included. Antonio built SightWork with AI coding assistance and deploys it himself.
 
 ## Running it
-Setup instructions will be added as the build lands. The Meta Model API key is read from an environment variable and is never committed to this repo.
+Full setup instructions will be added as the build lands. API keys are read from environment variables and are never committed to this repo.
+
+To preview the screens with example data (no API calls):
+```bash
+npm install
+npm run dev
+```
+Then open http://localhost:3000 and choose the example plan. Add `?mock=nometa` to the URL to see a plan made without outlines or an after picture, and `?plan=baseten` to label the planning steps as Muse Spark Open.
 
 ## Status
 Work in progress during the hackathon.
