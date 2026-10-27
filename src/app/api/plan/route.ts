@@ -21,7 +21,7 @@
  * step that moves. The plan's meta.planProvider records which engine
  * wrote the reason step, so a finished plan names its own engine.
  * The shared usage tracker enforces the $10 spike cap in code, and
- * every call it records is logged server-side when the run finishes.
+ * every call it records is logged server-side when the run finishes, successfully or not.
  *
  * No Meta API calls happen on import, and the key is read from
  * process.env only (MODEL_API_KEY or META_API_KEY) by the callers.
@@ -131,7 +131,7 @@ export async function POST(req: Request): Promise<Response> {
       };
       push({ state: "running", step: "uploading" });
 
-      let tracker;
+      let tracker: ReturnType<typeof createUsageTracker> | undefined;
       let wired = false;
       try {
         // Every caller throws here when no key is configured, so a
@@ -186,6 +186,18 @@ export async function POST(req: Request): Promise<Response> {
               .join(", "),
         );
       } catch (err) {
+        // A failed run still spent model calls: log the partial usage
+        // so spike tracking has real data even when no plan comes back.
+        if (tracker) {
+          console.error(
+            `plan route: failed after ${tracker.records().length} calls, ` +
+              `spike total $${tracker.totals().spikeTotalUsd}: ` +
+              tracker
+                .records()
+                .map((r) => `${r.model}/${r.step} $${r.costUsd} ${r.latencyMs}ms`)
+                .join(", "),
+          );
+        }
         if (isAbort(err)) {
           // Client went away; nothing left to stream.
         } else if (err instanceof PlanStepError) {
