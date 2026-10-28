@@ -100,13 +100,24 @@ export async function POST(req: Request): Promise<Response> {
   try {
     bodyText = await req.text();
   } catch {
-    return new Response("could not read request body", { status: 400 });
+    // JSON {error} (not plain text) so the client can surface this
+    // message on a non-OK response instead of only its generic one.
+    return new Response(JSON.stringify({ error: "could not read request body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   // Agreed cap: the browser builder stays under 9 MB; over 10 MB the
   // client shows its own too-large message from the 413.
   if (planBodyTooLarge(bodyText)) {
-    return new Response("plan request body too large", { status: 413 });
+    // JSON {error} (not plain text) so the client can surface this
+    // message on a non-OK response; the client still keys its
+    // too-large message off the 413 status, so this changes no UI yet.
+    return new Response(JSON.stringify({ error: "plan request body too large" }), {
+      status: 413,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   let parsed: unknown;
