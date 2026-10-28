@@ -59,6 +59,10 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * transcribe step treats any non-empty string as audio, so blank audio
  * would otherwise pass here (it strips to empty, which the base64 and
  * WAV checks both accept as "no audio") and fail at "listening".
+ * Finally the fmt chunk must be mono s16le at 16000 or 24000 Hz:
+ * Meta transcribe rejects anything else (8 kHz got a 400 on
+ * 2026-10-28), so an unsupported rate would otherwise fail the run
+ * at "listening" instead of here on "uploading".
  */
 
 /**
@@ -113,6 +117,51 @@ function isWavBase64(value: string): boolean {
   if (stripped.length < 16) return false;
   const head = atob(stripped.slice(0, 16));
   return head.length >= 12 && head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WAVE";
+}
+
+/**
+ * True when the WAV is in the format Meta transcribe accepts, per its
+ * 400 on Grok Bot's 2026-10-28 2:40 AM test (8 kHz rejected: "expected
+ * mono s16le at 16000 or 24000 Hz"). The fmt chunk is found by
+ * scanning RIFF chunks, not by assuming it sits at offset 12, so an
+ * extra chunk before fmt does not break it. Empty passes (no audio),
+ * and a WAV with no fmt chunk in the decoded head passes too and is
+ * left to the transcribe step, so this only rejects audio Meta is
+ * known to refuse. Decoded with atob (not Buffer) so this pure module
+ * stays free of node types.
+ */
+function isTranscribeWavBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  if (stripped.length === 0) return true;
+  // 200 bytes covers a standard header plus small leading chunks.
+  const chunk = stripped.slice(0, 268);
+  const head = atob(chunk.slice(0, chunk.length - (chunk.length % 4)));
+  if (head.length < 12) return false;
+  const u16 = (i: number): number => head.charCodeAt(i) | (head.charCodeAt(i + 1) << 8);
+  const u32 = (i: number): number =>
+    head.charCodeAt(i) |
+    (head.charCodeAt(i + 1) << 8) |
+    (head.charCodeAt(i + 2) << 16) |
+    (head.charCodeAt(i + 3) << 24);
+  let off = 12;
+  while (off + 8 <= head.length) {
+    const id = head.slice(off, off + 4);
+    const size = u32(off + 4);
+    if (id === "fmt " && size >= 16 && off + 8 + 16 <= head.length) {
+      const format = u16(off + 8);
+      const channels = u16(off + 10);
+      const sampleRate = u32(off + 12);
+      const bits = u16(off + 22);
+      return (
+        format === 1 &&
+        channels === 1 &&
+        (sampleRate === 16000 || sampleRate === 24000) &&
+        bits === 16
+      );
+    }
+    off += 8 + size + (size % 2);
+  }
+  return true;
 }
 
 export function validatePlanRequest(body: unknown): string[] {
@@ -205,6 +254,10 @@ export function validatePlanRequest(body: unknown): string[] {
       problems.push("audioWavBase64 must be valid base64");
     } else if (!isWavBase64(req.audioWavBase64)) {
       problems.push("audioWavBase64 must be a WAV file (RIFF/WAVE header)");
+    } else if (!isTranscribeWavBase64(req.audioWavBase64)) {
+      problems.push(
+        "audioWavBase64 must be mono 16-bit WAV at 16000 or 24000 Hz (the format Meta transcribe accepts)",
+      );
     }
   }
   if (
