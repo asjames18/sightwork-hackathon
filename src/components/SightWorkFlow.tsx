@@ -56,7 +56,8 @@ export function SightWorkFlow() {
     if (job?.state === "running" && job.skipped?.length) setSkipped(job.skipped);
   }, [job]);
 
-  // New stage: back to the top so the next screen starts at its heading, not mid-scroll.
+  // New stage: back to the top so the next screen starts at its heading, not mid-scroll, and move
+  // keyboard and screen-reader focus to that heading (the button that was pressed is gone).
   const firstStage = useRef(true);
   useEffect(() => {
     if (firstStage.current) {
@@ -64,6 +65,11 @@ export function SightWorkFlow() {
       return;
     }
     window.scrollTo({ top: 0 });
+    const heading = document.querySelector<HTMLElement>("main h1");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
   }, [stage.kind]);
 
   // Phones get the full width; tablets and desktops get a readable column, wider for the plan.

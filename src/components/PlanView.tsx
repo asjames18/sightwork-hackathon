@@ -282,8 +282,14 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                 {plan.costRange.sources.map((src, i) => (
                   <span key={src.url}>
                     {i > 0 && ", "}
-                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="break-words underline">
+                    <a
+                      href={src.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-words rounded-sm underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
                       {src.title}
+                      <span className="sr-only"> (opens in a new tab)</span>
                     </a>
                   </span>
                 ))}
