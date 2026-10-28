@@ -137,7 +137,14 @@ export function parseTurns(raw: unknown): TranscriptTurn[] {
     if (typeof t.startSec !== "number" || !Number.isFinite(t.startSec) || t.startSec < 0) {
       throw new Error(`transcribe: turn ${i} has no valid startSec`);
     }
-    if (t.endSec !== undefined && (typeof t.endSec !== "number" || t.endSec < t.startSec)) {
+    // endSec must be finite too, like startSec: a NaN endSec slipped
+    // through before, because NaN < startSec is false, and an
+    // Infinity endSec passed the same way; both would then ride
+    // into the transcript turns unchecked.
+    if (
+      t.endSec !== undefined &&
+      (typeof t.endSec !== "number" || !Number.isFinite(t.endSec) || t.endSec < t.startSec)
+    ) {
       throw new Error(`transcribe: turn ${i} has an invalid endSec`);
     }
     if (typeof t.text !== "string") {
