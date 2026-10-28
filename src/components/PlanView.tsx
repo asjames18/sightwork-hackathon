@@ -33,11 +33,11 @@ function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
   if (!narrated)
     return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
   if (issue.unmentioned)
-    return <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
+    return <span className="rounded-full bg-[#c2410c] px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
   if (issue.status === "mentioned_not_seen")
     return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">You said it, check in person</span>;
   return (
-    <span className="rounded-full bg-safe/15 px-2 py-0.5 text-xs font-semibold text-safe">
+    <span className="rounded-full bg-safe/15 px-2 py-0.5 text-xs font-semibold text-[#237032]">
       You said it{issue.mention ? ` at ${issue.mention.saidAtSec.toFixed(0)} s` : ""}
     </span>
   );
@@ -182,7 +182,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                   <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Said</span>
                   {row.said ? <>&ldquo;{row.said.quote}&rdquo; <span className="text-ink/65">({row.said.atSec.toFixed(0)} s)</span></> : <span className="text-ink/65">Not mentioned</span>}
                 </div>
-                <div className={row.status === "unmentioned" ? "font-semibold text-accent" : ""}>
+                <div className={row.status === "unmentioned" ? "font-semibold text-[#c2410c]" : ""}>
                   <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Seen</span>
                   {row.seen ? row.seen.summary : <span className="text-ink/65">Not visible in the video</span>}
                 </div>
@@ -267,7 +267,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
               <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-accent">{plan.costRange.label}</p>
+            <p className="mt-1 text-sm font-semibold text-[#c2410c]">{plan.costRange.label}</p>
             <p className="mt-2 text-sm">
               Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
             </p>
