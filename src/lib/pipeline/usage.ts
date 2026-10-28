@@ -54,6 +54,25 @@ export function createUsageTracker(opts?: {
   spikeCapUsd?: number;
   creditTotalUsd?: number;
 }): UsageTracker {
+  // A bad cap would silently break the spike accounting: a NaN cap
+  // makes canSpend false and every record throw, a negative cap
+  // throws on the first record with a misleading cap message, and a
+  // bad credit total corrupts remainingCreditUsd. Reject bad opts
+  // up front, at tracker creation, instead of at first record.
+  if (
+    opts?.spikeCapUsd !== undefined &&
+    (!Number.isFinite(opts.spikeCapUsd) || opts.spikeCapUsd < 0)
+  ) {
+    throw new Error(`usage: spikeCapUsd must be a finite number >= 0, got ${opts.spikeCapUsd}`);
+  }
+  if (
+    opts?.creditTotalUsd !== undefined &&
+    (!Number.isFinite(opts.creditTotalUsd) || opts.creditTotalUsd < 0)
+  ) {
+    throw new Error(
+      `usage: creditTotalUsd must be a finite number >= 0, got ${opts.creditTotalUsd}`,
+    );
+  }
   const spikeCapUsd = opts?.spikeCapUsd ?? SPIKE_CAP_USD;
   const creditTotalUsd = opts?.creditTotalUsd ?? CREDIT_TOTAL_USD;
   const seen: UsageRecord[] = [];
