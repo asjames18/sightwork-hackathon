@@ -252,11 +252,24 @@ const JUDGE_SCHEMA: Record<string, unknown> = {
 
 /** Adapter for the renderAfter step's JudgeCaller (original + 2 candidates, in order). */
 export function createJudgeSparkCaller(client: MetaClient) {
-  return (req: { model: string; prompt: string; images: [string, string, string] }) =>
-    client.callSpark({
+  return (req: { model: string; prompt: string; images: [string, string, string] }) => {
+    // The judge prompt's pick (2 or 3) indexes into exactly
+    // [original, candidate 1, candidate 2], and callSpark only
+    // checks that images are non-empty strings — so a wrong-count
+    // list would otherwise spend a paid judge call whose pick no
+    // longer maps to the candidates it was asked about. Reject it
+    // here, before any fetch, like the other callers reject bad
+    // request fields at the same point.
+    if (!Array.isArray(req.images) || req.images.length !== 3) {
+      throw new Error(
+        `meta: judge images must be exactly 3 (original + 2 candidates), got ${Array.isArray(req.images) ? req.images.length : String(req.images)}`,
+      );
+    }
+    return client.callSpark({
       model: req.model,
       prompt: req.prompt,
       images: [...req.images],
       schema: JUDGE_SCHEMA,
     });
+  };
 }
