@@ -150,6 +150,13 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
   const requestCost = opts.requestCostUsd ?? DEFAULT_REQUEST_COST_USD;
+  // A bad per-request cost would only surface later, mid-run, when the
+  // segment step records the call and the usage tracker rejects it.
+  // Reject it here, at caller creation, like the tracker rejects bad
+  // opts, so a misconfigured cost fails fast before any SAM call.
+  if (!Number.isFinite(requestCost) || requestCost < 0) {
+    throw new Error(`sam: requestCostUsd must be a finite number >= 0, got ${opts.requestCostUsd}`);
+  }
 
   return async (req) => {
     const body: Record<string, unknown> = {
