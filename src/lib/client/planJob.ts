@@ -37,7 +37,9 @@ function wait(ms: number, signal: AbortSignal): Promise<boolean> {
 /** Mock runner: walks the step labels on a timer and ends on the EXAMPLE plan (`?mock=nometa` for the plan-only one). No network calls. */
 export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
   const failAt = mockFailStep();
-  // `?mock=nometa` also previews the processing screen with Meta's optional steps skipped.
+  // `?mock=nometa` also previews the processing screen with Meta's optional steps skipped,
+  // on the real route's timing: looking and counting show active, then flip to skipped on the
+  // comparing line; picturing's skip only shows on the finished plan (meta.skipped.afterImage).
   const noMeta = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "nometa";
   const skipped: Exclude<PlanStep, "done">[] = [];
   for (const step of PLAN_STEPS) {
@@ -52,7 +54,7 @@ export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
       });
       return;
     }
-    if (noMeta && (step === "looking" || step === "counting" || step === "picturing")) skipped.push(step);
+    if (noMeta && step === "counting") skipped.push("looking", "counting");
   }
   if (!signal.aborted) onStatus({ state: "done", plan: pickMockPlan() });
 };
