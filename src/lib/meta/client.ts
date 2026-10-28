@@ -126,6 +126,39 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
 
   return {
     async callSpark(req: SparkCallRequest): Promise<SparkCallResult> {
+      // A bad request would otherwise spend a paid Spark call and only
+      // fail downstream, when the step parses an empty or garbage
+      // result. Reject it here, before any fetch, like the SAM, Image,
+      // and ASR callers do for their request fields.
+      if (typeof req.model !== "string" || req.model.trim().length === 0) {
+        throw new Error("meta: model must be a non-empty string");
+      }
+      if (typeof req.prompt !== "string" || req.prompt.trim().length === 0) {
+        throw new Error("meta: prompt must be a non-empty string");
+      }
+      if (
+        req.images !== undefined &&
+        (!Array.isArray(req.images) ||
+          req.images.some((image) => typeof image !== "string" || image.trim().length === 0))
+      ) {
+        throw new Error("meta: images must be an array of non-empty strings");
+      }
+      if (req.schema === null || typeof req.schema !== "object" || Array.isArray(req.schema)) {
+        throw new Error("meta: schema must be an object");
+      }
+      if (
+        req.tools !== undefined &&
+        (!Array.isArray(req.tools) ||
+          req.tools.some(
+            (tool) =>
+              tool === null ||
+              typeof tool !== "object" ||
+              typeof tool.type !== "string" ||
+              tool.type.trim().length === 0,
+          ))
+      ) {
+        throw new Error("meta: tools must be an array of { type: non-empty string }");
+      }
       const content: Record<string, unknown>[] = [{ type: "input_text", text: req.prompt }];
       for (const image of req.images ?? []) {
         content.push({ type: "input_image", image_url: image });
