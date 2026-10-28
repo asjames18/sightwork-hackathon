@@ -82,7 +82,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="mt-8 flex min-h-[176px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink/25 bg-white px-6 py-10 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink active:scale-[.99]"
+          className="mt-8 flex min-h-[176px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink/25 bg-white px-6 py-10 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99]"
         >
           <span aria-hidden className="text-4xl">🎥</span>
           <span className="text-lg font-semibold">Record or choose a video</span>
