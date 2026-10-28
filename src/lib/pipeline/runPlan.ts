@@ -313,6 +313,59 @@ export function remapReasonOutput(output: ReasonOutput, subset: number[]): Reaso
 }
 
 /**
+ * Fail fast on bad wiring before any step call. The route already
+ * validates the request body (planRequest.ts), so this covers the
+ * dep side only — the part no step validates up front. Two real
+ * gaps closed: a tracker without totals() used to throw only at
+ * plan assembly, after the paid reason and cost calls, when
+ * planMeta read the totals; and a missing later step bundle (e.g.
+ * segment) used to surface only at its own stage, after the
+ * earlier paid calls. A bad reasonMaxFrames is caught here too:
+ * pickReasonFrames returns [] for a cap <= 0, which would hand
+ * the reason step no frames at all.
+ */
+export function validateRunPlanDeps(deps: RunPlanDeps): void {
+  if (deps === null || typeof deps !== "object" || Array.isArray(deps)) {
+    throw new Error("runPlan: deps is not an object");
+  }
+  for (const field of ["transcribe", "segment", "reason", "cost", "renderAfter"] as const) {
+    const v = deps[field];
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      throw new Error(`runPlan: ${field} deps is not an object`);
+    }
+  }
+  if (
+    deps.tracker === null ||
+    typeof deps.tracker !== "object" ||
+    typeof deps.tracker.record !== "function" ||
+    typeof deps.tracker.totals !== "function"
+  ) {
+    throw new Error("runPlan: tracker.record and tracker.totals must be functions");
+  }
+  if (
+    deps.planProvider !== undefined &&
+    deps.planProvider !== "meta" &&
+    deps.planProvider !== "baseten"
+  ) {
+    throw new Error(`runPlan: planProvider must be meta or baseten, got ${deps.planProvider}`);
+  }
+  if (
+    deps.reasonMaxFrames !== undefined &&
+    (!Number.isInteger(deps.reasonMaxFrames) || deps.reasonMaxFrames < 1)
+  ) {
+    throw new Error("runPlan: reasonMaxFrames must be a whole number >= 1 when given");
+  }
+  for (const field of ["reasonPrompt", "costPrompt", "onStatus"] as const) {
+    if (deps[field] !== undefined && typeof deps[field] !== "function") {
+      throw new Error(`runPlan: ${field} must be a function when given`);
+    }
+  }
+  if (deps.signal !== undefined && (deps.signal === null || typeof deps.signal !== "object")) {
+    throw new Error("runPlan: signal must be an object when given");
+  }
+}
+
+/**
  * Run the full pipeline for one request. The segment stage covers both
  * the "looking" and "counting" UI steps (one SAM pass does hazards and
  * counts), so both statuses are emitted around it. A segment failure
@@ -364,6 +417,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
 
   // listening: transcribe the narration, or null when there is none.
   assertNotAborted(deps.signal);
+  validateRunPlanDeps(deps);
   emit("listening");
   let transcript: string | null;
   let transcriptTurns: NonNullable<WorkPlan["transcriptTurns"]>;
