@@ -163,6 +163,9 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
     // fail downstream, when the segment step parses an empty or
     // garbage result. Reject it here, before any fetch, like the
     // other callers reject bad costs at creation.
+    if (typeof req.model !== "string" || req.model.trim().length === 0) {
+      throw new Error("sam: model must be a non-empty string");
+    }
     if (typeof req.concept !== "string" || req.concept.trim().length === 0) {
       throw new Error("sam: concept must be a non-empty string");
     }
