@@ -43,7 +43,9 @@ export function SightWorkFlow() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const current = job && job.state !== "done" ? PLAN_STEPS.indexOf(job.step) : 0;
+  // When the job finishes, show every step passed (not step 1) for the frame before the plan opens,
+  // so the bar never snaps back to the start.
+  const current = !job ? 0 : job.state === "done" ? PLAN_STEPS.length : PLAN_STEPS.indexOf(job.step);
 
   // Steps the server reported as skipped this run. The list is cumulative, so keep the latest one
   // through a failure (failed lines don't carry it); a new run starts empty.
