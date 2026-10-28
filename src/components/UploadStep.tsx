@@ -34,6 +34,9 @@ export function formatDuration(sec: number): string {
 
 export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => void; onExample: () => void }) {
   const input = useRef<HTMLInputElement>(null);
+  // The picker button unmounts once a video is chosen, so move focus to the preview card
+  // instead of letting keyboard and screen-reader users fall back to the top of the page.
+  const card = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<{ url: string; file: File } | null>(null);
   const [check, setCheck] = useState<Check>({ kind: "reading" });
   // Read in an effect so the server render and the first client render match.
@@ -42,9 +45,14 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
     setRunner(pickRunnerKind(window.location.search, process.env.NEXT_PUBLIC_SIGHTWORK_RUNNER));
   }, []);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
+  useEffect(() => { if (preview) card.current?.focus(); }, [preview]);
 
   const durationSec = check.kind === "ok" || check.kind === "warn" ? check.durationSec : null;
   const canSend = check.kind === "ok" || check.kind === "warn";
+  // Polite announcement for the length check; warnings and blocks have their own status/alert below.
+  const liveText =
+    check.kind === "reading" ? "Checking the video length." : check.kind === "ok" ? `Video is ${formatDuration(check.durationSec)} long. Ready to make your plan.` : "";
+  const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
   return (
     <section>
@@ -85,7 +93,14 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
       {!preview ? (
         <FilmingTips />
       ) : (
-        <div className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div
+          ref={card}
+          tabIndex={-1}
+          role="group"
+          aria-label="Your walkthrough"
+          className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm focus:outline-none"
+        >
+          <p aria-live="polite" className="sr-only">{liveText}</p>
           {/* Phone walkthroughs are usually portrait: cap the height and letterbox instead of forcing 16:9. */}
           <video
             key={preview.url}
@@ -107,7 +122,8 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
             <button
               type="button"
               onClick={() => input.current?.click()}
-              className="-my-2 min-h-[44px] shrink-0 px-2 text-sm font-medium underline"
+              aria-label="Change video"
+              className={`-my-2 min-h-[44px] shrink-0 rounded px-2 text-sm font-medium underline ${ring}`}
             >
               Change
             </button>
@@ -127,7 +143,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
               type="button"
               disabled={!canSend}
               onClick={() => onVideo(preview.file)}
-              className="w-full rounded-xl bg-ink px-5 py-4 text-lg font-semibold text-white active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-40"
+              className={`w-full rounded-xl bg-ink px-5 py-4 text-lg font-semibold text-white active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-40 ${ring}`}
             >
               {check.kind === "reading" ? "Checking video…" : "Make my work plan"}
             </button>
@@ -143,7 +159,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
       <button
         type="button"
         onClick={onExample}
-        className="mt-4 min-h-[44px] w-full text-center text-sm font-medium text-[#c2410c] underline"
+        className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-[#c2410c] underline ${ring}`}
       >
         See an example plan first
       </button>
