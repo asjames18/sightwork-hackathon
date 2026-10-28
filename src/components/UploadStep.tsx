@@ -79,19 +79,25 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
       />
 
       {!preview ? (
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          className="mt-8 flex min-h-[176px] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-ink/25 bg-white px-6 py-10 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99]"
-        >
-          <span aria-hidden className="text-4xl">🎥</span>
-          <span className="text-lg font-semibold">Record or choose a video</span>
-          <span className="text-sm text-ink/65">MP4 or MOV, about 60 to 90 seconds</span>
-        </button>
-      ) : null}
-
-      {!preview ? (
-        <FilmingTips />
+        <>
+          <button
+            type="button"
+            onClick={() => input.current?.click()}
+            className="mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-ink/20 bg-white px-6 py-7 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99]"
+          >
+            <CameraIcon />
+            <span className="rounded-xl bg-accent-dark px-5 py-3 text-base font-semibold text-white">Record or choose a video</span>
+            <span className="text-sm text-ink/70">MP4 or MOV, about 60 to 90 seconds</span>
+          </button>
+          <button
+            type="button"
+            onClick={onExample}
+            className={`mt-3 min-h-[44px] w-full rounded-xl border border-ink/20 bg-white/60 px-5 py-2.5 text-center text-base font-semibold text-ink hover:border-ink/40 ${ring}`}
+          >
+            See an example plan first
+          </button>
+          <FilmingTips />
+        </>
       ) : (
         <div
           ref={card}
@@ -156,13 +162,15 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onExample}
-        className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-accent-dark underline ${ring}`}
-      >
-        See an example plan first
-      </button>
+      {preview ? (
+        <button
+          type="button"
+          onClick={onExample}
+          className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-accent-dark underline ${ring}`}
+        >
+          See an example plan first
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -176,21 +184,42 @@ export const FILMING_TIPS: { title: string; detail: string }[] = [
 
 function FilmingTips() {
   return (
-    <ul aria-label="Tips for a good walkthrough" className="mt-4 grid gap-2 sm:grid-cols-3">
+    <ul
+      aria-label="Tips for a good walkthrough"
+      className="mt-5 divide-y divide-ink/10 rounded-xl bg-white/70"
+    >
       {FILMING_TIPS.map((t, i) => (
-        <li key={t.title} className="flex gap-3 rounded-xl bg-white/70 p-3 sm:flex-col sm:gap-1">
+        <li key={t.title} className="flex gap-3 px-3 py-2.5">
           <span
             aria-hidden
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink/10 text-xs font-bold"
+            className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/10 text-xs font-bold"
           >
             {i + 1}
           </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">{t.title}</span>
-            <span className="block text-xs text-ink/65">{t.detail}</span>
-          </span>
+          <p className="min-w-0 text-sm text-ink/70">
+            <span className="font-semibold text-ink">{t.title}.</span> {t.detail}
+          </p>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Simple outline video camera, drawn in SVG so it renders the same on every phone. */
+function CameraIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-10 w-10 text-ink/70"
+    >
+      <rect x="2.5" y="6" width="13" height="12" rx="2.5" />
+      <path d="M15.5 10.5 21 7.5v9l-5.5-3" />
+    </svg>
   );
 }
