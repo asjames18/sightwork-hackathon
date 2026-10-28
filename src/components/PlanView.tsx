@@ -143,6 +143,23 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </p>
       )}
 
+      {/* The after picture is the wow moment, so it sits right under the summary, but only when it exists. */}
+      {plan.afterImageUrl && hero && (
+        <Section title="Before and after" className="mt-6!">
+          <BeforeAfter before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? AFTER_IMAGE_LABEL} />
+        </Section>
+      )}
+
+      {plan.afterImageUrl && !hero && (
+        <Section title="After the work" className="mt-6!">
+          <figure className="overflow-hidden rounded-xl bg-ink">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={plan.afterImageUrl} alt="AI concept of the finished space" className="block aspect-[4/3] max-h-[70vh] w-full object-cover" />
+            <figcaption className="bg-ink px-3 py-1.5 text-sm text-white/80">{plan.afterImageLabel ?? AFTER_IMAGE_LABEL}</figcaption>
+          </figure>
+        </Section>
+      )}
+
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
         {plan.issues.length > 0 && !masks && (
@@ -306,22 +323,6 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               )}
             </details>
           </div>
-        </Section>
-      )}
-
-      {plan.afterImageUrl && hero && (
-        <Section title="Before and after">
-          <BeforeAfter before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? AFTER_IMAGE_LABEL} />
-        </Section>
-      )}
-
-      {plan.afterImageUrl && !hero && (
-        <Section title="After the work">
-          <figure className="overflow-hidden rounded-xl bg-black">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={plan.afterImageUrl} alt="AI concept of the finished space" className="mx-auto block h-auto max-h-[60vh] w-auto max-w-full" />
-            <figcaption className="bg-ink px-3 py-1.5 text-xs text-white/80">{plan.afterImageLabel ?? AFTER_IMAGE_LABEL}</figcaption>
-          </figure>
         </Section>
       )}
 
