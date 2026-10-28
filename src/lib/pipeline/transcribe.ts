@@ -219,11 +219,15 @@ export async function runTranscribe(
       `transcribe: audio is ${bytes} bytes, over the ${MAX_AUDIO_BYTES} byte limit`,
     );
   }
-  if (bytes >= 12) {
-    const head = Buffer.from(input.audioWavBase64, "base64").subarray(0, 12).toString("latin1");
-    if (head.slice(0, 4) !== "RIFF" || head.slice(8, 12) !== "WAVE") {
-      throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
-    }
+  // A file shorter than 12 bytes can never hold a RIFF/WAVE header, so
+  // it used to skip this check entirely and ride to the model caller
+  // as garbage; fail fast with the same WAV error instead.
+  if (bytes < 12) {
+    throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
+  }
+  const head = Buffer.from(input.audioWavBase64, "base64").subarray(0, 12).toString("latin1");
+  if (head.slice(0, 4) !== "RIFF" || head.slice(8, 12) !== "WAVE") {
+    throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
   }
 
   const res = await deps.callTranscribe({
