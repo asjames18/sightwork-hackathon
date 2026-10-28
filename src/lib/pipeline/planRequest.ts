@@ -142,16 +142,24 @@ export function validatePlanRequest(body: unknown): string[] {
       const frame = f as Record<string, unknown>;
       if (typeof frame.tSec !== "number" || !Number.isFinite(frame.tSec) || frame.tSec < 0) {
         problems.push(`frames[${i}].tSec must be a number >= 0`);
-      } else if (frame.tSec < prevTsec) {
-        problems.push(`frames[${i}].tSec must not be earlier than the previous frame`);
-      } else if (
-        typeof req.durationSec === "number" &&
-        Number.isFinite(req.durationSec) &&
-        req.durationSec >= 0 &&
-        frame.tSec > req.durationSec
-      ) {
-        problems.push(`frames[${i}].tSec must not exceed durationSec`);
       } else {
+        // The order and duration checks are independent, and prevTsec
+        // advances on every valid tSec — even one that exceeds
+        // durationSec. The old else-if chain only advanced prevTsec
+        // on a clean frame, so a frame after an over-duration frame
+        // was compared against an older timestamp and an out-of-order
+        // frame (e.g. 5, 12, 6 with duration 10) slipped through.
+        if (frame.tSec < prevTsec) {
+          problems.push(`frames[${i}].tSec must not be earlier than the previous frame`);
+        }
+        if (
+          typeof req.durationSec === "number" &&
+          Number.isFinite(req.durationSec) &&
+          req.durationSec >= 0 &&
+          frame.tSec > req.durationSec
+        ) {
+          problems.push(`frames[${i}].tSec must not exceed durationSec`);
+        }
         prevTsec = frame.tSec;
       }
       if (
