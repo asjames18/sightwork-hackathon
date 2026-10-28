@@ -40,6 +40,11 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * surface later, when the segment step skips and the plan silently loses
  * segmentation. A garbage payload would pass the prefix check the same
  * way, so the payload is checked with the same base64 rule as audio.
+ * Valid base64 alone is still not an image: a text blob re-labelled
+ * data:image/jpeg would pass the base64 check and only surface later,
+ * when the segment step rejects it and the plan silently loses
+ * segmentation. So the payload must also decode to a real image
+ * header (JPEG, PNG, WebP, or GIF, the formats a canvas can produce).
  * A frame's tSec must not exceed
  * durationSec: the browser builder samples frames from the video
  * itself, so a later timestamp would mislabel that proof frame's
@@ -73,6 +78,32 @@ function isBase64(value: string): boolean {
  * audio, not as malformed audio. Decoded with atob (not Buffer) so
  * this pure module stays free of node types.
  */
+/**
+ * True when the base64 string decodes to a real image header, by
+ * magic bytes: JPEG (FF D8 FF), PNG (89 50 4E 47 0D 0A 1A 0A),
+ * GIF ("GIF87a"/"GIF89a"), or WebP ("RIFF" + "WEBP" at bytes 8-11).
+ * Only the first 12 bytes are decoded (the first 16 base64 chars),
+ * with atob (not Buffer) so this pure module stays free of node
+ * types. A payload too short to hold any header fails.
+ */
+function isImageBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  const chunk = stripped.slice(0, 16);
+  if (chunk.length < 8) return false;
+  const head = atob(chunk.length % 4 === 0 ? chunk : chunk.slice(0, chunk.length - (chunk.length % 4)));
+  const b = (i: number): number => head.charCodeAt(i);
+  if (head.length >= 3 && b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return true;
+  if (
+    head.length >= 8 &&
+    b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47 &&
+    b(4) === 0x0d && b(5) === 0x0a && b(6) === 0x1a && b(7) === 0x0a
+  ) return true;
+  if (head.length >= 6 && head.slice(0, 6) === "GIF87a") return true;
+  if (head.length >= 6 && head.slice(0, 6) === "GIF89a") return true;
+  if (head.length >= 12 && head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WEBP") return true;
+  return false;
+}
+
 function isWavBase64(value: string): boolean {
   const stripped = value.replace(/\s/g, "");
   if (stripped.length === 0) return true;
@@ -130,6 +161,8 @@ export function validatePlanRequest(body: unknown): string[] {
         const payload = frame.dataUrl.slice(frame.dataUrl.indexOf(";base64,") + 8);
         if (payload.length === 0 || !isBase64(payload)) {
           problems.push(`frames[${i}].dataUrl must carry valid base64 image data`);
+        } else if (!isImageBase64(payload)) {
+          problems.push(`frames[${i}].dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`);
         }
       }
     });
