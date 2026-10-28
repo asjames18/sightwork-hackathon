@@ -161,6 +161,25 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
         throw new Error(`meta: response text was not JSON: ${text.slice(0, 200)}`);
       }
       const usage = (parsed.usage ?? {}) as MetaUsage;
+      // A bad provider token count would otherwise flow into the
+      // cost math unchecked and only surface later, mid-run, when
+      // the step records the call and the usage tracker rejects the
+      // resulting negative (or non-finite) cost with a generic cost
+      // message. Token counts are whole counts, so reject a
+      // non-integer, negative, or non-finite count here, at the cost
+      // computation, like the ASR caller rejects a bad duration.
+      // A missing field still means zero tokens, as before.
+      for (const [field, value] of [
+        ["input_tokens", usage.input_tokens],
+        ["output_tokens", usage.output_tokens],
+      ] as const) {
+        if (
+          value !== undefined &&
+          (typeof value !== "number" || !Number.isInteger(value) || value < 0)
+        ) {
+          throw new Error(`meta: usage ${field} must be an integer >= 0, got ${value}`);
+        }
+      }
       const inputTokens = usage.input_tokens ?? 0;
       const outputTokens = usage.output_tokens ?? 0;
       const tokenCost = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
