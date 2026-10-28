@@ -54,6 +54,8 @@ To send a walkthrough to the models, open `http://localhost:3000/?runner=api` (o
 
 If SAM 3.1 or Muse Image isn't available to your key, those steps are skipped and the plan still comes back complete. Keys are never logged or committed.
 
+Each run is capped at $10 of model spend, enforced in code. If a call would push a run past the cap, the run stops with a failure message instead of moving on to the next step, and the calls it did make are logged on the server.
+
 Each plan is one request: still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) and the narration as 16 kHz mono audio. The full video stays on the device. The browser keeps a request under about 9 MB, since the server accepts up to 10 MB. Some hosts cap request bodies lower (Vercel functions take 4.5 MB), so a long narrated walkthrough can come back as "too large" there.
 
 On the plan screen, "Save PDF" prints a clean copy of the plan.
