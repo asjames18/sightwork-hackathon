@@ -122,6 +122,18 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   }
   const size = opts.size ?? DEFAULT_SIZE;
   const outputFormat = opts.outputFormat ?? DEFAULT_OUTPUT_FORMAT;
+  // A blank or non-string size/outputFormat would otherwise be sent to
+  // the provider and only fail on a paid Image call (or come back in
+  // the wrong format), so reject it here, at caller creation, like the
+  // per-image cost is rejected above.
+  if (typeof size !== "string" || size.trim().length === 0) {
+    throw new Error(`image: size must be a non-empty string, got ${JSON.stringify(opts.size)}`);
+  }
+  if (typeof outputFormat !== "string" || outputFormat.trim().length === 0) {
+    throw new Error(
+      `image: outputFormat must be a non-empty string, got ${JSON.stringify(opts.outputFormat)}`,
+    );
+  }
 
   return async (req) => {
     // A bad request would otherwise spend a paid Image call and only
