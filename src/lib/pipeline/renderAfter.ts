@@ -35,6 +35,13 @@
  * Model IDs are not hardcoded here: prompt 04 says to confirm them at
  * the first spike, so the wiring supplies imageModel (and judgeModel
  * when the judge runs) through deps.
+ *
+ * Fail-fast validation (same series as reason.ts): the input shape is
+ * validated before any work, and the call deps are validated after the
+ * skip checks but before any paid Image call, so a bad request never
+ * spends a call. A bad request throws with a clear reason: error; the
+ * skip paths (no frames, no visible changes, unusable hero URL) still
+ * return null without needing valid call deps, because no call is made.
  */
 
 import { AFTER_IMAGE_LABEL, type WorkPlan, type WorkStep } from "../types";
@@ -202,10 +209,85 @@ function isUsableImage(s: unknown): s is string {
   );
 }
 
+/**
+ * Validate the renderAfter input shape before any work. Throws with a
+ * clear reason: error; a bad plan used to surface as a TypeError inside
+ * the hero pick or the visible-changes build instead.
+ */
+export function validateRenderAfterInput(input: RenderAfterInput): void {
+  if (!input || typeof input !== "object") {
+    throw new Error("renderAfter: input must be an object");
+  }
+  const plan = (input as RenderAfterInput).plan;
+  if (!plan || typeof plan !== "object") {
+    throw new Error("renderAfter: plan must be an object");
+  }
+  if (plan.frames !== undefined) {
+    if (!Array.isArray(plan.frames)) {
+      throw new Error("renderAfter: plan.frames must be an array when given");
+    }
+    plan.frames.forEach((f, i) => {
+      if (
+        !f ||
+        typeof f !== "object" ||
+        !Number.isInteger(f.index) ||
+        (f.index as number) < 0 ||
+        typeof f.tSec !== "number" ||
+        !Number.isFinite(f.tSec) ||
+        f.tSec < 0
+      ) {
+        throw new Error(`renderAfter: plan.frames[${i}] has no valid index/tSec`);
+      }
+    });
+  }
+  if (!Array.isArray(plan.issues)) {
+    throw new Error("renderAfter: plan.issues must be an array");
+  }
+  if (!Array.isArray(plan.workOrder)) {
+    throw new Error("renderAfter: plan.workOrder must be an array");
+  }
+  if (
+    input.spaceType !== undefined &&
+    (typeof input.spaceType !== "string" || input.spaceType.trim().length === 0)
+  ) {
+    throw new Error("renderAfter: spaceType must be a non-empty string when given");
+  }
+}
+
+/**
+ * Validate the call deps before any paid Image call. Throws with a
+ * clear reason: error. In particular, generateTwo without a judge
+ * used to pay for 2 candidates and then pick the first anyway, since
+ * the judge branch silently requires both callJudge and judgeModel.
+ */
+export function validateRenderAfterDeps(deps: RenderAfterDeps): void {
+  if (!deps || typeof deps !== "object") {
+    throw new Error("renderAfter: deps must be an object");
+  }
+  if (typeof deps.imageModel !== "string" || deps.imageModel.trim().length === 0) {
+    throw new Error("renderAfter: imageModel must be a non-empty string");
+  }
+  if (typeof deps.callImage !== "function") {
+    throw new Error("renderAfter: callImage must be a function");
+  }
+  if (!deps.tracker || typeof deps.tracker.record !== "function") {
+    throw new Error("renderAfter: tracker.record must be a function");
+  }
+  if (deps.generateTwo === true) {
+    if (typeof deps.judgeModel !== "string" || deps.judgeModel.trim().length === 0) {
+      throw new Error("renderAfter: judgeModel must be a non-empty string when generateTwo is true");
+    }
+    if (typeof deps.callJudge !== "function") {
+      throw new Error("renderAfter: callJudge must be a function when generateTwo is true");
+    }
+  }
+}
+
 export async function runRenderAfter(
   input: RenderAfterInput,
   deps: RenderAfterDeps,
 ): Promise<RenderAfterOutput> {
+  validateRenderAfterInput(input);
   const { plan } = input;
   const hero = pickHeroFrameIndex(plan);
   if (hero === null) {
@@ -230,6 +312,21 @@ export async function runRenderAfter(
       skipped: "no-frames",
     };
   }
+  if (typeof heroFrame.url !== "string" || heroFrame.url.length === 0) {
+    // No usable image to edit: skip without spending a paid call.
+    return {
+      afterImageUrl: null,
+      heroFrameIndex: hero,
+      visibleChanges,
+      skipped: "no-frames",
+      error: "renderAfter: hero frame has no usable image URL",
+    };
+  }
+
+  // Fail fast here, after the skip paths and before the try: a
+  // validation throw inside the try would be swallowed as a
+  // "model-failure" null, hiding a wiring bug.
+  validateRenderAfterDeps(deps);
 
   const spaceType = input.spaceType ?? DEFAULT_SPACE_TYPE;
   const prompt = buildRenderAfterPrompt(spaceType, visibleChanges);
