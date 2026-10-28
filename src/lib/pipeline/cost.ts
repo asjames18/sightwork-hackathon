@@ -19,7 +19,11 @@
  *   and sources; code computes the range. Totals are reproducible.
  * - Materials: qty is the leading number of the qty string, or 1 when
  *   there is none. A material with no model price gets [0, 0] plus a
- *   "No price for <item>" assumption line.
+ *   "No price for <item>" assumption line. A model price for a
+ *   material index outside the materials array is ignored, never
+ *   silently dropped: it adds an "Ignored price for material index
+ *   <n>" assumption line, so a model slip stays visible on the plan
+ *   instead of surfacing as a puzzling "No price" line.
  * - Labor: volunteer basis pays only licensed trades (electrician,
  *   plumber, roofer); contractor pays every step; mixed pays every step
  *   whose trade is not "volunteer". Steps without hours add no labor.
@@ -195,7 +199,15 @@ export function computeCostRange(
   model: CostModelOutput,
 ): CostResult {
   const byIndex = new Map<number, ModelUnitCost>();
-  for (const u of model.unitCosts) byIndex.set(u.materialIndex, u);
+  const ignored = new Set<number>();
+  for (const u of model.unitCosts) {
+    // parseCostModel only checks materialIndex >= 0, so an index past
+    // the end of the materials array would otherwise vanish here with
+    // no trace: the material it meant keeps a "No price" line and the
+    // stray price is never seen. Keep it visible instead.
+    if (u.materialIndex < materials.length) byIndex.set(u.materialIndex, u);
+    else ignored.add(u.materialIndex);
+  }
 
   const missing: string[] = [];
   const filled: MaterialItem[] = materials.map((m, i) => {
@@ -240,7 +252,12 @@ export function computeCostRange(
     label: COST_LABEL,
     region,
     laborBasis,
-    assumptions: [...model.assumptions, COMPUTED_LINE, ...missing],
+    assumptions: [
+      ...model.assumptions,
+      COMPUTED_LINE,
+      ...missing,
+      ...[...ignored].sort((a, b) => a - b).map((n) => `Ignored price for material index ${n} (no such material)`),
+    ],
     ...(model.sources.length > 0 ? { sources: model.sources } : {}),
   };
   return { costRange, materials: filled };
