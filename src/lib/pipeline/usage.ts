@@ -121,12 +121,17 @@ export function createUsageTracker(opts?: {
             `($${round2(total)} spent + $${round2(input.costUsd)} for ${model}/${step})`,
         );
       }
+      // Normalize a supplied timestamp to ISO: a parseable but
+      // non-ISO value (e.g. "Oct 28 2026") used to be stored
+      // verbatim, so spike log lines sorted by `at` would order
+      // wrong against the ISO timestamps the tracker itself
+      // generates. Omitted at still defaults to now.
       const rec: UsageRecord = {
         model,
         step,
         latencyMs: input.latencyMs,
         costUsd: round2(input.costUsd),
-        at: at ?? new Date().toISOString(),
+        at: at === undefined ? new Date().toISOString() : new Date(at).toISOString(),
       };
       seen.push(rec);
       total = round2(total + rec.costUsd);
