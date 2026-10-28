@@ -7,6 +7,8 @@
   /* Darker accent for fills, chips and small text: 5.18:1 on white (AA). Keep --color-accent for big display numbers. */
   --color-accent-dark: #c2410c;
   --color-safe: #2f9e44;
+  /* Darker green for fills behind white text ("done" step marks): AA on white text. */
+  --color-safe-dark: #237032;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -14,6 +16,12 @@ html,
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+}
+
+/* Each screen's h1 gets focus by script on a stage change (tabindex -1) so keyboard and screen-reader
+   users land at the top. It isn't a control, so it shows no focus box; real controls keep their rings. */
+main h1[tabindex="-1"]:focus {
+  outline: none;
 }
 
 /* Plan screen "Save PDF": the browser print dialog saves a clean, paper-white plan. */

@@ -159,7 +159,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
       <button
         type="button"
         onClick={onExample}
-        className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-[#c2410c] underline ${ring}`}
+        className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-accent-dark underline ${ring}`}
       >
         See an example plan first
       </button>
