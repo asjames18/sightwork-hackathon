@@ -55,7 +55,7 @@ export function ProcessingStep({
   return (
     <section aria-live="polite">
       <h1 className="text-2xl font-extrabold sm:text-3xl">{failed ? "We couldn't finish your plan" : "Working on your plan"}</h1>
-      <p className="mt-1 truncate text-sm text-ink/60" title={videoName}>
+      <p className="mt-1 truncate text-sm text-ink/65" title={videoName}>
         {videoName}
       </p>
 
@@ -64,7 +64,7 @@ export function ProcessingStep({
           <span className="font-semibold">
             Step {position} of {total}
           </span>
-          {!failed && <span className="text-ink/55">Keep this tab open</span>}
+          {!failed && <span className="text-ink/65">Keep this tab open</span>}
         </div>
         <div
           role="progressbar"
@@ -93,12 +93,12 @@ export function ProcessingStep({
                   state === "done"
                     ? "bg-safe text-white"
                     : state === "skipped"
-                      ? "border border-dashed border-ink/30 bg-white text-ink/45"
+                      ? "border border-dashed border-ink/30 bg-white text-ink/65"
                     : state === "now"
                       ? "animate-pulse bg-accent text-white"
                       : state === "failed"
                         ? "bg-red-600 text-white"
-                        : "bg-ink/10 text-ink/40"
+                        : "bg-ink/10 text-ink/70"
                 }`}
               >
                 {state === "done" ? "✓" : state === "failed" ? "!" : state === "skipped" ? "–" : i + 1}
@@ -106,18 +106,18 @@ export function ProcessingStep({
               <span className="min-w-0 flex-1">
                 <span
                   className={`block break-words leading-snug ${
-                    state === "next" ? "text-ink/40" : state === "skipped" ? "font-medium text-ink/50" : "font-medium"
+                    state === "next" ? "text-ink/60" : state === "skipped" ? "font-medium text-ink/65" : "font-medium"
                   }`}
                 >
                   {LABELS[s]}
                 </span>
                 {(ENGINE[s] || state === "skipped") && (
-                  <span className={`block text-xs ${state === "next" ? "text-ink/30" : "text-ink/55"}`}>
+                  <span className={`block text-xs ${state === "next" ? "text-ink/60" : "text-ink/65"}`}>
                     {ENGINE[s]}
                     {state === "skipped" ? (
-                      <span className="text-ink/45">{ENGINE[s] ? " · " : ""}skipped this run</span>
+                      <span>{ENGINE[s] ? " · " : ""}skipped this run</span>
                     ) : (
-                      ENGINE[s] && OPTIONAL_STEPS.has(s) && <span className="text-ink/40"> · optional</span>
+                      ENGINE[s] && OPTIONAL_STEPS.has(s) && <span> · optional</span>
                     )}
                   </span>
                 )}

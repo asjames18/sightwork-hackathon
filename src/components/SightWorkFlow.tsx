@@ -81,7 +81,7 @@ export function SightWorkFlow() {
             <span>
               Sight<span className="text-accent">Work</span>
             </span>
-            <span className="hidden text-sm font-medium tracking-normal text-ink/50 md:inline">Film a walkthrough. Get a work plan.</span>
+            <span className="hidden text-sm font-medium tracking-normal text-ink/65 md:inline">Film a walkthrough. Get a work plan.</span>
           </button>
           {stage.kind === "plan" && (
             <div className="flex shrink-0 items-center gap-2">

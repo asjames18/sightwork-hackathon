@@ -78,7 +78,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
         >
           <span aria-hidden className="text-4xl">🎥</span>
           <span className="text-lg font-semibold">Record or choose a video</span>
-          <span className="text-sm text-ink/60">MP4 or MOV, about 60 to 90 seconds</span>
+          <span className="text-sm text-ink/65">MP4 or MOV, about 60 to 90 seconds</span>
         </button>
       ) : null}
 
@@ -102,7 +102,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
           <div className="flex items-center justify-between gap-3 p-4">
             <p className="min-w-0 truncate text-sm text-ink/70">
               {preview.file.name}
-              {durationSec !== null && <span className="text-ink/50"> · {formatDuration(durationSec)}</span>}
+              {durationSec !== null && <span className="text-ink/65"> · {formatDuration(durationSec)}</span>}
             </p>
             <button
               type="button"
@@ -131,7 +131,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
             >
               {check.kind === "reading" ? "Checking video…" : "Make my work plan"}
             </button>
-            <p className="mt-2 text-center text-xs text-ink/50">
+            <p className="mt-2 text-center text-xs text-ink/65">
               {runner === "api"
                 ? "Frames and narration are sent to make your plan. The full video stays on this device."
                 : "Preview build: your video stays on this device and an example plan is shown."}
@@ -143,7 +143,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
       <button
         type="button"
         onClick={onExample}
-        className="mt-4 min-h-[44px] w-full text-center text-sm font-medium text-accent underline"
+        className="mt-4 min-h-[44px] w-full text-center text-sm font-medium text-[#c2410c] underline"
       >
         See an example plan first
       </button>
@@ -171,7 +171,7 @@ function FilmingTips() {
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold">{t.title}</span>
-            <span className="block text-xs text-ink/60">{t.detail}</span>
+            <span className="block text-xs text-ink/65">{t.detail}</span>
           </span>
         </li>
       ))}
