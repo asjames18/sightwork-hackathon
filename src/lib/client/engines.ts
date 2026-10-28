@@ -3,12 +3,13 @@ import type { PlanProvider, PlanStep } from "@/lib/types";
 /**
  * Which plan engine the processing screen names. Build-time default comes from
  * NEXT_PUBLIC_SIGHTWORK_PLAN_PROVIDER ("baseten" or "meta"); `?plan=baseten|meta` overrides it in a preview.
+ * Unset or blank means "baseten", matching the server's PLAN_PROVIDER default.
  * Labels only: the server decides what actually runs.
  */
 export function pickPlanProvider(search: string | null, envValue: string | undefined): PlanProvider {
   const q = search ? new URLSearchParams(search).get("plan") : null;
   if (q === "baseten" || q === "meta") return q;
-  return envValue === "baseten" ? "baseten" : "meta";
+  return envValue?.trim().toLowerCase() === "meta" ? "meta" : "baseten";
 }
 
 /** Steps that need Meta model access and may be skipped; the plan still finishes without them. */
