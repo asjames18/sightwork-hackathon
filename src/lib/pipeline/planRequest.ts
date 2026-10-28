@@ -55,7 +55,10 @@ export function planBodyTooLarge(bodyText: string): boolean {
  * a WAV header: the transcribe step throws on a non-WAV payload with
  * the same RIFF/WAVE rule, so a valid-base64 MP3 (or any other blob)
  * would otherwise pass here and fail at "listening" instead of here
- * on "uploading".
+ * on "uploading". A whitespace-only string is rejected outright: the
+ * transcribe step treats any non-empty string as audio, so blank audio
+ * would otherwise pass here (it strips to empty, which the base64 and
+ * WAV checks both accept as "no audio") and fail at "listening".
  */
 
 /**
@@ -176,6 +179,11 @@ export function validatePlanRequest(body: unknown): string[] {
   if (req.audioWavBase64 !== undefined) {
     if (typeof req.audioWavBase64 !== "string") {
       problems.push("audioWavBase64 must be a string");
+    } else if (
+      req.audioWavBase64.length > 0 &&
+      req.audioWavBase64.replace(/\s/g, "").length === 0
+    ) {
+      problems.push("audioWavBase64 must not be blank");
     } else if (!isBase64(req.audioWavBase64)) {
       problems.push("audioWavBase64 must be valid base64");
     } else if (!isWavBase64(req.audioWavBase64)) {
