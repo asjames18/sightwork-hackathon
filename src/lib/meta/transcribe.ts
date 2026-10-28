@@ -111,6 +111,13 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
   const pricePerHour = opts.pricePerHourUsd ?? DEFAULT_PRICE_PER_HOUR_USD;
+  // A bad hourly price would only surface later, mid-run, when the
+  // transcribe step records the call and the usage tracker rejects it.
+  // Reject it here, at caller creation, like the tracker rejects bad
+  // opts, so a misconfigured price fails fast before any ASR call.
+  if (!Number.isFinite(pricePerHour) || pricePerHour < 0) {
+    throw new Error(`asr: pricePerHourUsd must be a finite number >= 0, got ${opts.pricePerHourUsd}`);
+  }
 
   return async (req) => {
     const sessionId = `sightwork-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
