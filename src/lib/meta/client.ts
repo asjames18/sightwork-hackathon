@@ -108,6 +108,21 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
   const inputPrice = opts.inputPricePerMillion ?? DEFAULT_INPUT_PRICE_PER_MILLION;
   const outputPrice = opts.outputPricePerMillion ?? DEFAULT_OUTPUT_PRICE_PER_MILLION;
   const webSearchCost = opts.webSearchCostUsd ?? DEFAULT_WEB_SEARCH_COST_USD;
+  if (!Number.isFinite(inputPrice) || inputPrice < 0) {
+    throw new Error(
+      `meta: inputPricePerMillion must be a finite number >= 0, got ${opts.inputPricePerMillion}`,
+    );
+  }
+  if (!Number.isFinite(outputPrice) || outputPrice < 0) {
+    throw new Error(
+      `meta: outputPricePerMillion must be a finite number >= 0, got ${opts.outputPricePerMillion}`,
+    );
+  }
+  if (!Number.isFinite(webSearchCost) || webSearchCost < 0) {
+    throw new Error(
+      `meta: webSearchCostUsd must be a finite number >= 0, got ${opts.webSearchCostUsd}`,
+    );
+  }
 
   return {
     async callSpark(req: SparkCallRequest): Promise<SparkCallResult> {
