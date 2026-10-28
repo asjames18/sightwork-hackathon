@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { PlanStep } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS } from "@/lib/client/engines";
 
@@ -47,6 +48,12 @@ export function ProcessingStep({
 }) {
   const ENGINE = engines ?? currentStepEngines();
   const failed = Boolean(failure);
+  // When a run stops, move keyboard and screen-reader focus to "Try again" (focus also scrolls it into
+  // view on a phone, where the failure card sits below the step list).
+  const retryRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (failed) retryRef.current?.focus();
+  }, [failed]);
   // "done" is the end state, not a step the user waits on, so it doesn't count toward "Step N of M".
   const work = steps.filter((s) => s !== "done");
   const total = Math.max(work.length, 1);
@@ -134,12 +141,21 @@ export function ProcessingStep({
           <p className="mt-1 text-sm text-ink/70">{failure.message}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             {onRetry && (
-              <button type="button" onClick={onRetry} className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 font-semibold text-white active:scale-[.99]">
+              <button
+                ref={retryRef}
+                type="button"
+                onClick={onRetry}
+                className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 font-semibold text-white active:scale-[.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
                 Try again
               </button>
             )}
             {onExample && (
-              <button type="button" onClick={onExample} className="min-h-11 flex-1 rounded-xl border border-ink/20 px-4 py-3 font-semibold active:scale-[.99]">
+              <button
+                type="button"
+                onClick={onExample}
+                className="min-h-11 flex-1 rounded-xl border border-ink/20 px-4 py-3 font-semibold active:scale-[.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
                 See the example plan
               </button>
             )}
