@@ -179,8 +179,32 @@ export function buildVisibleChanges(plan: WorkPlan, hero: number): string[] {
   return lines;
 }
 
+/**
+ * Validate a prompt builder's inputs before it emits a prompt: a
+ * blank space type used to produce "this exact  photo", a non-array
+ * changes list threw a bare TypeError on .map, an empty list produced
+ * a prompt with an empty "Change only" section (a paid Image call
+ * that asks for nothing), and a non-string/blank entry leaked
+ * "undefined" into the prompt. Valid inputs pass through verbatim,
+ * so prompts built from good input are unchanged.
+ */
+function validatePromptChanges(visibleChanges: unknown, caller: string): void {
+  if (!Array.isArray(visibleChanges) || visibleChanges.length === 0) {
+    throw new Error(`renderAfter: ${caller} needs a non-empty visibleChanges array`);
+  }
+  visibleChanges.forEach((c, i) => {
+    if (typeof c !== "string" || c.trim().length === 0) {
+      throw new Error(`renderAfter: ${caller} visibleChanges[${i}] must be a non-empty string`);
+    }
+  });
+}
+
 /** The prompt-04 edit prompt, with space type, keep list, and changes filled. */
 export function buildRenderAfterPrompt(spaceType: string, visibleChanges: string[]): string {
+  if (typeof spaceType !== "string" || spaceType.trim().length === 0) {
+    throw new Error("renderAfter: buildRenderAfterPrompt spaceType must be a non-empty string");
+  }
+  validatePromptChanges(visibleChanges, "buildRenderAfterPrompt");
   const changes = visibleChanges.map((c) => `- ${c}`).join("\n");
   return (
     `Photo edit of this exact ${spaceType} photo. Show the same room after the work is done.\n` +
@@ -192,6 +216,7 @@ export function buildRenderAfterPrompt(spaceType: string, visibleChanges: string
 
 /** The prompt-04 judge prompt for two candidates. */
 export function buildJudgePrompt(visibleChanges: string[]): string {
+  validatePromptChanges(visibleChanges, "buildJudgePrompt");
   const changes = visibleChanges.map((c) => `- ${c}`).join("\n");
   return (
     `Image 1 is the original photo. Images 2 and 3 are edits that should show only these changes:\n${changes}\n` +
