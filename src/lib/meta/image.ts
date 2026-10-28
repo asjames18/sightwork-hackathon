@@ -112,6 +112,14 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
   const imageCost = opts.imageCostUsd ?? DEFAULT_IMAGE_COST_USD;
+  // A bad per-image cost would only surface later, mid-run, when the
+  // renderAfter step records the call and the usage tracker rejects
+  // it. Reject it here, at caller creation, like the SAM caller does
+  // for its per-request cost, so a misconfigured cost fails fast
+  // before any Image call.
+  if (!Number.isFinite(imageCost) || imageCost < 0) {
+    throw new Error(`image: imageCostUsd must be a finite number >= 0, got ${opts.imageCostUsd}`);
+  }
   const size = opts.size ?? DEFAULT_SIZE;
   const outputFormat = opts.outputFormat ?? DEFAULT_OUTPUT_FORMAT;
 
