@@ -274,13 +274,75 @@ export function computeCostRange(
 }
 
 /**
+ * Fail fast on a bad request before any paid Spark call: a non-object
+ * input or a non-array materials/workOrder used to throw a bare
+ * TypeError deep inside computeCostRange, after the model call.
+ */
+export function validateCostInput(input: CostInput): void {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("estimateCost: input is not an object");
+  }
+  for (const field of ["spaceName", "generatedFrom"] as const) {
+    const v = input[field];
+    if (typeof v !== "string" || v.trim().length === 0) {
+      throw new Error(`estimateCost: ${field} must be a non-empty string`);
+    }
+  }
+  for (const field of ["inventory", "issues", "materials", "workOrder"] as const) {
+    if (!Array.isArray(input[field])) {
+      throw new Error(`estimateCost: ${field} is not an array`);
+    }
+  }
+  if (input.region !== undefined && typeof input.region !== "string") {
+    throw new Error("estimateCost: region must be a string when given");
+  }
+  if (
+    input.laborBasis !== undefined &&
+    input.laborBasis !== "volunteer" &&
+    input.laborBasis !== "contractor" &&
+    input.laborBasis !== "mixed"
+  ) {
+    throw new Error(`estimateCost: laborBasis must be volunteer, contractor or mixed, got ${input.laborBasis}`);
+  }
+}
+
+/**
+ * Fail fast on bad wiring after the no-region skip but before the paid
+ * Spark call: a tracker without record used to throw only after the
+ * call, when record ran, so the spend was already made.
+ */
+export function validateCostDeps(deps: CostDeps): void {
+  if (deps === null || typeof deps !== "object" || Array.isArray(deps)) {
+    throw new Error("estimateCost: deps is not an object");
+  }
+  if (typeof deps.prompt !== "string" || deps.prompt.trim().length === 0) {
+    throw new Error("estimateCost: prompt must be a non-empty string");
+  }
+  if (!isRecord(deps.schema)) {
+    throw new Error("estimateCost: schema must be an object");
+  }
+  if (typeof deps.callSpark !== "function") {
+    throw new Error("estimateCost: callSpark must be a function");
+  }
+  if (
+    deps.tracker === null ||
+    typeof deps.tracker !== "object" ||
+    typeof deps.tracker.record !== "function"
+  ) {
+    throw new Error("estimateCost: tracker.record is not a function");
+  }
+}
+
+/**
  * Run the cost step. Returns null without calling the model when no
  * region was supplied. Otherwise one model call, tracker-recorded, then
  * the math above and a checkWorkPlan validation of the result.
  */
 export async function estimateCost(input: CostInput, deps: CostDeps): Promise<CostResult | null> {
+  validateCostInput(input);
   const region = input.region?.trim();
   if (!region) return null;
+  validateCostDeps(deps);
   const laborBasis = input.laborBasis ?? "volunteer";
 
   const res = await deps.callSpark({ model: SPARK_MODEL, prompt: deps.prompt, schema: deps.schema });
@@ -312,3 +374,4 @@ export async function estimateCost(input: CostInput, deps: CostDeps): Promise<Co
   }
   return result;
 }
+
