@@ -156,6 +156,17 @@ function detailOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * True when the error is a usage-tracker spike-cap throw. A cap breach
+ * is a spending stop, not an optional-step failure: the run must fail
+ * fast instead of continuing to later steps, each of which would spend
+ * another call before its own tracker record throws.
+ */
+function isSpikeCapError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /spike cap/i.test(message);
+}
+
 /** Baseten reason-call image cap (Grok Bot, 2026-10-27 11:43 AM). */
 export const REASON_MAX_FRAMES = 8;
 
@@ -383,6 +394,10 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     );
   } catch (err) {
     if (isAbort(err)) throw err;
+    // A cap breach is not a SAM failure: stop the run instead of
+    // continuing to the reason step, which would spend another call.
+    if (isSpikeCapError(err))
+      throw new PlanStepError("counting", PLAIN_FAILURE_MESSAGE.counting, detailOf(err));
     console.warn(`runPlan: segment failed, continuing without segmentation: ${detailOf(err)}`);
     segmentation = null;
     // The segment stage covers both UI steps, so both read as
@@ -487,6 +502,10 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     cost = await estimateCost(costInput, costDeps);
   } catch (err) {
     if (isAbort(err)) throw err;
+    // A cap breach is not a cost failure: stop the run instead of
+    // continuing to the picturing step, which would spend another call.
+    if (isSpikeCapError(err))
+      throw new PlanStepError("planning", PLAIN_FAILURE_MESSAGE.planning, detailOf(err));
     // No-region estimateCost returns null without calling, so a throw
     // here is unexpected: keep the old planning failure, don't mask it.
     if (!request.region?.trim()) {
