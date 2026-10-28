@@ -137,7 +137,10 @@ export function createUsageTracker(opts?: {
       };
     },
     records(): readonly UsageRecord[] {
-      return seen;
+      // A copy, not the live log: a caller pushing to (or splicing)
+      // the returned array must not change the tracker's own record
+      // count or the order the spike log is printed in.
+      return [...seen];
     },
   };
 }
