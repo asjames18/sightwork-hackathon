@@ -174,6 +174,15 @@ export function validatePlanRequest(body: unknown): string[] {
   for (const key of ["spaceName", "spaceType", "region"]) {
     if (req[key] !== undefined && typeof req[key] !== "string") {
       problems.push(`${key} must be a string`);
+    } else if (
+      typeof req[key] === "string" &&
+      req[key].length > 0 &&
+      req[key].trim().length === 0
+    ) {
+      // A present-but-blank label is never what the UI sends: an
+      // empty string means "not given", but spaces-only would print
+      // as a blank label on the plan screen, so fail fast here.
+      problems.push(`${key} must not be blank`);
     }
   }
   if (req.audioWavBase64 !== undefined) {
