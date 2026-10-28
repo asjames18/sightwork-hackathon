@@ -177,6 +177,13 @@ export function pickReasonFrames(
   maxFrames: number,
 ): number[] {
   if (frameCount <= 0 || maxFrames <= 0) return [];
+  // A cap of 1 would divide by zero in the spacing below
+  // (i * (frameCount - 1) / (maxFrames - 1)), yielding a NaN subset
+  // index and an undefined frame downstream. The route only ever
+  // passes 8, but the function is exported, so fail safe: with one
+  // slot, the subset is the first frame, which the spacing would
+  // have picked first anyway.
+  if (maxFrames === 1) return [0];
   if (frameCount <= maxFrames) {
     return Array.from({ length: frameCount }, (_, i) => i);
   }
