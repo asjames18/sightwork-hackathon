@@ -68,6 +68,18 @@ export const ASR_MODE = "ENDPOINTING" as const;
 
 /** Cost of audio of the given length, whole seconds rounded down. */
 export function computeAsrCostUsd(durationMs: number, pricePerHourUsd = DEFAULT_PRICE_PER_HOUR_USD): number {
+  // A bad duration or price would otherwise surface later, mid-run,
+  // when the transcribe step records the call and the usage tracker
+  // rejects it with a generic cost message. The caller checks the
+  // provider duration only for finiteness, so a negative duration
+  // would reach here; reject both bad inputs here, at the cost
+  // computation, like the caller rejects a bad price at creation.
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error(`asr: durationMs must be a finite number >= 0, got ${durationMs}`);
+  }
+  if (!Number.isFinite(pricePerHourUsd) || pricePerHourUsd < 0) {
+    throw new Error(`asr: pricePerHourUsd must be a finite number >= 0, got ${pricePerHourUsd}`);
+  }
   return (Math.floor(durationMs / 1000) / 3600) * pricePerHourUsd;
 }
 
