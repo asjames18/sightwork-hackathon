@@ -82,7 +82,7 @@ export function ProcessingStep({
           className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink/10"
         >
           <div
-            className={`h-full rounded-full transition-[width] duration-500 ${failed ? "bg-red-600" : "bg-accent"}`}
+            className={`h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${failed ? "bg-red-600" : "bg-accent"}`}
             style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
           />
         </div>
