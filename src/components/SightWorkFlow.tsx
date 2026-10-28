@@ -59,12 +59,13 @@ export function SightWorkFlow() {
   // New stage: back to the top so the next screen starts at its heading, not mid-scroll, and move
   // keyboard and screen-reader focus to that heading (the button that was pressed is gone). "Try again"
   // keeps the processing stage but starts a new run, and its button unmounts too, so do the same then.
-  const firstStage = useRef(true);
+  // Compare against the last stage seen rather than a "first run" flag: React's dev Strict Mode runs
+  // effects twice on mount, which used to focus (and ring) the upload heading on a fresh page load.
+  const shownStage = useRef(`${stage.kind}:${runKey}`);
   useEffect(() => {
-    if (firstStage.current) {
-      firstStage.current = false;
-      return;
-    }
+    const key = `${stage.kind}:${runKey}`;
+    if (shownStage.current === key) return;
+    shownStage.current = key;
     window.scrollTo({ top: 0 });
     const heading = document.querySelector<HTMLElement>("main h1");
     if (heading) {
