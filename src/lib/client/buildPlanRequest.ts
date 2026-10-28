@@ -18,7 +18,10 @@ export interface BuildOptions {
   intervalSec?: number;
   /** Longest frame side in px. Default 1024. */
   longSide?: number;
-  /** Narration sample rate. Default 16000. */
+  /**
+   * Narration sample rate. Default 16000. Meta's transcribe step only takes mono 16-bit WAV at
+   * 16000 or 24000 Hz (8000 gets a 400, checked 2026-10-28), so any other value falls back to 16000.
+   */
   audioSampleRate?: number;
   /** Total request budget in bytes (the route caps at 10 MB). Default 9 MB, leaving room for JSON. */
   maxRequestBytes?: number;
@@ -31,6 +34,14 @@ const DEFAULTS = {
   audioSampleRate: 16000,
   maxRequestBytes: 9 * 1024 * 1024,
 };
+
+/** Sample rates the transcribe step accepts. */
+export const TRANSCRIBE_SAMPLE_RATES = [16000, 24000] as const;
+
+/** The requested narration rate when transcribe accepts it, otherwise 16000. */
+export function narrationSampleRate(requested: number | undefined): number {
+  return (TRANSCRIBE_SAMPLE_RATES as readonly number[]).includes(requested as number) ? (requested as number) : 16000;
+}
 
 /** JPEG qualities tried in order until a frame fits its share of the budget. */
 const QUALITIES = [0.72, 0.55, 0.4];
@@ -209,7 +220,7 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       if (!video.videoWidth || !video.videoHeight)
         throw new BuildRequestError("This browser can't show this video's picture. Try Safari, or export it as an MP4 and try again.");
 
-      const wav = await extractNarration(file, o.audioSampleRate, signal);
+      const wav = await extractNarration(file, narrationSampleRate(o.audioSampleRate), signal);
       const audioWavBase64 = wav ? bytesToBase64(wav) : undefined;
 
       const times = pickFrameTimes(durationSec, o.maxFrames, o.intervalSec);
