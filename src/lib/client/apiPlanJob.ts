@@ -43,6 +43,36 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
 }
 
 /**
+ * Screen text for a non-OK /api/plan response, keyed by status. The server's own
+ * {error} text is written for developers, so it goes to the console, not the screen.
+ */
+export function messageForStatus(status: number): string {
+  if (status === 413) return "That video is too large to send. Try a shorter walkthrough.";
+  if (status === 400) return "The video's frames didn't come through right. Try again, or open the example plan.";
+  if (status === 429) return "Too many plans are running right now. Wait a minute and try again.";
+  if (status === 504) return "The plan took too long to finish. Try a shorter walkthrough, or open the example plan.";
+  return GENERIC_FAIL;
+}
+
+/** Reads a JSON {error} (or short plain text) from a non-OK response and logs it. Never throws. */
+async function logServerError(res: Response): Promise<void> {
+  try {
+    const text = (await res.text()).slice(0, 500);
+    let detail = text;
+    try {
+      const v: unknown = JSON.parse(text);
+      if (v && typeof v === "object" && typeof (v as { error?: unknown }).error === "string")
+        detail = (v as { error: string }).error;
+    } catch {
+      /* plain text body */
+    }
+    console.warn(`plan request failed: HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+  } catch {
+    /* body unreadable; the status is enough */
+  }
+}
+
+/**
  * Real runner for POST /api/plan. The server streams newline-delimited JSON, one
  * PlanJobStatus per line; the last line is done or failed. Aborting the signal
  * cancels the request, and the server stops its work on disconnect.
@@ -81,7 +111,8 @@ export function createApiPlanJob(buildRequest: BuildPlanRequest, endpoint = "/ap
       return;
     }
     if (!res.ok || !res.body) {
-      fail(res.status === 413 ? "That video is too large to send. Try a shorter walkthrough." : GENERIC_FAIL);
+      if (!res.ok) await logServerError(res);
+      fail(res.ok ? GENERIC_FAIL : messageForStatus(res.status));
       return;
     }
 
