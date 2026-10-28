@@ -124,6 +124,19 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   const outputFormat = opts.outputFormat ?? DEFAULT_OUTPUT_FORMAT;
 
   return async (req) => {
+    // A bad request would otherwise spend a paid Image call and only
+    // fail downstream, when the renderAfter step finds no completed
+    // image. Reject it here, before any fetch, like the SAM caller
+    // does for its request fields.
+    if (typeof req.model !== "string" || req.model.trim().length === 0) {
+      throw new Error("image: model must be a non-empty string");
+    }
+    if (typeof req.prompt !== "string" || req.prompt.trim().length === 0) {
+      throw new Error("image: prompt must be a non-empty string");
+    }
+    if (typeof req.image !== "string" || req.image.length === 0) {
+      throw new Error("image: image must be a non-empty string");
+    }
     const wanted = req.n ?? 1;
     if (!Number.isInteger(wanted) || wanted < 1) {
       throw new Error(`image: n must be a positive integer, got ${String(req.n)}`);
