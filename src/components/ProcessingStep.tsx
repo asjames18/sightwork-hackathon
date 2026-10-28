@@ -119,7 +119,7 @@ export function ProcessingStep({
                   {LABELS[s]}
                 </span>
                 {(ENGINE[s] || state === "skipped") && (
-                  <span className={`block text-xs ${state === "next" ? "text-ink/60" : "text-ink/65"}`}>
+                  <span className={`block text-sm text-ink/70`}>
                     {ENGINE[s]}
                     {state === "skipped" ? (
                       <span>{ENGINE[s] ? " · " : ""}skipped this run</span>

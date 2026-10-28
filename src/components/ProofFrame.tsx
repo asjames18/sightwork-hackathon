@@ -23,7 +23,7 @@ export function ProofFrame({
 }) {
   if (!frame)
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/50">
+      <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/70">
         Proof frame not available for this problem
       </div>
     );
@@ -55,7 +55,7 @@ export function ProofFrame({
           </span>
         )}
       </div>
-      <figcaption className="flex justify-between gap-2 bg-ink px-3 py-1.5 text-xs text-white/80">
+      <figcaption className="flex justify-between gap-2 bg-ink px-3 py-1.5 text-sm text-white/85">
         <span className="truncate">{caption ?? "Proof frame"}</span>
         <span className="shrink-0 tabular-nums">{frame.tSec.toFixed(1)} s</span>
       </figcaption>

@@ -23,7 +23,7 @@ function Section({ title, children, id, className }: { title: string; children: 
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-2xl bg-white p-4 text-sm text-ink/60">{children}</p>;
+  return <p className="rounded-2xl bg-white p-4 text-sm text-ink/70">{children}</p>;
 }
 
 /** A walkthrough with no speech: the said-vs-seen framing doesn't apply. */
@@ -75,7 +75,7 @@ function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
     ["After picture", plan.afterImageUrl ? "Muse Image" : "Off this run"],
   ];
   return (
-    <footer className="mt-12 border-t border-ink/10 pt-4 text-xs text-ink/65">
+    <footer className="mt-12 border-t border-ink/10 pt-4 text-sm text-ink/70">
       <p className="font-semibold uppercase tracking-wide">How this plan was made</p>
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {rows.map(([k, v]) => (
@@ -109,7 +109,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
       )}
 
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
-      <p className="mt-1 text-sm text-ink/60">{plan.generatedFrom}</p>
+      <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
 
       {unmentioned.length > 0 && (
         <a href="#problems" className="mt-5 block rounded-2xl bg-ink p-5 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50">
@@ -198,11 +198,11 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             {plan.saidVsSeen.map((row, i) => (
               <li key={i} className="grid gap-1 p-3 text-sm sm:grid-cols-2 sm:gap-3">
                 <div>
-                  <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Said</span>
+                  <span className="mr-1 text-xs font-semibold uppercase text-ink/70 sm:hidden">Said</span>
                   {row.said ? <>&ldquo;{row.said.quote}&rdquo; <span className="text-ink/65">({row.said.atSec.toFixed(0)} s)</span></> : <span className="text-ink/65">Not mentioned</span>}
                 </div>
                 <div className={row.status === "unmentioned" ? "font-semibold text-accent-dark" : ""}>
-                  <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Seen</span>
+                  <span className="mr-1 text-xs font-semibold uppercase text-ink/70 sm:hidden">Seen</span>
                   {row.seen ? row.seen.summary : <span className="text-ink/65">Not visible in the video</span>}
                 </div>
               </li>
@@ -219,13 +219,13 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <p className="text-3xl font-extrabold tabular-nums">{item.range ? range(item.range) : item.count}</p>
               <p className="font-medium break-words">{item.label}</p>
               {item.zone && !item.label.toLowerCase().includes(item.zone.toLowerCase()) && (
-                <p className="text-xs text-ink/65">{item.zone}</p>
+                <p className="text-sm text-ink/70">{item.zone}</p>
               )}
             </li>
           ))}
         </ul>
         {plan.inventory.length > 0 && (
-          <p className="mt-2 text-xs text-ink/65">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
+          <p className="mt-2 text-sm text-ink/70">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
         )}
       </Section>
 
@@ -238,7 +238,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <div className="min-w-0">
                 <p className="font-bold">{step.title}</p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                <p className="mt-1 text-xs text-ink/65">
+                <p className="mt-1 text-sm text-ink/70">
                   {[step.trade, step.hours && `${range(step.hours, " h")}`, step.dependsOn && `after step ${step.dependsOn}`, step.fixes?.length && `fixes #${step.fixes.join(", #")}`]
                     .filter(Boolean)
                     .join(" · ")}
@@ -256,13 +256,13 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
             <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium break-words">{m.item}</p>
-                <p className="text-xs text-ink/65">
+                <p className="text-sm text-ink/70">
                   {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
                 </p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="font-semibold">{m.qty}</p>
-                {m.unitCost && <p className="text-xs text-ink/65">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
+                {m.unitCost && <p className="text-sm text-ink/70">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
               </div>
             </li>
           ))}
@@ -303,7 +303,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                 ))}
               </ul>
               {plan.costRange.sources && plan.costRange.sources.length > 0 && (
-                <p className="mt-3 text-xs text-ink/65">
+                <p className="mt-3 text-sm text-ink/70">
                   Prices from{" "}
                   {plan.costRange.sources.map((src, i) => (
                     <span key={src.url}>

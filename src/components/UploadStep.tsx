@@ -153,7 +153,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
             >
               {check.kind === "reading" ? "Checking video…" : "Make my work plan"}
             </button>
-            <p className="mt-2 text-center text-xs text-ink/65">
+            <p className="mt-2 text-center text-sm text-ink/70">
               {runner === "api"
                 ? "Frames and narration are sent to make your plan. The full video stays on this device."
                 : "Preview build: your video stays on this device and an example plan is shown."}
