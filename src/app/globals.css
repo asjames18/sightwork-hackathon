@@ -4,6 +4,8 @@
   --color-ink: #14171c;
   --color-paper: #f7f5f0;
   --color-accent: #e8590c;
+  /* Darker accent for fills, chips and small text: 5.18:1 on white (AA). Keep --color-accent for big display numbers. */
+  --color-accent-dark: #c2410c;
   --color-safe: #2f9e44;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

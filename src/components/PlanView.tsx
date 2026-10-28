@@ -2,11 +2,13 @@ import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type Wor
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 
-const SEVERITY: Record<Issue["severity"], string> = {
-  high: "bg-red-600 text-white",
-  medium: "bg-amber-400 text-ink",
-  low: "bg-ink/10 text-ink",
+/** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
+const SEVERITY_BORDER: Record<Issue["severity"], string> = {
+  high: "border-l-red-600",
+  medium: "border-l-amber-500",
+  low: "border-l-ink/25",
 };
+const SEVERITY_LABEL: Record<Issue["severity"], string> = { high: "High", medium: "Medium", low: "Low" };
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -33,11 +35,11 @@ function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
   if (!narrated)
     return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
   if (issue.unmentioned)
-    return <span className="rounded-full bg-[#c2410c] px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
+    return <span className="rounded-full bg-accent-dark px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
   if (issue.status === "mentioned_not_seen")
     return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">You said it, check in person</span>;
   return (
-    <span className="rounded-full bg-safe/15 px-2 py-0.5 text-xs font-semibold text-[#237032]">
+    <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">
       You said it{issue.mention ? ` at ${issue.mention.saidAtSec.toFixed(0)} s` : ""}
     </span>
   );
@@ -154,10 +156,10 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
             return (
-              <li key={issue.rank} className="min-w-0 rounded-2xl bg-white p-4 shadow-sm">
+              <li key={issue.rank} className={`min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm ${SEVERITY_BORDER[issue.severity]}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase ${SEVERITY[issue.severity]}`}>{issue.severity}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink/70">{SEVERITY_LABEL[issue.severity]} priority</span>
                   <SaidBadge issue={issue} narrated={narrated} />
                 </div>
                 <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
@@ -182,7 +184,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
                   <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Said</span>
                   {row.said ? <>&ldquo;{row.said.quote}&rdquo; <span className="text-ink/65">({row.said.atSec.toFixed(0)} s)</span></> : <span className="text-ink/65">Not mentioned</span>}
                 </div>
-                <div className={row.status === "unmentioned" ? "font-semibold text-[#c2410c]" : ""}>
+                <div className={row.status === "unmentioned" ? "font-semibold text-accent-dark" : ""}>
                   <span className="mr-1 text-xs font-semibold uppercase text-ink/65 sm:hidden">Seen</span>
                   {row.seen ? row.seen.summary : <span className="text-ink/65">Not visible in the video</span>}
                 </div>
@@ -267,7 +269,7 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
               <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-[#c2410c]">{plan.costRange.label}</p>
+            <p className="mt-1 text-sm font-semibold text-accent-dark">{plan.costRange.label}</p>
             <p className="mt-2 text-sm">
               Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
             </p>
