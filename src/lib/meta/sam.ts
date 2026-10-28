@@ -172,7 +172,11 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
     if (!Number.isInteger(req.frameIndex) || req.frameIndex < 0) {
       throw new Error(`sam: frameIndex must be an integer >= 0, got ${String(req.frameIndex)}`);
     }
-    if (typeof req.dataUrl !== "string" || req.dataUrl.length === 0) {
+    // A whitespace-only dataUrl would otherwise spend a paid SAM call
+    // and only fail at the provider: the old length check accepted it. Reject it here, before any fetch, like the other
+    // callers reject blank fields at the same point. Valid dataUrls
+    // still pass through unchanged.
+    if (typeof req.dataUrl !== "string" || req.dataUrl.trim().length === 0) {
       throw new Error("sam: dataUrl must be a non-empty string");
     }
     const body: Record<string, unknown> = {
