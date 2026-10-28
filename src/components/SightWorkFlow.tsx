@@ -57,7 +57,8 @@ export function SightWorkFlow() {
   }, [job]);
 
   // New stage: back to the top so the next screen starts at its heading, not mid-scroll, and move
-  // keyboard and screen-reader focus to that heading (the button that was pressed is gone).
+  // keyboard and screen-reader focus to that heading (the button that was pressed is gone). "Try again"
+  // keeps the processing stage but starts a new run, and its button unmounts too, so do the same then.
   const firstStage = useRef(true);
   useEffect(() => {
     if (firstStage.current) {
@@ -70,7 +71,7 @@ export function SightWorkFlow() {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
     }
-  }, [stage.kind]);
+  }, [stage.kind, runKey]);
 
   // Phones get the full width; tablets and desktops get a readable column, wider for the plan.
   const width = stage.kind === "plan" ? "max-w-xl md:max-w-2xl lg:max-w-3xl" : "max-w-xl md:max-w-2xl";
