@@ -23,7 +23,11 @@
  *   material index outside the materials array is ignored, never
  *   silently dropped: it adds an "Ignored price for material index
  *   <n>" assumption line, so a model slip stays visible on the plan
- *   instead of surfacing as a puzzling "No price" line.
+ *   instead of surfacing as a puzzling "No price" line. A second
+ *   price for the same material index is likewise surfaced: it adds
+ *   a "Duplicate price for material index <n>" assumption line (the
+ *   last price wins), so a model slip stays visible instead of
+ *   silently overwriting the first price.
  * - Labor: volunteer basis pays only licensed trades (electrician,
  *   plumber, roofer); contractor pays every step; mixed pays every step
  *   whose trade is not "volunteer". Steps without hours add no labor.
@@ -200,13 +204,18 @@ export function computeCostRange(
 ): CostResult {
   const byIndex = new Map<number, ModelUnitCost>();
   const ignored = new Set<number>();
+  const duplicates = new Set<number>();
   for (const u of model.unitCosts) {
     // parseCostModel only checks materialIndex >= 0, so an index past
     // the end of the materials array would otherwise vanish here with
     // no trace: the material it meant keeps a "No price" line and the
-    // stray price is never seen. Keep it visible instead.
-    if (u.materialIndex < materials.length) byIndex.set(u.materialIndex, u);
-    else ignored.add(u.materialIndex);
+    // stray price is never seen. Keep it visible instead. Likewise a
+    // second price for an index already seen would silently overwrite
+    // the first; keep that visible too, with the last price winning.
+    if (u.materialIndex < materials.length) {
+      if (byIndex.has(u.materialIndex)) duplicates.add(u.materialIndex);
+      byIndex.set(u.materialIndex, u);
+    } else ignored.add(u.materialIndex);
   }
 
   const missing: string[] = [];
@@ -257,6 +266,7 @@ export function computeCostRange(
       COMPUTED_LINE,
       ...missing,
       ...[...ignored].sort((a, b) => a - b).map((n) => `Ignored price for material index ${n} (no such material)`),
+      ...[...duplicates].sort((a, b) => a - b).map((n) => `Duplicate price for material index ${n} (kept the last price)`),
     ],
     ...(model.sources.length > 0 ? { sources: model.sources } : {}),
   };
