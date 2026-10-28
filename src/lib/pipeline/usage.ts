@@ -123,7 +123,9 @@ export function createUsageTracker(opts?: {
       };
       seen.push(rec);
       total = round2(total + rec.costUsd);
-      return rec;
+      // A copy, not the live log entry: a caller mutating the
+      // returned record must not rewrite the spike log line.
+      return { ...rec };
     },
     canSpend(costUsd: number): boolean {
       return Number.isFinite(costUsd) && costUsd >= 0 && round2(total + costUsd) <= spikeCapUsd;
@@ -137,10 +139,12 @@ export function createUsageTracker(opts?: {
       };
     },
     records(): readonly UsageRecord[] {
-      // A copy, not the live log: a caller pushing to (or splicing)
-      // the returned array must not change the tracker's own record
-      // count or the order the spike log is printed in.
-      return [...seen];
+      // Copies of the log and of each entry, not the live array or
+      // live entries: a caller pushing to (or splicing) the returned
+      // array, or mutating a returned record, must not change the
+      // tracker's own record count, the order the spike log is
+      // printed in, or the logged cost of a call.
+      return seen.map((r) => ({ ...r }));
     },
   };
 }
