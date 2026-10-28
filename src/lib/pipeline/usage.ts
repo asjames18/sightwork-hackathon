@@ -38,7 +38,7 @@ export interface UsageTotals {
 }
 
 export interface UsageTracker {
-  /** Record a call. Throws if the cost is invalid or would break the spike cap. */
+  /** Record a call. Throws if the model or step is blank, the cost is invalid, or the call would break the spike cap. */
   record(input: Omit<UsageRecord, "at"> & { at?: string }): UsageRecord;
   /** True when adding costUsd would stay within the spike cap. */
   canSpend(costUsd: number): boolean;
@@ -61,6 +61,15 @@ export function createUsageTracker(opts?: {
 
   return {
     record(input) {
+      // Spike tracking attributes every call by model/step, so a
+      // blank label would leave a server log line unattributable
+      // and break per-model accounting against the $150 credits.
+      if (typeof input.model !== "string" || input.model.trim().length === 0) {
+        throw new Error(`usage: model must be a non-empty string, got ${JSON.stringify(input.model)}`);
+      }
+      if (typeof input.step !== "string" || input.step.trim().length === 0) {
+        throw new Error(`usage: step must be a non-empty string, got ${JSON.stringify(input.step)}`);
+      }
       if (!Number.isFinite(input.costUsd) || input.costUsd < 0) {
         throw new Error(`usage: costUsd must be a finite number >= 0, got ${input.costUsd}`);
       }
