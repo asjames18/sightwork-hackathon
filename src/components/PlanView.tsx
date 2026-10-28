@@ -11,9 +11,9 @@ const SEVERITY: Record<Issue["severity"], string> = {
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
-function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
+function Section({ title, children, id, className }: { title: string; children: React.ReactNode; id?: string; className?: string }) {
   return (
-    <section id={id} className="mt-10">
+    <section id={id} className={className ? `mt-10 ${className}` : "mt-10"}>
       <h2 className="mb-3 text-xl font-extrabold">{title}</h2>
       {children}
     </section>
@@ -309,8 +309,9 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
         </Section>
       )}
 
+      {/* The "coming soon" placeholder is screen-only: a saved PDF shows just the finished plan. */}
       {!plan.afterImageUrl && plan.workOrder.length > 0 && (
-        <Section title="After the work">
+        <Section title="After the work" className="print:hidden">
           <AfterSlot frame={slotFrame} />
         </Section>
       )}
