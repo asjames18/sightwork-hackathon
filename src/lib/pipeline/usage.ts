@@ -38,7 +38,7 @@ export interface UsageTotals {
 }
 
 export interface UsageTracker {
-  /** Record a call. Throws if the model or step is blank, the cost is invalid, or the call would break the spike cap. */
+  /** Record a call. Throws if the model, step, or supplied at is blank, the cost is invalid, or the call would break the spike cap. */
   record(input: Omit<UsageRecord, "at"> & { at?: string }): UsageRecord;
   /** True when adding costUsd would stay within the spike cap. */
   canSpend(costUsd: number): boolean;
@@ -69,6 +69,13 @@ export function createUsageTracker(opts?: {
       }
       if (typeof input.step !== "string" || input.step.trim().length === 0) {
         throw new Error(`usage: step must be a non-empty string, got ${JSON.stringify(input.step)}`);
+      }
+      // A caller-supplied timestamp is stored verbatim in the spike
+      // log, so a blank or non-string at would leave a log line
+      // undated and break ordering against the $150 credits. Omitted
+      // at still defaults to now; only a supplied value is checked.
+      if (input.at !== undefined && (typeof input.at !== "string" || input.at.trim().length === 0)) {
+        throw new Error(`usage: at must be a non-empty string when supplied, got ${JSON.stringify(input.at)}`);
       }
       if (!Number.isFinite(input.costUsd) || input.costUsd < 0) {
         throw new Error(`usage: costUsd must be a finite number >= 0, got ${input.costUsd}`);
