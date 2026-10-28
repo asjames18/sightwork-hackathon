@@ -177,6 +177,21 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
         throw new Error(`baseten: response text was not JSON: ${text.slice(0, 200)}`);
       }
       const usage = (parsed.usage ?? {}) as { prompt_tokens?: number; completion_tokens?: number };
+      // Mirror the Meta caller: a bad provider token count must fail
+      // fast here, at the cost computation, not later as a generic
+      // usage-tracker cost rejection. A missing field still means
+      // zero tokens, as before.
+      for (const [field, value] of [
+        ["prompt_tokens", usage.prompt_tokens],
+        ["completion_tokens", usage.completion_tokens],
+      ] as const) {
+        if (
+          value !== undefined &&
+          (typeof value !== "number" || !Number.isInteger(value) || value < 0)
+        ) {
+          throw new Error(`baseten: usage ${field} must be an integer >= 0`);
+        }
+      }
       const inputTokens = usage.prompt_tokens ?? 0;
       const outputTokens = usage.completion_tokens ?? 0;
       const costUsd = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
