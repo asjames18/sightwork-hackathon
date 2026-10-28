@@ -365,13 +365,31 @@ export function planSegmentFrames(opts: {
   };
 }
 
-export async function runSegment(
-  input: SegmentInput,
-  deps: SegmentDeps,
-): Promise<SegmentOutput> {
+/** Validate the segment step's request before any paid SAM call. */
+export function validateSegmentInput(input: SegmentInput): void {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("segment: input is not an object");
+  }
+  if (!Array.isArray(input.frames)) {
+    throw new Error("segment: frames is not an array");
+  }
   const minScore = input.minScore ?? DEFAULT_MIN_SCORE;
   if (typeof minScore !== "number" || !Number.isFinite(minScore) || minScore < 0 || minScore > 1) {
     throw new Error(`segment: minScore must be 0-1, got ${minScore}`);
+  }
+  if (
+    input.maxRequests !== undefined &&
+    (!Number.isInteger(input.maxRequests) || input.maxRequests < 0)
+  ) {
+    throw new Error(`segment: maxRequests must be a whole number >= 0, got ${input.maxRequests}`);
+  }
+  if (input.sceneFrameIndices !== undefined) {
+    if (
+      !Array.isArray(input.sceneFrameIndices) ||
+      input.sceneFrameIndices.some((i) => !Number.isInteger(i))
+    ) {
+      throw new Error("segment: sceneFrameIndices is not an array of integers");
+    }
   }
   for (let i = 0; i < input.frames.length; i++) {
     const f = input.frames[i];
@@ -387,6 +405,31 @@ export async function runSegment(
       throw new Error(`segment: frame ${i} has no valid tSec/dataUrl`);
     }
   }
+}
+
+/** Validate the segment step's call deps before any paid SAM call. */
+export function validateSegmentDeps(deps: SegmentDeps): void {
+  if (deps === null || typeof deps !== "object" || Array.isArray(deps)) {
+    throw new Error("segment: deps is not an object");
+  }
+  if (typeof deps.callSegment !== "function") {
+    throw new Error("segment: callSegment is not a function");
+  }
+  if (
+    deps.tracker === null ||
+    typeof deps.tracker !== "object" ||
+    typeof deps.tracker.record !== "function"
+  ) {
+    throw new Error("segment: tracker.record is not a function");
+  }
+}
+
+export async function runSegment(
+  input: SegmentInput,
+  deps: SegmentDeps,
+): Promise<SegmentOutput> {
+  validateSegmentInput(input);
+  const minScore = input.minScore ?? DEFAULT_MIN_SCORE;
 
   const plan = planSegmentFrames({
     frameCount: input.frames.length,
@@ -404,6 +447,9 @@ export async function runSegment(
       budgetExceeded: false,
     };
   }
+  // After the no-frames skip but before the first SAM call, so a bad
+  // tracker no longer throws only after a paid call, when record runs.
+  validateSegmentDeps(deps);
 
   const rawLog: SegmentRawEntry[] = [];
   let requestsMade = 0;
