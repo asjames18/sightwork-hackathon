@@ -132,6 +132,26 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
   }
 
   return async (req) => {
+    // A bad request would otherwise spend a paid ASR call and only
+    // fail downstream, when the transcribe step parses an empty or
+    // garbage result. Reject it here, before any fetch, like the
+    // SAM and Image callers reject bad requests at the same point.
+    if (typeof req.model !== "string" || req.model.trim().length === 0) {
+      throw new Error("asr: model must be a non-empty string");
+    }
+    if (req.mode !== "standard") {
+      throw new Error(`asr: mode must be "standard", got ${String(req.mode)}`);
+    }
+    if (typeof req.audioWavBase64 !== "string" || req.audioWavBase64.trim().length === 0) {
+      throw new Error("asr: audioWavBase64 must be a non-empty string");
+    }
+    const b64 = req.audioWavBase64.trim();
+    if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || Buffer.from(b64, "base64").length === 0) {
+      throw new Error("asr: audioWavBase64 must be valid base64 audio data");
+    }
+    if (!Array.isArray(req.keywordBias) || req.keywordBias.some((k) => typeof k !== "string")) {
+      throw new Error("asr: keywordBias must be an array of strings");
+    }
     const sessionId = `sightwork-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const form = new FormData();
     form.append(
