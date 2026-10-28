@@ -195,5 +195,5 @@ export const samplePlan = {
   afterImageUrl: MOCK_AFTER_IMAGE_URL,
   afterImageLabel: AFTER_IMAGE_LABEL,
   heroFrameIndex: 2,
-  meta: { isExample: true, durationSec: 78 },
+  meta: { isExample: true, durationSec: 78, planProvider: "baseten" },
 } satisfies WorkPlan;
