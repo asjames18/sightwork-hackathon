@@ -123,6 +123,67 @@ export interface TranscribeDeps {
   callCleanup?: CleanupCaller;
 }
 
+/**
+ * Fail fast on a bad transcribe request before any paid call. An
+ * empty audio string still means "no narration" (the skip path below),
+ * so only a non-string value is rejected here.
+ */
+export function validateTranscribeInput(input: TranscribeInput): void {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("transcribe: input is not an object");
+  }
+  if (
+    input.audioWavBase64 !== undefined &&
+    typeof input.audioWavBase64 !== "string"
+  ) {
+    throw new Error("transcribe: audioWavBase64 is not a string");
+  }
+  if (
+    input.spaceType !== undefined &&
+    (typeof input.spaceType !== "string" || !input.spaceType.trim())
+  ) {
+    throw new Error("transcribe: spaceType is not a non-empty string");
+  }
+}
+
+/**
+ * Fail fast on bad wiring before any paid call. A bad tracker used to
+ * throw only after the paid ASR call, when record ran; a bad
+ * keywordBias used to ride into that call unchecked.
+ */
+export function validateTranscribeDeps(deps: TranscribeDeps): void {
+  if (deps === null || typeof deps !== "object" || Array.isArray(deps)) {
+    throw new Error("transcribe: deps is not an object");
+  }
+  if (typeof deps.callTranscribe !== "function") {
+    throw new Error("transcribe: callTranscribe is not a function");
+  }
+  if (
+    deps.tracker === null ||
+    typeof deps.tracker !== "object" ||
+    typeof deps.tracker.record !== "function"
+  ) {
+    throw new Error("transcribe: tracker.record is not a function");
+  }
+  if (deps.keywordBias !== undefined) {
+    if (
+      !Array.isArray(deps.keywordBias) ||
+      deps.keywordBias.some((k) => typeof k !== "string" || !k.trim())
+    ) {
+      throw new Error("transcribe: keywordBias is not an array of non-empty strings");
+    }
+  }
+  if (
+    deps.cleanupPrompt !== undefined &&
+    (typeof deps.cleanupPrompt !== "string" || !deps.cleanupPrompt.trim())
+  ) {
+    throw new Error("transcribe: cleanupPrompt is not a non-empty string");
+  }
+  if (deps.callCleanup !== undefined && typeof deps.callCleanup !== "function") {
+    throw new Error("transcribe: callCleanup is not a function");
+  }
+}
+
 /** Validate raw ASR output into turns: drop empties, enforce time order. */
 export function parseTurns(raw: unknown): TranscriptTurn[] {
   if (!Array.isArray(raw)) {
@@ -210,9 +271,13 @@ export async function runTranscribe(
   input: TranscribeInput,
   deps: TranscribeDeps,
 ): Promise<TranscribeOutput> {
+  validateTranscribeInput(input);
   if (!input.audioWavBase64) {
     return { transcript: null, transcriptTurns: [] };
   }
+  // After the skip checks but before the call, so a validation throw
+  // is never paid for and never swallowed as a model failure.
+  validateTranscribeDeps(deps);
   const bytes = audioByteLength(input.audioWavBase64);
   if (bytes > MAX_AUDIO_BYTES) {
     throw new Error(
