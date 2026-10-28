@@ -37,6 +37,7 @@ cp .env.example .env.local   # then add your own keys (see "Real runs"); .env.lo
 npm run dev
 ```
 Then open http://localhost:3000.
+To check the TypeScript types without starting the app, run `npm run typecheck`.
 
 ### Preview with example data (no API calls, no keys)
 By default the browser uses a built-in example run, so every screen works without any keys. These links jump straight to a screen:
