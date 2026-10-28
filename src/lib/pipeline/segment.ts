@@ -400,7 +400,7 @@ export function validateSegmentInput(input: SegmentInput): void {
       !Number.isFinite(f.tSec) ||
       f.tSec < 0 ||
       typeof f.dataUrl !== "string" ||
-      f.dataUrl.length === 0
+      f.dataUrl.trim().length === 0
     ) {
       throw new Error(`segment: frame ${i} has no valid tSec/dataUrl`);
     }
