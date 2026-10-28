@@ -277,7 +277,98 @@ function shapeProblems(json: unknown): string[] {
   return errs;
 }
 
+/**
+ * Fail fast on a bad reason request, before any paid Spark call.
+ * A bad request used to spend up to two Spark calls (initial attempt
+ * plus retry) and only fail downstream, when the step parsed an empty
+ * or garbage result. Shape-only checks for segmentation: runReason
+ * never reads it directly (it rides into the prompt through
+ * buildReasonPrompt), so flaggedFrames are checked as integers >= 0
+ * but not range-checked against frames here.
+ */
+export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): void {
+  if (!input || typeof input !== "object") {
+    throw new Error("reason: input must be an object");
+  }
+  if (!Array.isArray(input.frames) || input.frames.length === 0) {
+    throw new Error("reason: frames must be a non-empty array");
+  }
+  input.frames.forEach((f, i) => {
+    if (
+      !f ||
+      typeof f !== "object" ||
+      typeof f.tSec !== "number" ||
+      !Number.isFinite(f.tSec) ||
+      f.tSec < 0 ||
+      typeof f.dataUrl !== "string" ||
+      f.dataUrl.trim().length === 0
+    ) {
+      throw new Error(`reason: frame ${i} has no valid tSec/dataUrl`);
+    }
+  });
+  if (input.segmentation !== null) {
+    const seg = input.segmentation;
+    if (!seg || typeof seg !== "object") {
+      throw new Error("reason: segmentation must be an object or null");
+    }
+    if (!Array.isArray(seg.counts)) {
+      throw new Error("reason: segmentation.counts must be an array");
+    }
+    seg.counts.forEach((c, i) => {
+      if (
+        !c ||
+        typeof c !== "object" ||
+        typeof c.label !== "string" ||
+        c.label.trim().length === 0 ||
+        typeof c.count !== "number" ||
+        !Number.isFinite(c.count) ||
+        c.count < 0 ||
+        typeof c.confidence !== "number" ||
+        !Number.isFinite(c.confidence) ||
+        c.confidence < 0 ||
+        c.confidence > 1
+      ) {
+        throw new Error(`reason: segmentation.counts[${i}] has no valid label/count/confidence`);
+      }
+    });
+    if (
+      !Array.isArray(seg.flaggedFrames) ||
+      seg.flaggedFrames.some((f) => !Number.isInteger(f) || f < 0)
+    ) {
+      throw new Error("reason: segmentation.flaggedFrames must be an array of integers >= 0");
+    }
+  }
+  if (input.transcript !== null && typeof input.transcript !== "string") {
+    throw new Error("reason: transcript must be a string or null");
+  }
+  for (const field of ["spaceName", "spaceType"] as const) {
+    const v = input[field];
+    if (v !== undefined && (typeof v !== "string" || v.trim().length === 0)) {
+      throw new Error(`reason: ${field} must be a non-empty string when given`);
+    }
+  }
+  if (typeof input.durationSec !== "number" || !Number.isFinite(input.durationSec) || input.durationSec < 0) {
+    throw new Error(`reason: durationSec must be a finite number >= 0, got ${input.durationSec}`);
+  }
+  if (!deps || typeof deps !== "object") {
+    throw new Error("reason: deps must be an object");
+  }
+  if (typeof deps.prompt !== "string" || deps.prompt.trim().length === 0) {
+    throw new Error("reason: prompt must be a non-empty string");
+  }
+  if (!isRecord(deps.schema)) {
+    throw new Error("reason: schema must be an object");
+  }
+  if (typeof deps.callSpark !== "function") {
+    throw new Error("reason: callSpark must be a function");
+  }
+  if (!deps.tracker || typeof deps.tracker.record !== "function") {
+    throw new Error("reason: tracker.record must be a function");
+  }
+}
+
 export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<ReasonOutput> {
+  validateReasonRequest(input, deps);
   const schema = inlineSchemaRefs(deps.schema) as Record<string, unknown>;
   const images = input.frames.map((f) => f.dataUrl);
   let prompt = deps.prompt;
