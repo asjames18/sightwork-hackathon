@@ -57,6 +57,13 @@ import type { PlanJobStatus, PlanRequest, PlanStep } from "../../../lib/types";
 
 export const runtime = "nodejs";
 
+// Explicit Vercel function duration: 300 s is the Hobby maximum and
+// the Pro default, so this states the platform limit rather than
+// raising it. Plan runs take ~45-51 s, so time is not the binding
+// limit on a hosted run; the 4.5 MB request-body cap is (see the
+// 10 MB route cap below, which only applies before the platform cap).
+export const maxDuration = 300;
+
 /**
  * The reason step's provider, from PLAN_PROVIDER. Default "baseten"
  * (the main plan engine per Antonio's Oct 27 decision); "meta" runs
