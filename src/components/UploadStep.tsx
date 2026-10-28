@@ -108,7 +108,7 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
             controls
             playsInline
             preload="metadata"
-            className="max-h-[60vh] w-full bg-black object-contain"
+            className="max-h-[60vh] w-full bg-black object-contain [@media(min-width:640px)_and_(max-height:820px)]:max-h-[38vh]"
             onLoadedMetadata={(e) => setCheck(checkDuration(e.currentTarget.duration))}
             onError={() =>
               setCheck({ kind: "block", message: "This browser can't play that video. Try an MP4, or record it again here." })
