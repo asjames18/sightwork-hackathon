@@ -14,6 +14,13 @@
  * builders below fill those variables from the step input, so the
  * /api/plan route can hand each step a finished prompt. The builders
  * are pure: no API calls, no keys, no provider text.
+ *
+ * The builders validate their own inputs and refuse to emit a prompt
+ * with an unfilled placeholder. runPlan calls a builder before the
+ * step's own validator runs, so without this a bad step input failed
+ * here with a bare TypeError (or, worse, produced a prompt carrying
+ * "undefined"/"NaN" that only failed later, after the step validator).
+ * A builder failure is still pre-call: no paid Spark call is spent.
  */
 
 import type { CostInput } from "./cost";
@@ -512,12 +519,135 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
 }
 
 /**
+ * Fail fast on a bad reason-step input, before a prompt is built.
+ * Only the fields the prompt actually prints are checked: tSec (the
+ * frame list prints t only) and the scalar fields. dataUrl is
+ * intentionally unchecked here — runReason validates it before the
+ * model call, and this builder never prints it.
+ */
+export function validateReasonPromptInput(input: ReasonInput): void {
+  if (!input || typeof input !== "object") {
+    throw new Error("buildReasonPrompt: input must be an object");
+  }
+  if (!Array.isArray(input.frames) || input.frames.length === 0) {
+    throw new Error("buildReasonPrompt: frames must be a non-empty array");
+  }
+  input.frames.forEach((f, i) => {
+    if (
+      !f ||
+      typeof f !== "object" ||
+      typeof f.tSec !== "number" ||
+      !Number.isFinite(f.tSec) ||
+      f.tSec < 0
+    ) {
+      throw new Error(`buildReasonPrompt: frames[${i}].tSec must be a finite number >= 0`);
+    }
+  });
+  if (
+    typeof input.durationSec !== "number" ||
+    !Number.isFinite(input.durationSec) ||
+    input.durationSec < 0
+  ) {
+    throw new Error(`buildReasonPrompt: durationSec must be a finite number >= 0, got ${input.durationSec}`);
+  }
+  for (const field of ["spaceName", "spaceType"] as const) {
+    const v = input[field];
+    if (v !== undefined && typeof v !== "string") {
+      throw new Error(`buildReasonPrompt: ${field} must be a string when given`);
+    }
+  }
+  if (
+    input.transcript !== null &&
+    input.transcript !== undefined &&
+    typeof input.transcript !== "string"
+  ) {
+    throw new Error("buildReasonPrompt: transcript must be a string or null");
+  }
+  if (
+    input.segmentation !== null &&
+    input.segmentation !== undefined &&
+    typeof input.segmentation !== "object"
+  ) {
+    throw new Error("buildReasonPrompt: segmentation must be an object or null");
+  }
+}
+
+/**
+ * Fail fast on a bad cost-step input, before a prompt is built.
+ * A material with no item/qty or a step with no title/order used to
+ * print verbatim as item="undefined" / order=undefined in the prompt.
+ * Region is required here: this builder is only called with a region
+ * (runPlan guards the call, estimateCost returns null without one).
+ */
+export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("buildCostPrompt: input must be an object");
+  }
+  if (typeof input.region !== "string" || input.region.trim().length === 0) {
+    throw new Error("buildCostPrompt: region must be a non-empty string");
+  }
+  if (spaceType !== undefined && typeof spaceType !== "string") {
+    throw new Error("buildCostPrompt: spaceType must be a string when given");
+  }
+  if (
+    input.laborBasis !== undefined &&
+    input.laborBasis !== "volunteer" &&
+    input.laborBasis !== "contractor" &&
+    input.laborBasis !== "mixed"
+  ) {
+    throw new Error(`buildCostPrompt: laborBasis must be volunteer, contractor or mixed, got ${input.laborBasis}`);
+  }
+  if (!Array.isArray(input.materials)) {
+    throw new Error("buildCostPrompt: materials must be an array");
+  }
+  input.materials.forEach((m, i) => {
+    if (
+      !m ||
+      typeof m !== "object" ||
+      typeof m.item !== "string" ||
+      m.item.trim().length === 0 ||
+      typeof m.qty !== "string" ||
+      m.qty.trim().length === 0
+    ) {
+      throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
+    }
+  });
+  if (!Array.isArray(input.workOrder)) {
+    throw new Error("buildCostPrompt: workOrder must be an array");
+  }
+  input.workOrder.forEach((s, i) => {
+    if (
+      !s ||
+      typeof s !== "object" ||
+      typeof s.title !== "string" ||
+      s.title.trim().length === 0 ||
+      typeof s.order !== "number" ||
+      !Number.isFinite(s.order)
+    ) {
+      throw new Error(`buildCostPrompt: workOrder[${i}] must have a finite order and a non-empty title`);
+    }
+    if (s.trade !== undefined && typeof s.trade !== "string") {
+      throw new Error(`buildCostPrompt: workOrder[${i}].trade must be a string when given`);
+    }
+    if (
+      s.hours !== undefined &&
+      (!Array.isArray(s.hours) ||
+        s.hours.length !== 2 ||
+        s.hours.some((h) => typeof h !== "number" || !Number.isFinite(h)))
+    ) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].hours must be [low, high] finite numbers when given`);
+    }
+  });
+}
+
+/**
  * Build the finished prompt 03 for one reason step. Variable table from
  * prompt 03: space_name falls back to "Walkthrough", space_type to
  * "church sanctuary", transcript to the literal "(no narration)" when
  * null, frame_list one line per frame in array order.
  */
 export function buildReasonPrompt(input: ReasonInput): string {
+  validateReasonPromptInput(input);
   const spaceName = input.spaceName && input.spaceName.trim() ? input.spaceName : "Walkthrough";
   const spaceType = input.spaceType && input.spaceType.trim() ? input.spaceType : "church sanctuary";
   const frameList = input.frames
@@ -539,6 +669,9 @@ export function buildReasonPrompt(input: ReasonInput): string {
     : "(no segmentation data: the segmentation step failed, so there are no SAM counts and no flaggedFrames; count objects yourself from the frames, and use method \"model\" for every inventory item)";
   prompt = fill(prompt, "segmentation_json", segmentationJson);
   prompt = fill(prompt, "transcript", input.transcript ?? "(no narration)");
+  if (hasUnfilledPlaceholders(prompt)) {
+    throw new Error("buildReasonPrompt: prompt still has unfilled placeholders");
+  }
   return prompt;
 }
 
@@ -550,6 +683,7 @@ export function buildReasonPrompt(input: ReasonInput): string {
  * null without one, so no prompt is built for a region-less request.
  */
 export function buildCostPrompt(input: CostInput, spaceType = "church sanctuary"): string {
+  validateCostPromptInput(input, spaceType);
   const space = spaceType && spaceType.trim() ? spaceType : "church sanctuary";
   const laborBasis = input.laborBasis ?? "volunteer";
   const materialsList = input.materials
@@ -569,6 +703,9 @@ export function buildCostPrompt(input: CostInput, spaceType = "church sanctuary"
   prompt = fill(prompt, "labor_basis", laborBasis);
   prompt = fill(prompt, "materials_list", materialsList);
   prompt = fill(prompt, "steps_list", stepsList);
+  if (hasUnfilledPlaceholders(prompt)) {
+    throw new Error("buildCostPrompt: prompt still has unfilled placeholders");
+  }
   return prompt;
 }
 
