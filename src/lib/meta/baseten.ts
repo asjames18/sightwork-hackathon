@@ -108,6 +108,16 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
   const fetchImpl = opts.fetchImpl ?? fetch;
   const inputPrice = opts.inputPricePerMillion ?? DEFAULT_INPUT_PRICE_PER_MILLION;
   const outputPrice = opts.outputPricePerMillion ?? DEFAULT_OUTPUT_PRICE_PER_MILLION;
+  if (!Number.isFinite(inputPrice) || inputPrice < 0) {
+    throw new Error(
+      `baseten: inputPricePerMillion must be a finite number >= 0, got ${opts.inputPricePerMillion}`,
+    );
+  }
+  if (!Number.isFinite(outputPrice) || outputPrice < 0) {
+    throw new Error(
+      `baseten: outputPricePerMillion must be a finite number >= 0, got ${opts.outputPricePerMillion}`,
+    );
+  }
 
   return {
     async callSpark(req: BasetenCallRequest): Promise<BasetenCallResult> {
