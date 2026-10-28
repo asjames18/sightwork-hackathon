@@ -269,34 +269,42 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
               <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
               <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
             </p>
-            <p className="mt-1 text-sm font-semibold text-accent-dark">{plan.costRange.label}</p>
-            <p className="mt-2 text-sm">
-              Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
-            </p>
-            <ul className="mt-2 list-disc pl-5 text-sm text-ink/70">
-              {plan.costRange.assumptions.map((a) => (
-                <li key={a}>{a}</li>
-              ))}
-            </ul>
-            {plan.costRange.sources && plan.costRange.sources.length > 0 && (
-              <p className="mt-3 text-xs text-ink/65">
-                Prices from{" "}
-                {plan.costRange.sources.map((src, i) => (
-                  <span key={src.url}>
-                    {i > 0 && ", "}
-                    <a
-                      href={src.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="break-words rounded-sm underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      {src.title}
-                      <span className="sr-only"> (opens in a new tab)</span>
-                    </a>
-                  </span>
-                ))}
+            <p className="mt-1 text-sm text-ink/70">{plan.costRange.label}</p>
+            <details className="group mt-3 border-t border-ink/10 pt-3">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
+                  <path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                How we got this
+              </summary>
+              <p className="mt-2 text-sm">
+                Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
               </p>
-            )}
+              <ul className="mt-2 list-disc pl-5 text-sm text-ink/70">
+                {plan.costRange.assumptions.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+              {plan.costRange.sources && plan.costRange.sources.length > 0 && (
+                <p className="mt-3 text-xs text-ink/65">
+                  Prices from{" "}
+                  {plan.costRange.sources.map((src, i) => (
+                    <span key={src.url}>
+                      {i > 0 && ", "}
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-words rounded-sm underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        {src.title}
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                    </span>
+                  ))}
+                </p>
+              )}
+            </details>
           </div>
         </Section>
       )}
