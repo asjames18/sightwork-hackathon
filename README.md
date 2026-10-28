@@ -23,20 +23,36 @@ SightWork is a multi-step agent built on Meta's Muse models through the Meta Mod
 5. **Muse Spark** turns the findings into materials, an ordered work plan and a rough cost range.
 6. **Muse Image** generates the "after" image.
 
-The planning steps (4 and 5) are moving to **Muse Spark Open**, Meta's open-weights model, served on Baseten. SAM 3.1 outlines and the Muse Image "after" picture are optional: when either one is unavailable, the plan still comes back complete, and the screen marks those parts as coming soon.
+The planning steps (4 and 5) run on **Muse Spark Open**, Meta's open-weights model, served on Baseten. SAM 3.1 outlines and the Muse Image "after" picture are optional: when either one is unavailable, the plan still comes back complete, and the screen marks those parts as coming soon.
 
 ## Built during the hackathon
 Everything in this repository was written during the event (Oct 26 – Nov 4, 2026). The idea and planning came before; no earlier code is included. Antonio built SightWork with AI coding assistance and deploys it himself.
 
 ## Running it
-Full setup instructions will be added as the build lands. API keys are read from environment variables and are never committed to this repo.
+You need Node.js 20.9 or newer.
 
-To preview the screens with example data (no API calls):
 ```bash
 npm install
+cp .env.example .env.local   # then add your own keys (see "Real runs"); .env.local is never committed
 npm run dev
 ```
-Then open http://localhost:3000 and choose the example plan. Add `?mock=nometa` to the URL to see a plan made without outlines or an after picture, and `?plan=baseten` to label the planning steps as Muse Spark Open.
+Then open http://localhost:3000.
+
+### Preview with example data (no API calls, no keys)
+By default the browser uses a built-in example run, so every screen works without any keys. These links jump straight to a screen:
+- `http://localhost:3000/?view=example` opens the example plan.
+- `?view=example&mock=nometa` shows a plan made without SAM outlines or an after picture.
+- `?view=example&mock=nocost` shows a plan whose cost step failed.
+- `?view=last` reopens the last finished plan on this device.
+
+### Real runs
+To send a walkthrough to the models, open `http://localhost:3000/?runner=api` (or set `NEXT_PUBLIC_SIGHTWORK_RUNNER=api`) and upload a video. The server reads these keys from the environment only:
+- `BASETEN_API_KEY`: Muse Spark Open on Baseten, which writes the plan (the default, `PLAN_PROVIDER=baseten`).
+- `META_API_KEY` (or `MODEL_API_KEY`): the Meta Model API for narration transcription, SAM 3.1 outlines and the Muse Image after picture. Set `PLAN_PROVIDER=meta` to run the planning steps on Muse Spark instead.
+
+If SAM 3.1 or Muse Image isn't available to your key, those steps are skipped and the plan still comes back complete. Keys are never logged or committed.
+
+On the plan screen, "Save PDF" prints a clean copy of the plan.
 
 ## Status
 Work in progress during the hackathon.
