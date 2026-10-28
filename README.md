@@ -44,6 +44,8 @@ By default the browser uses a built-in example run, so every screen works withou
 - `?view=example&mock=nometa` shows a plan made without SAM outlines or an after picture.
 - `?view=example&mock=nocost` shows a plan whose cost step failed.
 - `?view=last` reopens the last finished plan on this device.
+- `?mock=nometa` (without `view`), then upload any video: the processing screen runs with SAM and the after picture turned off. Looking and Counting flip to "skipped this run" once Comparing starts, the same timing as a real run with no Meta access.
+- `?fail=<step>` (for example `?fail=planning`), then upload any video: the preview stops at that step with a failure message, so the error screen can be checked. Nothing is sent anywhere.
 
 ### Real runs
 To send a walkthrough to the models, open `http://localhost:3000/?runner=api` (or set `NEXT_PUBLIC_SIGHTWORK_RUNNER=api`) and upload a video. The server reads these keys from the environment only:
