@@ -121,6 +121,25 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
 
   return {
     async callSpark(req: BasetenCallRequest): Promise<BasetenCallResult> {
+      // A bad request would otherwise spend a paid Baseten call and only
+      // fail downstream, when the step parses an empty or garbage
+      // result. Reject it here, before any fetch, mirroring the Meta
+      // caller's request-field validation. The request's model is
+      // deliberately not checked: this caller always uses its
+      // configured model and ignores any model name on the request.
+      if (typeof req.prompt !== "string" || req.prompt.trim().length === 0) {
+        throw new Error("baseten: prompt must be a non-empty string");
+      }
+      if (
+        req.images !== undefined &&
+        (!Array.isArray(req.images) ||
+          req.images.some((image) => typeof image !== "string" || image.trim().length === 0))
+      ) {
+        throw new Error("baseten: images must be an array of non-empty strings");
+      }
+      if (req.schema === null || typeof req.schema !== "object" || Array.isArray(req.schema)) {
+        throw new Error("baseten: schema must be an object");
+      }
       const images = req.images ?? [];
       if (images.length > MAX_IMAGES_PER_REQUEST) {
         throw new Error(
