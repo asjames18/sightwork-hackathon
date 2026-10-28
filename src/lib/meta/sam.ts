@@ -159,6 +159,19 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
   }
 
   return async (req) => {
+    // A bad request would otherwise spend a paid SAM call and only
+    // fail downstream, when the segment step parses an empty or
+    // garbage result. Reject it here, before any fetch, like the
+    // other callers reject bad costs at creation.
+    if (typeof req.concept !== "string" || req.concept.trim().length === 0) {
+      throw new Error("sam: concept must be a non-empty string");
+    }
+    if (!Number.isInteger(req.frameIndex) || req.frameIndex < 0) {
+      throw new Error(`sam: frameIndex must be an integer >= 0, got ${String(req.frameIndex)}`);
+    }
+    if (typeof req.dataUrl !== "string" || req.dataUrl.length === 0) {
+      throw new Error("sam: dataUrl must be a non-empty string");
+    }
     const body: Record<string, unknown> = {
       model: req.model,
       input: [
