@@ -80,25 +80,32 @@ export function createUsageTracker(opts?: {
 
   return {
     record(input) {
+      // Normalize before validating: a padded label (" muse-spark ")
+      // used to be stored padded, so the spike log showed it as a
+      // different model/step than the clean label, while a padded
+      // timestamp was rejected outright even though it parses once
+      // trimmed. Trimming all three first keeps labels attributable
+      // and timestamps accepted on the same rule.
+      const model = typeof input.model === "string" ? input.model.trim() : input.model;
+      const step = typeof input.step === "string" ? input.step.trim() : input.step;
+      const at = typeof input.at === "string" ? input.at.trim() : input.at;
       // Spike tracking attributes every call by model/step, so a
       // blank label would leave a server log line unattributable
       // and break per-model accounting against the $150 credits.
-      if (typeof input.model !== "string" || input.model.trim().length === 0) {
+      if (typeof model !== "string" || model.length === 0) {
         throw new Error(`usage: model must be a non-empty string, got ${JSON.stringify(input.model)}`);
       }
-      if (typeof input.step !== "string" || input.step.trim().length === 0) {
+      if (typeof step !== "string" || step.length === 0) {
         throw new Error(`usage: step must be a non-empty string, got ${JSON.stringify(input.step)}`);
       }
-      // A caller-supplied timestamp is stored verbatim in the spike
+      // A caller-supplied timestamp is stored in the spike
       // log, so a blank, non-string, or unparseable at would leave a
       // log line undated (or unsortable) and break ordering against
       // the $150 credits. Omitted at still defaults to now; only a
       // supplied value is checked.
       if (
-        input.at !== undefined &&
-        (typeof input.at !== "string" ||
-          input.at.trim().length === 0 ||
-          Number.isNaN(Date.parse(input.at)))
+        at !== undefined &&
+        (typeof at !== "string" || at.length === 0 || Number.isNaN(Date.parse(at)))
       ) {
         throw new Error(`usage: at must be a parseable date string when supplied, got ${JSON.stringify(input.at)}`);
       }
@@ -111,15 +118,15 @@ export function createUsageTracker(opts?: {
       if (round2(total + input.costUsd) > spikeCapUsd) {
         throw new Error(
           `usage: spike cap $${spikeCapUsd} would be exceeded ` +
-            `($${round2(total)} spent + $${round2(input.costUsd)} for ${input.model}/${input.step})`,
+            `($${round2(total)} spent + $${round2(input.costUsd)} for ${model}/${step})`,
         );
       }
       const rec: UsageRecord = {
-        model: input.model,
-        step: input.step,
+        model,
+        step,
         latencyMs: input.latencyMs,
         costUsd: round2(input.costUsd),
-        at: input.at ?? new Date().toISOString(),
+        at: at ?? new Date().toISOString(),
       };
       seen.push(rec);
       total = round2(total + rec.costUsd);
