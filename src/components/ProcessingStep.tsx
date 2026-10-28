@@ -91,11 +91,11 @@ export function ProcessingStep({
                 aria-hidden="true"
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                   state === "done"
-                    ? "bg-safe text-white"
+                    ? "bg-[#237032] text-white"
                     : state === "skipped"
                       ? "border border-dashed border-ink/30 bg-white text-ink/65"
                     : state === "now"
-                      ? "animate-pulse bg-accent text-white"
+                      ? "bg-[#c2410c] text-white motion-safe:animate-pulse"
                       : state === "failed"
                         ? "bg-red-600 text-white"
                         : "bg-ink/10 text-ink/70"
