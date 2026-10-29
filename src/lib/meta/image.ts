@@ -23,7 +23,7 @@
  *   price before this is trusted end to end.
  * - Model ID: muse-image-1.0 (spike note). The wiring supplies it;
  *   IMAGE_MODEL is exported for that wiring, not hardcoded in the step.
- * - Options (spike note): store:false so church frames are not kept
+ * - Options (spike note): store:false so demo frames are not kept
  *   for conversation state; size "1536x1024" for landscape frames;
  *   output_format "jpeg" so the returned data URL matches what the
  *   plan screen already renders (the provider default is webp).
