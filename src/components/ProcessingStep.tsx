@@ -113,7 +113,7 @@ export function ProcessingStep({
             style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
           />
         </div>
-        {!failed && <p className="mt-2 text-sm text-ink/65">Usually about a minute. Keep this tab open.</p>}
+        {!failed && <p className="mt-2 text-sm text-ink/65">Usually a few minutes. Keep this tab open.</p>}
       </div>
 
       <div className={`mt-5 ${failed ? "" : "lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6"}`}>

@@ -15,7 +15,7 @@ const steps = [
   },
   {
     title: "Get your plan.",
-    body: "Usually in about a minute: problems ranked worst first, each with a proof frame from your video, then the steps in the right order and the materials.",
+    body: "Usually in a few minutes: problems ranked worst first, each with a proof frame from your video, then the steps in the right order and the materials.",
   },
 ];
 
