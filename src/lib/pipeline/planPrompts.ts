@@ -643,13 +643,13 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
 /**
  * Build the finished prompt 03 for one reason step. Variable table from
  * prompt 03: space_name falls back to "Walkthrough", space_type to
- * "church sanctuary", transcript to the literal "(no narration)" when
+ * "room", transcript to the literal "(no narration)" when
  * null, frame_list one line per frame in array order.
  */
 export function buildReasonPrompt(input: ReasonInput): string {
   validateReasonPromptInput(input);
   const spaceName = input.spaceName && input.spaceName.trim() ? input.spaceName : "Walkthrough";
-  const spaceType = input.spaceType && input.spaceType.trim() ? input.spaceType : "church sanctuary";
+  const spaceType = input.spaceType && input.spaceType.trim() ? input.spaceType : "room";
   const frameList = input.frames
     .map((f, i) => `frameIndex=${i} t=${f.tSec}s`)
     .join("\n");
@@ -679,12 +679,12 @@ export function buildReasonPrompt(input: ReasonInput): string {
  * Build the finished prompt 05 for one cost step. Variable table from
  * prompt 05: labor_basis falls back to "volunteer". CostInput carries no
  * spaceType, so the caller passes PlanRequest.spaceType (default
- * "church sanctuary"). Only called with a region: estimateCost returns
+ * "room"). Only called with a region: estimateCost returns
  * null without one, so no prompt is built for a region-less request.
  */
-export function buildCostPrompt(input: CostInput, spaceType = "church sanctuary"): string {
+export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   validateCostPromptInput(input, spaceType);
-  const space = spaceType && spaceType.trim() ? spaceType : "church sanctuary";
+  const space = spaceType && spaceType.trim() ? spaceType : "room";
   const laborBasis = input.laborBasis ?? "volunteer";
   const materialsList = input.materials
     .map((m, i) => `i=${i} item="${m.item}" qty="${m.qty}" note="${m.note ?? ""}"`)
