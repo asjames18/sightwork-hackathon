@@ -15,8 +15,8 @@ const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${uni
 
 function Section({ title, children, id, className }: { title: React.ReactNode; children: React.ReactNode; id?: string; className?: string }) {
   return (
-    <section id={id} className={className ? `mt-10 scroll-mt-32 ${className}` : "mt-10 scroll-mt-32"}>
-      <h2 className="mb-3 text-xl font-extrabold">{title}</h2>
+    <section id={id} className={className ? `mt-12 scroll-mt-32 md:mt-16 ${className}` : "mt-12 scroll-mt-32 md:mt-16"}>
+      <h2 className="mb-6 text-xl font-extrabold">{title}</h2>
       {children}
     </section>
   );
@@ -431,7 +431,7 @@ export function PlanView({
 
         {plan.costRange && (
           <Section title="What it might cost" id="cost">
-            <div className="rounded-2xl bg-white p-5">
+            <div className="rounded-2xl bg-white p-4">
               <p className="text-3xl font-extrabold tabular-nums">
                 <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
                 <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
