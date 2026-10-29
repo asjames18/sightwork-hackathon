@@ -32,6 +32,11 @@
  *   and $4.25/M output (spike-measured: 8,812 in / 2,805 out = $0.0229).
  *   Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing.
+ * - A transient 404 model_not_found is retried, up to 3 attempts with a
+ *   short backoff (250 ms, then 500 ms), mirroring the Meta callers:
+ *   any other error, or a 404 without model_not_found, still throws at
+ *   once, and a 404 that survives all 3 attempts throws with the last
+ *   response, so one bad hop no longer fails the whole reason step.
  */
 
 export interface BasetenClientOptions {
@@ -39,6 +44,8 @@ export interface BasetenClientOptions {
   baseUrl?: string;
   /** Injectable fetch for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests. Defaults to a real setTimeout wait. */
+  sleepImpl?: (ms: number) => Promise<void>;
   /** Fixed model for every call. Default: the hackathon model below. */
   model?: string;
   /** USD per 1M input tokens. Default: Baseten Muse Spark Open pricing. */
@@ -75,6 +82,10 @@ const BASETEN_MODEL = "meta-models/muse-spark-open-1026";
 const MAX_IMAGES_PER_REQUEST = 8;
 const DEFAULT_INPUT_PRICE_PER_MILLION = 1.25;
 const DEFAULT_OUTPUT_PRICE_PER_MILLION = 4.25;
+/** Total attempts for a transient 404 model_not_found. */
+const MAX_BASETEN_ATTEMPTS = 3;
+/** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
+const BASETEN_RETRY_DELAYS_MS = [250, 500];
 
 function readEnv(name: string): string | undefined {
   try {
@@ -116,6 +127,8 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
     throw new Error(`baseten: model must be a non-empty string, got ${JSON.stringify(opts.model)}`);
   }
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl =
+    opts.sleepImpl ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const inputPrice = opts.inputPricePerMillion ?? DEFAULT_INPUT_PRICE_PER_MILLION;
   const outputPrice = opts.outputPricePerMillion ?? DEFAULT_OUTPUT_PRICE_PER_MILLION;
   if (!Number.isFinite(inputPrice) || inputPrice < 0) {
@@ -174,17 +187,25 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       };
 
       const started = Date.now();
-      const res = await fetchImpl(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const latencyMs = Date.now() - started;
-
-      if (!res.ok) {
+      let res: Awaited<ReturnType<typeof fetchImpl>>;
+      // Mirror the Meta callers: only a 404 naming model_not_found is
+      // transient, so only that retries; any other error, or a 404
+      // surviving all attempts, throws with the last response.
+      for (let attempt = 0; attempt < MAX_BASETEN_ATTEMPTS; attempt++) {
+        res = await fetchImpl(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) break;
         const detail = await res.text();
-        throw new Error(`baseten: ${res.status} ${detail}`);
+        const transient = res.status === 404 && detail.includes("model_not_found");
+        if (!transient || attempt === MAX_BASETEN_ATTEMPTS - 1) {
+          throw new Error(`baseten: ${res.status} ${detail}`);
+        }
+        await sleepImpl(BASETEN_RETRY_DELAYS_MS[attempt] ?? 500);
       }
+      const latencyMs = Date.now() - started;
       const parsed = (await res.json()) as Record<string, unknown>;
       const choices = parsed.choices;
       if (!Array.isArray(choices) || choices.length === 0) {
