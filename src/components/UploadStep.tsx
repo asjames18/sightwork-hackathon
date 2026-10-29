@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
+import { loadLastPlan } from "@/lib/client/lastPlan";
 
 /** Walkthroughs work best at 60 to 90 seconds; past this we warn, past the hard limit we block. */
 const SOFT_MAX_SEC = 95;
@@ -32,7 +33,26 @@ export function formatDuration(sec: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => void; onExample: () => void }) {
+// Whether a finished plan is saved on this device. The server render and the first client render
+// both say no, so there's no hydration mismatch; another tab saving or clearing one updates it.
+const subscribeStorage = (onChange: () => void) => {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+};
+const hasSavedPlan = () => loadLastPlan() !== null;
+const noPlanOnServer = () => false;
+
+export function UploadStep({
+  onVideo,
+  onExample,
+  onLastPlan,
+}: {
+  onVideo: (file: File) => void;
+  onExample: () => void;
+  /** Reopens the last finished plan on this device; the link only shows when one is saved. */
+  onLastPlan?: () => void;
+}) {
+  const savedPlan = useSyncExternalStore(subscribeStorage, hasSavedPlan, noPlanOnServer);
   const input = useRef<HTMLInputElement>(null);
   // The picker button unmounts once a video is chosen, so move focus to the preview card
   // instead of letting keyboard and screen-reader users fall back to the top of the page.
@@ -96,6 +116,17 @@ export function UploadStep({ onVideo, onExample }: { onVideo: (file: File) => vo
           >
             See an example plan first
           </button>
+          {savedPlan && onLastPlan ? (
+            <p className="mt-2 text-center text-base">
+              <button
+                type="button"
+                onClick={onLastPlan}
+                className={`inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink ${ring}`}
+              >
+                Open my last plan
+              </button>
+            </p>
+          ) : null}
           <FilmingTips />
         </>
       ) : (

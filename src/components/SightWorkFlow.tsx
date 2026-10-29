@@ -31,6 +31,11 @@ export function SightWorkFlow() {
   }, [job, stage]);
 
   const showExample = () => setStage({ kind: "plan", plan: pickMockPlan(), videoName: null });
+  // Falls back to staying on upload if the saved plan was cleared since the link showed.
+  const showLastPlan = () => {
+    const saved = loadLastPlan();
+    if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+  };
 
   // `?view=example` opens straight on the example plan: a direct link for screen checks at
   // phone, tablet and desktop widths, and a one-tap fallback during the demo.
@@ -128,7 +133,11 @@ export function SightWorkFlow() {
 
       <main className={`mx-auto w-full px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pt-10 ${width}`}>
       {stage.kind === "upload" && (
-        <UploadStep onVideo={(file) => setStage({ kind: "processing", file, run: 1 })} onExample={showExample} />
+        <UploadStep
+          onVideo={(file) => setStage({ kind: "processing", file, run: 1 })}
+          onExample={showExample}
+          onLastPlan={showLastPlan}
+        />
       )}
       {stage.kind === "processing" && (
         <ProcessingStep
