@@ -30,8 +30,14 @@
  *   floor(audioDurationMs/1000)/3600*0.18. There is no usage field,
  *   so the caller computes it (spike: 42 s cost $0.0021). When the
  *   response omits audioDurationMs, the last turn's endMs is used.
- * - A 500 is retried once (spike note); other failures fail loudly
- *   with status + body, per the pipeline's rule.
+ * - A transient 404 model_not_found is retried, up to 3 attempts with a
+ *   short backoff (250 ms, then 500 ms): the Oct 28 spike showed Meta's
+ *   entitlement cache serving 404s intermittently for a model that then
+ *   returns 200, and those 404s are not billed, so one bad hop no longer
+ *   skips the whole transcribe step. A 500 is still retried once, with no
+ *   backoff (spike note); any other error, a 404 without model_not_found,
+ *   or a 404 that survives all 3 attempts still throws at once, with
+ *   status + body, per the pipeline's rule.
  */
 
 export interface AsrClientOptions {
@@ -39,6 +45,8 @@ export interface AsrClientOptions {
   baseUrl?: string;
   /** Injectable fetch for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests. Defaults to a real setTimeout wait. */
+  sleepImpl?: (ms: number) => Promise<void>;
   /** USD per hour of audio. Default: $0.18 (spike-verified). */
   pricePerHourUsd?: number;
 }
@@ -62,6 +70,11 @@ export interface AsrTranscribeCaller {
 
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_PRICE_PER_HOUR_USD = 0.18;
+
+/** Total attempts for a transient 404 model_not_found. */
+const MAX_ASR_ATTEMPTS = 3;
+/** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
+const ASR_RETRY_DELAYS_MS = [250, 500];
 
 /** Wire mode that returns turns with diarization off (spike-verified). */
 export const ASR_MODE = "ENDPOINTING" as const;
@@ -122,6 +135,8 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
   }
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl =
+    opts.sleepImpl ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const pricePerHour = opts.pricePerHourUsd ?? DEFAULT_PRICE_PER_HOUR_USD;
   // A bad hourly price would only surface later, mid-run, when the
   // transcribe step records the call and the usage tracker rejects it.
@@ -161,47 +176,62 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
       throw new Error("asr: keywordBias must be an array of non-empty strings");
     }
     const sessionId = `sightwork-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const form = new FormData();
-    form.append(
-      "request",
-      new Blob(
-        [
-          JSON.stringify({
-            mode: ASR_MODE,
-            model: req.model,
-            audioEncoding: "WAV",
-            keywords: req.keywordBias,
-          }),
-        ],
-        { type: "application/json" },
-      ),
-    );
     const audioBytes = Buffer.from(req.audioWavBase64, "base64");
-    form.append("audio", new Blob([audioBytes], { type: "audio/wav" }), "audio.wav");
-
     const started = Date.now();
-    let res: Response | undefined;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      res = await fetchImpl(`${baseUrl}/asr/transcribe?sessionId=${encodeURIComponent(sessionId)}`, {
+    let lastStatus = 0;
+    let lastDetail = "";
+    for (let attempt = 0; attempt < MAX_ASR_ATTEMPTS; attempt++) {
+      // Rebuilt per attempt: a multipart body already sent must not be
+      // re-sent on a retry, and the sessionId stays the same across
+      // retries of the same request.
+      const form = new FormData();
+      form.append(
+        "request",
+        new Blob(
+          [
+            JSON.stringify({
+              mode: ASR_MODE,
+              model: req.model,
+              audioEncoding: "WAV",
+              keywords: req.keywordBias,
+            }),
+          ],
+          { type: "application/json" },
+        ),
+      );
+      form.append("audio", new Blob([audioBytes], { type: "audio/wav" }), "audio.wav");
+      const res = await fetchImpl(`${baseUrl}/asr/transcribe?sessionId=${encodeURIComponent(sessionId)}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
         body: form,
       });
-      if (res.status !== 500 || attempt === 1) break;
+      if (res.ok) {
+        const latencyMs = Date.now() - started;
+        const parsed = (await res.json()) as Record<string, unknown>;
+        const turns = mapTurns(parsed.turns);
+        const durationMs =
+          typeof parsed.audioDurationMs === "number" && Number.isFinite(parsed.audioDurationMs)
+            ? parsed.audioDurationMs
+            : turns.length > 0
+              ? turns[turns.length - 1].endSec * 1000
+              : 0;
+        return { turns, latencyMs, costUsd: computeAsrCostUsd(durationMs, pricePerHour) };
+      }
+      lastStatus = res.status;
+      lastDetail = await res.text();
+      // Only a 404 naming model_not_found is transient (spike, Oct 28:
+      // unbilled, then 200 for the same model). A 500 is still retried
+      // once, with no backoff, as before. Anything else throws at
+      // once, as before, and so does a 404 that survives all attempts.
+      const transient404 = res.status === 404 && lastDetail.includes("model_not_found");
+      if (transient404) {
+        if (attempt === MAX_ASR_ATTEMPTS - 1) break;
+        await sleepImpl(ASR_RETRY_DELAYS_MS[attempt] ?? 500);
+        continue;
+      }
+      if (res.status === 500 && attempt === 0) continue;
+      break;
     }
-    const latencyMs = Date.now() - started;
-    if (!res || !res.ok) {
-      const detail = res ? await res.text() : "no response";
-      throw new Error(`asr: ${res ? res.status : "?"} ${detail}`);
-    }
-    const parsed = (await res.json()) as Record<string, unknown>;
-    const turns = mapTurns(parsed.turns);
-    const durationMs =
-      typeof parsed.audioDurationMs === "number" && Number.isFinite(parsed.audioDurationMs)
-        ? parsed.audioDurationMs
-        : turns.length > 0
-          ? turns[turns.length - 1].endSec * 1000
-          : 0;
-    return { turns, latencyMs, costUsd: computeAsrCostUsd(durationMs, pricePerHour) };
+    throw new Error(`asr: ${lastStatus} ${lastDetail}`);
   };
 }
