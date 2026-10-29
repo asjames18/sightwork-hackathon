@@ -17,7 +17,7 @@ export function pickRunnerKind(search: string | null, envValue: string | undefin
 
 /** Demo defaults sent with each request. Region is left out until Antonio picks one, so no cost range is asked for. */
 const apiPlanJob = createApiPlanJob(
-  createBuildPlanRequest({ spaceType: "church sanctuary" }),
+  createBuildPlanRequest({ spaceType: "room" }),
 );
 
 /**

@@ -66,7 +66,7 @@ export interface FrameManifest {
 
 export interface PlanRequest {
   spaceName?: string;
-  /** e.g. "church sanctuary". Defaults to "church sanctuary". */
+  /** What kind of space was filmed, e.g. "classroom", "office", "church sanctuary". The client sends "room"; the reason and cost prompts also fall back to "room". */
   spaceType?: string;
   durationSec: number;
   frames: { tSec: number; dataUrl: string }[];
