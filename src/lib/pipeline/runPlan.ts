@@ -423,6 +423,19 @@ export function validateRunPlanRequest(request: PlanRequest): void {
   if (request.audioWavBase64 !== undefined && typeof request.audioWavBase64 !== "string") {
     throw new Error("runPlan: audioWavBase64 must be a string when given");
   }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+  // an empty string means "not given" (runTranscribe returns no
+  // transcript), but a spaces-only string is truthy, so it rides past
+  // the no-audio skip into runTranscribe and dies there with a
+  // misleading "not a WAV file" error. A direct runPlan caller gets
+  // the same fail-fast here instead of only via the route.
+  if (
+    typeof request.audioWavBase64 === "string" &&
+    request.audioWavBase64.length > 0 &&
+    request.audioWavBase64.trim().length === 0
+  ) {
+    throw new Error("runPlan: audioWavBase64 must not be blank when given");
+  }
   if (
     request.laborBasis !== undefined &&
     request.laborBasis !== "volunteer" &&
