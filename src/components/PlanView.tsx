@@ -361,82 +361,85 @@ export function PlanView({
         )}
       </Section>
 
-      <Section title="Materials" id="materials">
-        {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
-        <ul className={plan.materials.length ? "divide-y divide-ink/10 rounded-2xl bg-white" : "hidden"}>
-          {plan.materials.map((m) => (
-            <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium break-words">{m.item}</p>
-                <p className="text-sm text-ink/70">
-                  {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="font-semibold">{m.qty}</p>
-                {m.unitCost && <p className="text-sm text-ink/70">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      {!plan.costRange && plan.materials.length > 0 && (
-        <Section title="What it might cost">
-          <Empty>
-            {plan.meta?.skipped?.cost
-              ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
-              : "No cost range yet. Add your city or region and we\u2019ll price the materials and labor for your area."}
-          </Empty>
+      {/* Materials and cost sit side by side on desktop (lg+) whenever a cost card renders; phones and tablets stack them. */}
+      <div className={plan.costRange || plan.materials.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-8" : undefined}>
+        <Section title="Materials" id="materials">
+          {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
+          <ul className={plan.materials.length ? "divide-y divide-ink/10 rounded-2xl bg-white" : "hidden"}>
+            {plan.materials.map((m) => (
+              <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium break-words">{m.item}</p>
+                  <p className="text-sm text-ink/70">
+                    {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold">{m.qty}</p>
+                  {m.unitCost && <p className="text-sm text-ink/70">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
         </Section>
-      )}
 
-      {plan.costRange && (
-        <Section title="What it might cost" id="cost">
-          <div className="rounded-2xl bg-white p-5">
-            <p className="text-3xl font-extrabold tabular-nums">
-              <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
-              <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
-            </p>
-            <p className="mt-1 text-sm text-ink/70">{plan.costRange.label}</p>
-            <details className="group mt-3 border-t border-ink/10 pt-3">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
-                  <path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                How we got this
-              </summary>
-              <p className="mt-2 text-sm">
-                Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
+        {!plan.costRange && plan.materials.length > 0 && (
+          <Section title="What it might cost">
+            <Empty>
+              {plan.meta?.skipped?.cost
+                ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
+                : "No cost range yet. Add your city or region and we\u2019ll price the materials and labor for your area."}
+            </Empty>
+          </Section>
+        )}
+
+        {plan.costRange && (
+          <Section title="What it might cost" id="cost">
+            <div className="rounded-2xl bg-white p-5">
+              <p className="text-3xl font-extrabold tabular-nums">
+                <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
+                <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
               </p>
-              <ul className="mt-2 list-disc pl-5 text-sm text-ink/70">
-                {plan.costRange.assumptions.map((a) => (
-                  <li key={a}>{a}</li>
-                ))}
-              </ul>
-              {plan.costRange.sources && plan.costRange.sources.length > 0 && (
-                <p className="mt-3 text-sm text-ink/70">
-                  Prices from{" "}
-                  {plan.costRange.sources.map((src, i) => (
-                    <span key={src.url}>
-                      {i > 0 && ", "}
-                      <a
-                        href={src.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-words rounded-sm underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        {src.title}
-                        <span className="sr-only"> (opens in a new tab)</span>
-                      </a>
-                    </span>
-                  ))}
+              <p className="mt-1 text-sm text-ink/70">{plan.costRange.label}</p>
+              <details className="group mt-3 border-t border-ink/10 pt-3">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
+                    <path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  How we got this
+                </summary>
+                <p className="mt-2 text-sm">
+                  Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
                 </p>
-              )}
-            </details>
-          </div>
-        </Section>
-      )}
+                <ul className="mt-2 list-disc pl-5 text-sm text-ink/70">
+                  {plan.costRange.assumptions.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+                {plan.costRange.sources && plan.costRange.sources.length > 0 && (
+                  <p className="mt-3 text-sm text-ink/70">
+                    Prices from{" "}
+                    {plan.costRange.sources.map((src, i) => (
+                      <span key={src.url}>
+                        {i > 0 && ", "}
+                        <a
+                          href={src.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="break-words rounded-sm underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          {src.title}
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </details>
+            </div>
+          </Section>
+        )}
+      </div>
 
       {/* The "coming soon" placeholder is screen-only: a saved PDF shows just the finished plan. */}
       {!plan.afterImageUrl && plan.workOrder.length > 0 && (
