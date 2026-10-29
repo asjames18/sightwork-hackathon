@@ -126,6 +126,8 @@ export function PlanView({
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
+  // Hand-written samples never ran the outline step, so they don't promise outlines "coming soon".
+  const sample = example?.kind === "sample";
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
@@ -251,7 +253,7 @@ export function PlanView({
       {/* No after picture: lead with the hero proof frame instead, so the top never shows an empty slot. */}
       {!plan.afterImageUrl && topProof && (
         <Section title="From your video" className="mt-6!">
-          <ProofFrame frame={topProof.frame} box={topProof.box} caption={topProof.caption} outlineUnavailable={!masks} priority />
+          <ProofFrame frame={topProof.frame} box={topProof.box} caption={topProof.caption} outlineUnavailable={!masks} frameOnlyLabel={sample ? "Frame only" : undefined} priority />
         </Section>
       )}
 
@@ -277,9 +279,11 @@ export function PlanView({
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
         {plan.issues.length > 0 && !masks && (
           <p className="mb-4 rounded-xl border border-ink/10 bg-white/70 px-4 py-3 text-sm text-ink/70">
-            {roughBoxes
-              ? "Exact outlines are off for this plan, so the dashed boxes are rough highlights from the plan step. Each problem still shows the frame it was found in."
-              : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
+            {sample
+              ? "In this sample the dashed boxes are drawn by hand to show where each problem is. On a real run, SightWork marks them from your video."
+              : roughBoxes
+                ? "Exact outlines are off for this plan, so the dashed boxes are rough highlights from the plan step. Each problem still shows the frame it was found in."
+                : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
         <ol className="flex flex-col gap-3">
@@ -303,7 +307,7 @@ export function PlanView({
                 </div>
                 {issue.status !== "mentioned_not_seen" && (
                   <div className="mt-3 min-w-0 md:mt-0">
-                    <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} outlineUnavailable={!masks} />
+                    <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} outlineUnavailable={!masks} frameOnlyLabel={sample ? "Frame only" : undefined} />
                   </div>
                 )}
               </li>

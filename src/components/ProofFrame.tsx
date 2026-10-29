@@ -21,12 +21,15 @@ export function ProofFrame({
   caption,
   outlineUnavailable = false,
   priority = false,
+  frameOnlyLabel = "Frame only, outline coming soon",
 }: {
   frame: PlanFrame | undefined;
   box?: Box;
   caption?: string;
   outlineUnavailable?: boolean;
   priority?: boolean;
+  /** Badge on a frame with no box when outlines are unavailable (samples say just "Frame only"). */
+  frameOnlyLabel?: string;
 }) {
   if (!frame)
     return (
@@ -70,7 +73,7 @@ export function ProofFrame({
         )}
         {!box && outlineUnavailable && (
           <span className="absolute right-2 top-2 whitespace-nowrap rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">
-            Frame only, outline coming soon
+            {frameOnlyLabel}
           </span>
         )}
       </div>
