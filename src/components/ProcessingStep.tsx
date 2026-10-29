@@ -185,7 +185,7 @@ export function ProcessingStep({
                 ref={retryRef}
                 type="button"
                 onClick={onRetry}
-                className="min-h-11 flex-1 rounded-xl bg-ink px-4 py-3 font-semibold text-white active:scale-[.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="btn-primary flex-1 active:scale-[.99]"
               >
                 Try again
               </button>
@@ -194,7 +194,7 @@ export function ProcessingStep({
               <button
                 type="button"
                 onClick={onExample}
-                className="min-h-11 flex-1 rounded-xl border border-ink/20 px-4 py-3 font-semibold active:scale-[.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="btn-secondary flex-1 active:scale-[.99]"
               >
                 See the example plan
               </button>
