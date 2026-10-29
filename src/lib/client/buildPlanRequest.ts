@@ -1,6 +1,7 @@
 import type { LaborBasis, PlanRequest } from "@/lib/types";
 import type { BuildPlanRequest } from "./apiPlanJob";
 import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
+import { trimFramesCoveringZones } from "./zoneCoverage";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -284,6 +285,8 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
         if (o.zones) signatures.push(signCanvas(canvas, thumb));
       }
       if (o.zones) frames = withZoneIds(frames, signatures);
+      // Guard: never send more than maxFrames, and if anything ever has to go, every zone keeps a frame.
+      frames = trimFramesCoveringZones(frames, Math.max(1, o.maxFrames));
       video.removeAttribute("src");
       video.load();
 
