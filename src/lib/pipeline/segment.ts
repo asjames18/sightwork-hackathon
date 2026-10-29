@@ -509,10 +509,15 @@ export function validateSegmentDeps(deps: SegmentDeps): void {
 
 /**
  * Run tasks with at most `limit` in flight, results in task order.
- * A task rejection rejects the whole run; in-flight tasks are not
- * cancelled, so when the usage tracker throws on the spike cap, at
- * most limit-1 extra calls may already be in flight (a few cents at
- * SAM prices, and the run still stops).
+ * A task rejection stops the pool: tasks already in flight finish
+ * (they cannot be cancelled), but no worker starts another task, so
+ * when the usage tracker throws on the spike cap, at most limit-1
+ * extra calls may already be in flight (a few cents at SAM prices,
+ * and the run still stops). Previously Promise.all let the surviving
+ * workers keep draining the queue after a rejection, so a cap throw
+ * could keep spending calls that would each throw at record time.
+ * Workers swallow their own errors and the first one is rethrown
+ * after all workers settle, so no rejection is ever unhandled.
  */
 export async function runWithConcurrency<T>(
   tasks: Array<() => Promise<T>>,
@@ -523,14 +528,27 @@ export async function runWithConcurrency<T>(
   }
   const results: T[] = new Array(tasks.length);
   let next = 0;
+  let failed = false;
+  let firstError: unknown;
+  let hasError = false;
   const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
-    while (next < tasks.length) {
+    while (!failed && next < tasks.length) {
       const i = next;
       next += 1;
-      results[i] = await tasks[i]();
+      try {
+        results[i] = await tasks[i]();
+      } catch (err) {
+        failed = true;
+        if (!hasError) {
+          hasError = true;
+          firstError = err;
+        }
+        return;
+      }
     }
   });
   await Promise.all(workers);
+  if (hasError) throw firstError;
   return results;
 }
 
