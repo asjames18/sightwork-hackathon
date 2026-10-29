@@ -64,7 +64,7 @@ export const EXAMPLES: Example[] = [
   {
     id: "office",
     kind: "sample",
-    title: "Empty office before move-in",
+    title: "Empty office before move‑in",
     blurb: "Door closer, floor covers and cleanup in the right order.",
     thumb: "/examples/samples/office.webp",
     plan: withFrameSizes(officeSample),
