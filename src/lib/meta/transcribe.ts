@@ -149,8 +149,16 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
     if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || Buffer.from(b64, "base64").length === 0) {
       throw new Error("asr: audioWavBase64 must be valid base64 audio data");
     }
-    if (!Array.isArray(req.keywordBias) || req.keywordBias.some((k) => typeof k !== "string")) {
-      throw new Error("asr: keywordBias must be an array of strings");
+    // A whitespace-only keyword would otherwise ride along on a paid
+    // ASR call and only fail (or silently do nothing) at the provider:
+    // the old check accepted any string. Reject it here, before any
+    // fetch, like the transcribe step rejects blank keywords in its
+    // own deps check. Valid keywords pass through unchanged.
+    if (
+      !Array.isArray(req.keywordBias) ||
+      req.keywordBias.some((k) => typeof k !== "string" || k.trim().length === 0)
+    ) {
+      throw new Error("asr: keywordBias must be an array of non-empty strings");
     }
     const sessionId = `sightwork-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const form = new FormData();
