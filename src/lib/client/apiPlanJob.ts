@@ -1,5 +1,6 @@
 import { PLAN_STEPS, type PlanJobStatus, type PlanRequest, type PlanStep } from "@/lib/types";
 import type { PlanJobRunner } from "./planJob";
+import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
 
 /**
  * Turns the picked video into the request body (frames + narration).
@@ -47,6 +48,7 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
  * {error} text is written for developers, so it goes to the console, not the screen.
  */
 export function messageForStatus(status: number): string {
+  if (status === 401) return "Real runs need a tester code. Enter it on the start screen, or open the example plan.";
   if (status === 413) return "That video is too large to send. Try a shorter walkthrough.";
   if (status === 400) return "The video's frames didn't come through right. Try again, or open the example plan.";
   if (status === 429) return "Too many plans are running right now. Wait a minute and try again.";
@@ -102,7 +104,7 @@ export function createApiPlanJob(buildRequest: BuildPlanRequest, endpoint = "/ap
     try {
       res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson", [TEST_CODE_HEADER]: loadTestCode() },
         body: JSON.stringify(body),
         signal,
       });

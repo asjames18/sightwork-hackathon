@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
 import { loadLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
+import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 
 /** Walkthroughs work best at 60 to 90 seconds; past this we warn, past the hard limit we block. */
 const SOFT_MAX_SEC = 95;
@@ -121,6 +122,7 @@ export function UploadStep({
               </button>
             </p>
           ) : null}
+          {runner === "api" && <TesterCode />}
           <FilmingTips />
           <ExamplePicker onPick={onExample} />
         </>
@@ -309,5 +311,49 @@ function ExampleCard({ example, onPick, wide = false }: { example: Example; onPi
         <span className="mt-1 text-sm font-semibold text-accent-dark group-hover:underline">Open plan →</span>
       </span>
     </button>
+  );
+}
+
+/** Real-run mode only (`?runner=api`): the tester code, typed once and kept on this device. */
+function TesterCode() {
+  const [code, setCode] = useState("");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    const c = loadTestCode();
+    setCode(c);
+    setSaved(Boolean(c));
+  }, []);
+  return (
+    <form
+      className="mt-4 rounded-xl bg-white/70 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        saveTestCode(code);
+        setSaved(Boolean(code.trim()));
+      }}
+    >
+      <label htmlFor="tester-code" className="block text-sm font-semibold">
+        Tester code for real runs
+      </label>
+      <div className="mt-2 flex gap-2">
+        <input
+          id="tester-code"
+          type="password"
+          autoComplete="off"
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setSaved(false);
+          }}
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-ink/20 bg-white px-3 text-base"
+        />
+        <button type="submit" className="btn-secondary shrink-0 text-sm">
+          Save
+        </button>
+      </div>
+      <p aria-live="polite" className="mt-1 text-xs text-ink/70">
+        {saved ? "Saved on this device." : "Real runs use paid model credits, so they need a code."}
+      </p>
+    </form>
   );
 }
