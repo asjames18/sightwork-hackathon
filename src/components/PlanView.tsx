@@ -13,7 +13,7 @@ const SEVERITY_LABEL: Record<Issue["severity"], string> = { high: "High", medium
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
-function Section({ title, children, id, className }: { title: string; children: React.ReactNode; id?: string; className?: string }) {
+function Section({ title, children, id, className }: { title: React.ReactNode; children: React.ReactNode; id?: string; className?: string }) {
   return (
     <section id={id} className={className ? `mt-10 scroll-mt-32 ${className}` : "mt-10 scroll-mt-32"}>
       <h2 className="mb-3 text-xl font-extrabold">{title}</h2>
@@ -322,11 +322,15 @@ export function PlanView({
         </Section>
       )}
 
-      <Section title="What's there" id="counts">
+      <Section
+        title={<>What&apos;s there{plan.inventory.length > 0 && <>{" "}<span className="ml-1 text-sm font-medium text-ink/70">approximate</span></>}</>}
+        id="counts"
+      >
         {plan.inventory.length === 0 && <Empty>Nothing was counted in this video.</Empty>}
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* Tiles grow to fill their row, so an odd last row (3 + 2, or 2 + 1 on phones) has no empty slot; four tiles stay 2 + 2. */}
+        <ul className="flex flex-wrap gap-3">
           {plan.inventory.map((item) => (
-            <li key={item.label} className="min-w-0 rounded-2xl bg-white p-4">
+            <li key={item.label} className={`min-w-0 grow basis-[calc(50%-0.375rem)] rounded-2xl bg-white p-4 ${plan.inventory.length === 4 ? "" : "sm:basis-[calc(33.333%-0.5rem)]"}`}>
               <p className="text-3xl font-extrabold tabular-nums">{item.range ? range(item.range) : item.count}</p>
               <p className="font-medium break-words">{item.label}</p>
               {item.zone && !item.label.toLowerCase().includes(item.zone.toLowerCase()) && (
@@ -336,7 +340,7 @@ export function PlanView({
           ))}
         </ul>
         {plan.inventory.length > 0 && (
-          <p className="mt-2 text-sm text-ink/70">{masks ? "Approximate, counted from the video." : "Approximate, estimated from the frames. Exact counts come with outlines."}</p>
+          <p className="mt-2 text-sm text-ink/70">{masks ? "Counted from the video, from what the camera saw." : "Estimated from the frames, from what the camera saw. Exact counts come with outlines."}</p>
         )}
       </Section>
 
