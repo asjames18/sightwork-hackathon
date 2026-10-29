@@ -81,7 +81,12 @@ export function SightWorkFlow() {
   }, [stage.kind, runKey]);
 
   // Phones get the full width; tablets and desktops get a readable column, wider for the plan.
-  const width = stage.kind === "plan" ? "max-w-xl md:max-w-2xl lg:max-w-3xl" : "max-w-xl md:max-w-2xl";
+  const width =
+    stage.kind === "plan"
+      ? "max-w-xl md:max-w-2xl lg:max-w-3xl"
+      : stage.kind === "processing"
+        ? "max-w-xl md:max-w-2xl lg:max-w-4xl"
+        : "max-w-xl md:max-w-2xl";
   const startOver = () => setStage({ kind: "upload" });
 
   return (

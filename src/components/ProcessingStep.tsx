@@ -116,7 +116,8 @@ export function ProcessingStep({
         {!failed && <p className="mt-2 text-sm text-ink/65">Usually about a minute. Keep this tab open.</p>}
       </div>
 
-      <ol className="mt-5 divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
+      <div className={`mt-5 ${failed ? "" : "lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6"}`}>
+      <ol className="divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
         {work.map((s, i) => {
           const passed = i < current ? (skipped?.includes(s) ? "skipped" : "done") : null;
           const state: keyof typeof STATE_TEXT = passed ?? (i === current ? (failed ? "failed" : "now") : "next");
@@ -171,6 +172,8 @@ export function ProcessingStep({
           );
         })}
       </ol>
+      {!failed && <WhileYouWait />}
+      </div>
 
       {failure && (
         <div role="alert" className="mt-6 rounded-2xl border border-red-600/30 bg-white p-4">
@@ -200,6 +203,35 @@ export function ProcessingStep({
         </div>
       )}
     </section>
+  );
+}
+
+/** What the finished plan holds, beside the step list on desktop so the screen isn't half empty. Only parts
+ * every run produces are listed (no cost or after picture, which are optional steps). Phones skip it. */
+const PLAN_PARTS = [
+  "Problems ranked by priority, including ones you didn't mention",
+  "Rough counts of what's in the room",
+  "Work steps in order, volunteer or paid trade",
+  "A materials list",
+] as const;
+
+function WhileYouWait() {
+  return (
+    <aside aria-labelledby="while-you-wait" className="hidden rounded-2xl bg-ink/[.04] p-5 lg:block">
+      <h2 id="while-you-wait" className="text-base font-bold">
+        While you wait
+      </h2>
+      <p className="mt-1 text-sm text-ink/70">Your plan will have:</p>
+      <ul className="mt-3 space-y-2.5 text-sm text-ink/80">
+        {PLAN_PARTS.map((t) => (
+          <li key={t} className="flex gap-2">
+            <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-dark" />
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-4 text-sm text-ink/70">When it's ready, your plan opens here on its own.</p>
+    </aside>
   );
 }
 
