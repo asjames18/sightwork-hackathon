@@ -35,6 +35,13 @@
  *   judge path cannot run.
  * - Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing, per the step's rule.
+ * - A transient 404 model_not_found is retried, up to 3 attempts with a
+ *   250 ms then 500 ms backoff, per candidate request: the Oct 28 spike
+ *   showed those 404s are unbilled and the same model then returns
+ *   200, so one bad hop no longer fails the whole picturing step. Any
+ *   other error, or a 404 without model_not_found, still throws at
+ *   once, and a 404 that survives all 3 attempts throws with the last
+ *   response. Same shape as the Spark and SAM callers' retry.
  */
 
 export interface ImageClientOptions {
@@ -42,6 +49,8 @@ export interface ImageClientOptions {
   baseUrl?: string;
   /** Injectable fetch for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests. Defaults to a real setTimeout wait. */
+  sleepImpl?: (ms: number) => Promise<void>;
   /** USD charged per returned image. Default: $0.01. */
   imageCostUsd?: number;
   /** Aspect-ratio size for the generation tool. Default: "1536x1024". */
@@ -69,6 +78,11 @@ const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_IMAGE_COST_USD = 0.01;
 const DEFAULT_SIZE = "1536x1024";
 const DEFAULT_OUTPUT_FORMAT = "jpeg";
+
+/** Total attempts for a transient 404 model_not_found. */
+const MAX_IMAGE_ATTEMPTS = 3;
+/** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
+const IMAGE_RETRY_DELAYS_MS = [250, 500];
 
 function readEnv(name: string): string | undefined {
   try {
@@ -111,6 +125,8 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   }
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl =
+    opts.sleepImpl ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const imageCost = opts.imageCostUsd ?? DEFAULT_IMAGE_COST_USD;
   // A bad per-image cost would only surface later, mid-run, when the
   // renderAfter step records the call and the usage tracker rejects
@@ -177,17 +193,32 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
         store: false,
       };
       const started = Date.now();
-      const res = await fetchImpl(`${baseUrl}/responses`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      latencyMs += Date.now() - started;
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`image: ${res.status} ${detail}`);
+      let parsed: Record<string, unknown> | null = null;
+      let lastStatus = 0;
+      let lastDetail = "";
+      for (let attempt = 0; attempt < MAX_IMAGE_ATTEMPTS; attempt++) {
+        const res = await fetchImpl(`${baseUrl}/responses`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          parsed = (await res.json()) as Record<string, unknown>;
+          break;
+        }
+        lastStatus = res.status;
+        lastDetail = await res.text();
+        // Only a 404 naming model_not_found is transient (spike, Oct 28:
+        // unbilled, then 200 for the same model). Anything else throws at
+        // once, as before, and so does a 404 that survives all attempts.
+        const transient = res.status === 404 && lastDetail.includes("model_not_found");
+        if (!transient || attempt === MAX_IMAGE_ATTEMPTS - 1) break;
+        await sleepImpl(IMAGE_RETRY_DELAYS_MS[attempt] ?? 500);
       }
-      const parsed = (await res.json()) as Record<string, unknown>;
+      latencyMs += Date.now() - started;
+      if (parsed === null) {
+        throw new Error(`image: ${lastStatus} ${lastDetail}`);
+      }
       const found = parseImageResults(parsed, outputFormat);
       // Only completed images are billed, per the spike note.
       costUsd += found.length * imageCost;
