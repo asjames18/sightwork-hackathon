@@ -181,13 +181,21 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   // A blank or non-string size/outputFormat would otherwise be sent to
   // the provider and only fail on a paid Image call (or come back in
   // the wrong format), so reject it here, at caller creation, like the
-  // per-image cost is rejected above.
-  if (typeof size !== "string" || size.trim().length === 0) {
-    throw new Error(`image: size must be a non-empty string, got ${JSON.stringify(opts.size)}`);
+  // per-image cost is rejected above. The bar is higher than
+  // non-empty: size rides verbatim into the image_generation tool
+  // params, and outputFormat rides verbatim into every returned data
+  // URL (parseImageResults builds `data:image/<format>;base64,...`),
+  // so a padded, punctuated, or otherwise non-token value would
+  // otherwise pass creation and only surface later as a provider
+  // rejection or a broken after-image data URL. Size must be the
+  // documented WxH form and outputFormat a media-subtype token; the
+  // defaults ("1536x1024", "jpeg") pass unchanged.
+  if (typeof size !== "string" || !/^\d+x\d+$/.test(size)) {
+    throw new Error(`image: size must be a WxH size like "1536x1024", got ${JSON.stringify(opts.size)}`);
   }
-  if (typeof outputFormat !== "string" || outputFormat.trim().length === 0) {
+  if (typeof outputFormat !== "string" || !/^[A-Za-z0-9][A-Za-z0-9+.-]*$/.test(outputFormat)) {
     throw new Error(
-      `image: outputFormat must be a non-empty string, got ${JSON.stringify(opts.outputFormat)}`,
+      `image: outputFormat must be a media-subtype token like "jpeg", got ${JSON.stringify(opts.outputFormat)}`,
     );
   }
 
