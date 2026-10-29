@@ -111,6 +111,14 @@ export function parseImageResults(body: Record<string, unknown>, outputFormat: s
     if (rec.status !== "completed") continue;
     const result = rec.result;
     if (typeof result !== "string" || result.length === 0) continue;
+    // A "completed" call is trusted for billing but not for bytes:
+    // a garbage or text result used to pass through here as a data
+    // URL and only fail downstream, when the render step showed a
+    // broken after-image (or handed the judge a bogus candidate).
+    // Skip anything that is not valid base64 image data, by the
+    // same header rule the request side enforces; the caller still
+    // throws "no completed image" when nothing usable remains.
+    if (!isBase64(result) || !isImageBase64(result)) continue;
     images.push(`data:image/${outputFormat};base64,${result}`);
   }
   return images;
