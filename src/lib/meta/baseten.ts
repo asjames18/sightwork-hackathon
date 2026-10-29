@@ -269,9 +269,19 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       if (!Array.isArray(choices) || choices.length === 0) {
         throw new Error("baseten: response had no choices");
       }
-      const message = (choices[0] as Record<string, unknown>).message as
-        | Record<string, unknown>
-        | undefined;
+      // A null or non-object first choice used to throw a raw
+      // TypeError here ("cannot read message of null") instead of
+      // the clean no-text-content error below, so the step's failure
+      // surfaced as an unexpected error rather than a provider
+      // failure. Guard it: anything but an object choice means no
+      // message, and the check below throws the clean error.
+      const firstChoice = choices[0];
+      const message =
+        firstChoice !== null && typeof firstChoice === "object"
+          ? (firstChoice as Record<string, unknown>).message as
+              | Record<string, unknown>
+              | undefined
+          : undefined;
       // Reasoning arrives in its own lane (e.g. reasoning_content); only
       // message.content is the answer, and only that is parsed.
       const text = message?.content;
