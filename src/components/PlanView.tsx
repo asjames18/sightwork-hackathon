@@ -477,8 +477,9 @@ export function PlanView({
         )}
       </div>
 
-      {/* The "coming soon" placeholder is screen-only: a saved PDF shows just the finished plan. */}
-      {!plan.afterImageUrl && plan.workOrder.length > 0 && (
+      {/* The "coming soon" placeholder is screen-only: a saved PDF shows just the finished plan.
+          When the after-image step was skipped this run, no slot at all: "Made with" already says it was off. */}
+      {!plan.afterImageUrl && !plan.meta?.skipped?.afterImage && plan.workOrder.length > 0 && (
         <Section title="After the work" className="print:hidden">
           <AfterSlot frame={slotFrame} />
         </Section>
