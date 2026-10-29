@@ -18,8 +18,8 @@
  * - model muse-voice-transcribe-1.0; confirm the ID at the first spike
  * - WAV, mono, 16-bit PCM, 16 or 24 kHz; max 32 MB / 10 min
  * - diarization off (one speaker); Standard mode, never -contributor
- *   (contributor mode lets Meta train on the content; this is church
- *   footage)
+ *   (contributor mode lets Meta train on the content; demo footage
+ *   is not for training)
  *
  * Post-processing (all in the prompt file, enforced here, not trusted
  * to the model):
@@ -39,7 +39,7 @@ export const CLEANUP_MODEL = "muse-spark";
 /** Max audio size from prompt 01 (32 MB). */
 export const MAX_AUDIO_BYTES = 32 * 1024 * 1024;
 
-/** Default keyword bias from prompt 01 (church walkthrough terms). */
+/** Default keyword bias from prompt 01 (demo-footage walkthrough terms). */
 export const DEFAULT_KEYWORD_BIAS = [
   "exit sign",
   "egress",
