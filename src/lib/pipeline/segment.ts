@@ -58,6 +58,14 @@ export const DEFAULT_MIN_SCORE = 0.5;
 /** Request cap per plan from prompt 02 (one request = one concept on one frame). */
 export const DEFAULT_MAX_SAM_REQUESTS = 300;
 
+/**
+ * Default SAM concurrency: at most this many SAM calls in flight at
+ * once. Serial runs made the 120-call real walkthrough pass the
+ * slowest step; a 4-wide pool is the timing win without letting a
+ * burst of calls hit the model endpoint at once.
+ */
+export const DEFAULT_SEGMENT_CONCURRENCY = 4;
+
 /** One SAM concept: the noun phrase sent to the model and its output label. */
 export interface CountConcept {
   /** Noun phrase sent to SAM, e.g. "folding table". */
@@ -140,6 +148,8 @@ export interface SegmentInput {
   sceneFrameIndices?: number[];
   minScore?: number;
   maxRequests?: number;
+  /** At most this many SAM calls in flight; default DEFAULT_SEGMENT_CONCURRENCY. */
+  concurrency?: number;
 }
 
 /** One hazard hit: the best instance for a hazard key on a frame. */
@@ -420,6 +430,12 @@ export function validateSegmentInput(input: SegmentInput): void {
   ) {
     throw new Error(`segment: maxRequests must be a whole number >= 0, got ${input.maxRequests}`);
   }
+  if (
+    input.concurrency !== undefined &&
+    (!Number.isInteger(input.concurrency) || input.concurrency < 1)
+  ) {
+    throw new Error(`segment: concurrency must be a whole number >= 1, got ${input.concurrency}`);
+  }
   if (input.sceneFrameIndices !== undefined) {
     if (
       !Array.isArray(input.sceneFrameIndices) ||
@@ -491,6 +507,33 @@ export function validateSegmentDeps(deps: SegmentDeps): void {
   }
 }
 
+/**
+ * Run tasks with at most `limit` in flight, results in task order.
+ * A task rejection rejects the whole run; in-flight tasks are not
+ * cancelled, so when the usage tracker throws on the spike cap, at
+ * most limit-1 extra calls may already be in flight (a few cents at
+ * SAM prices, and the run still stops).
+ */
+export async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error(`segment: concurrency must be a whole number >= 1, got ${limit}`);
+  }
+  const results: T[] = new Array(tasks.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      const i = next;
+      next += 1;
+      results[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 export async function runSegment(
   input: SegmentInput,
   deps: SegmentDeps,
@@ -518,12 +561,19 @@ export async function runSegment(
   // tracker no longer throws only after a paid call, when record runs.
   validateSegmentDeps(deps);
 
+  const concurrency = input.concurrency ?? DEFAULT_SEGMENT_CONCURRENCY;
   const rawLog: SegmentRawEntry[] = [];
   let requestsMade = 0;
   // Keyed "prompt|frameIndex": the hazard pass fills it, the count pass reuses it.
   const results = new Map<string, RawInstance[]>();
 
-  const call = async (concept: string, frameIndex: number): Promise<RawInstance[]> => {
+  // One SAM call plus its usage record and parse/filter. Assembly
+  // into results/rawLog happens in planned task order after the
+  // pool finishes, so output order matches the old serial run.
+  const makeCall = async (
+    concept: string,
+    frameIndex: number,
+  ): Promise<{ concept: string; frameIndex: number; kept: RawInstance[] }> => {
     const res = await deps.callSegment({
       model: SAM_MODEL,
       concept,
@@ -537,39 +587,53 @@ export async function runSegment(
       latencyMs: res.latencyMs,
       costUsd: res.costUsd,
     });
-    requestsMade += 1;
     const kept = parseInstances(res.instances, concept, frameIndex).filter(
       (inst) => inst.score >= minScore,
     );
-    results.set(`${concept}|${frameIndex}`, kept);
-    rawLog.push({
-      concept,
-      frameIndex,
-      count: kept.length,
-      boxes: kept.flatMap((inst) => (inst.box === undefined ? [] : [inst.box])),
-      scores: kept.map((inst) => inst.score),
-    });
-    return kept;
+    return { concept, frameIndex, kept };
+  };
+  const assemble = (
+    done: Array<{ concept: string; frameIndex: number; kept: RawInstance[] }>,
+  ): void => {
+    for (const r of done) {
+      results.set(`${r.concept}|${r.frameIndex}`, r.kept);
+      rawLog.push({
+        concept: r.concept,
+        frameIndex: r.frameIndex,
+        count: r.kept.length,
+        boxes: r.kept.flatMap((inst) => (inst.box === undefined ? [] : [inst.box])),
+        scores: r.kept.map((inst) => inst.score),
+      });
+    }
+    requestsMade += done.length;
   };
 
-  // Hazard pass: every unique hazard prompt on every frame.
+  // Hazard pass: every unique hazard prompt on every frame, bounded pool.
   const hazardPrompts = dedupePrompts(HAZARD_CONCEPTS.map((c) => c.prompt));
-  for (const prompt of hazardPrompts) {
-    for (const frameIndex of plan.hazardFrames) {
-      await call(prompt, frameIndex);
-    }
-  }
+  const hazardTasks = hazardPrompts.flatMap((prompt) =>
+    plan.hazardFrames.map(
+      (frameIndex) => () => makeCall(prompt, frameIndex),
+    ),
+  );
+  assemble(await runWithConcurrency(hazardTasks, concurrency));
 
   // Count pass: surviving count concepts on the planned subset, reusing
   // any prompt already run in the hazard pass ("exit sign").
   const activeCounts = COUNT_CONCEPTS.filter((c) => !plan.droppedLabels.includes(c.label));
+  const countTasks: Array<() => Promise<{ concept: string; frameIndex: number; kept: RawInstance[] }>> = [];
+  for (const concept of activeCounts) {
+    for (const frameIndex of plan.countFrames) {
+      if (!results.has(`${concept.prompt}|${frameIndex}`)) {
+        countTasks.push(() => makeCall(concept.prompt, frameIndex));
+      }
+    }
+  }
+  assemble(await runWithConcurrency(countTasks, concurrency));
+
   const perConcept = new Map<string, { frameIndex: number; count: number; scores: number[] }>();
   for (const concept of activeCounts) {
     for (const frameIndex of plan.countFrames) {
-      const key = `${concept.prompt}|${frameIndex}`;
-      const kept = results.has(key)
-        ? (results.get(key) as RawInstance[])
-        : await call(concept.prompt, frameIndex);
+      const kept = results.get(`${concept.prompt}|${frameIndex}`) ?? [];
       const prev = perConcept.get(concept.label);
       // Max-per-frame floor; ties keep the earliest frame.
       if (prev === undefined || kept.length > prev.count) {
