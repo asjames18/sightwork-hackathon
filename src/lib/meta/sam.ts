@@ -23,6 +23,13 @@
  *   billing is confirmed.
  * - Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing, per the segment step's rule.
+ * - A transient 404 model_not_found is retried, up to 3 attempts with a
+ *   short backoff (250 ms, then 500 ms): the Oct 28 spike showed Meta's
+ *   entitlement cache serving 404s intermittently for a model that then
+ *   returns 200, and those 404s are not billed, so one bad hop no longer
+ *   skips the whole segment step (and with it the after image). Any other
+ *   error, or a 404 without model_not_found, still throws at once, and a
+ *   404 that survives all 3 attempts throws with the last response.
  * - Empty output_text is a valid result (zero matches), not an error.
  */
 
@@ -33,6 +40,8 @@ export interface SamClientOptions {
   baseUrl?: string;
   /** Injectable fetch for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests. Defaults to a real setTimeout wait. */
+  sleepImpl?: (ms: number) => Promise<void>;
   /** USD charged per request. Default: $2.50 per 1,000 images. */
   requestCostUsd?: number;
 }
@@ -57,6 +66,11 @@ export interface SamSegmentCaller {
 
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_REQUEST_COST_USD = 0.0025;
+
+/** Total attempts for a transient 404 model_not_found, Grok Bot's ask. */
+const MAX_SAM_ATTEMPTS = 3;
+/** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
+const SAM_RETRY_DELAYS_MS = [250, 500];
 
 /** The SAM request must carry confidence as a string, not a boolean. */
 export const SAM_METADATA = {
@@ -149,6 +163,8 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
   }
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl =
+    opts.sleepImpl ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const requestCost = opts.requestCostUsd ?? DEFAULT_REQUEST_COST_USD;
   // A bad per-request cost would only surface later, mid-run, when the
   // segment step records the call and the usage tracker rejects it.
@@ -194,21 +210,32 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
       metadata: { ...SAM_METADATA },
     };
     const started = Date.now();
-    const res = await fetchImpl(`${baseUrl}/responses`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const latencyMs = Date.now() - started;
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(`sam: ${res.status} ${detail}`);
+    let lastStatus = 0;
+    let lastDetail = "";
+    for (let attempt = 0; attempt < MAX_SAM_ATTEMPTS; attempt++) {
+      const res = await fetchImpl(`${baseUrl}/responses`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const latencyMs = Date.now() - started;
+        const parsed = (await res.json()) as Record<string, unknown>;
+        const text = extractText(parsed);
+        if (text === null) {
+          throw new Error("sam: response had no text output");
+        }
+        return { instances: parseSamOutput(text), latencyMs, costUsd: requestCost };
+      }
+      lastStatus = res.status;
+      lastDetail = await res.text();
+      // Only a 404 naming model_not_found is transient (spike, Oct 28:
+      // unbilled, then 200 for the same model). Anything else throws at
+      // once, as before, and so does a 404 that survives all attempts.
+      const transient = res.status === 404 && lastDetail.includes("model_not_found");
+      if (!transient || attempt === MAX_SAM_ATTEMPTS - 1) break;
+      await sleepImpl(SAM_RETRY_DELAYS_MS[attempt] ?? 500);
     }
-    const parsed = (await res.json()) as Record<string, unknown>;
-    const text = extractText(parsed);
-    if (text === null) {
-      throw new Error("sam: response had no text output");
-    }
-    return { instances: parseSamOutput(text), latencyMs, costUsd: requestCost };
+    throw new Error(`sam: ${lastStatus} ${lastDetail}`);
   };
 }
