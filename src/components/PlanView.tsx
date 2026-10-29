@@ -107,6 +107,13 @@ export function PlanView({
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
+  // Summary stat row: never show a slot that can be empty, so "not mentioned" needs narration and cost needs a costRange.
+  const stats: { label: string; value: string; accent?: boolean; small?: boolean }[] = [
+    { label: narrated ? "Problems found" : "Problems found on camera", value: String(plan.issues.length) },
+    ...(narrated ? [{ label: "You didn't mention", value: String(unmentioned.length), accent: unmentioned.length > 0 }] : []),
+    ...(plan.workOrder.length > 0 ? [{ label: "Work steps", value: String(plan.workOrder.length) }] : []),
+    ...(plan.costRange ? [{ label: "Rough cost", value: `${usd(plan.costRange.low)}–${usd(plan.costRange.high)}`, small: true }] : []),
+  ];
 
   return (
     <article>
@@ -131,21 +138,25 @@ export function PlanView({
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
       <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
 
-      {unmentioned.length > 0 && (
-        <a href="#problems" className="mt-5 block rounded-2xl bg-ink p-5 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50">
-          <p className="text-4xl font-extrabold text-accent">{unmentioned.length}</p>
-          <p className="text-lg font-semibold">
-            problem{unmentioned.length === 1 ? "" : "s"} you didn&apos;t mention
+      {plan.issues.length > 0 && (
+        <a
+          href="#problems"
+          className="mt-5 block rounded-2xl bg-ink p-5 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50 sm:p-6"
+        >
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-10">
+            {stats.map((s) => (
+              <div key={s.label} className="min-w-0">
+                <dt className="text-sm font-semibold text-white/80">{s.label}</dt>
+                <dd className={`font-extrabold leading-tight break-words ${s.small ? "text-2xl" : "text-4xl"} ${s.accent ? "text-accent" : "text-white"}`}>
+                  {s.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-sm text-white/80">
+            {unmentioned.length > 0 && <span className="font-semibold text-white">Not mentioned: </span>}
+            {(unmentioned.length > 0 ? unmentioned : plan.issues).map((i) => i.title).join(" · ")}
           </p>
-          <p className="mt-1 text-sm text-white/70">{unmentioned.map((i) => i.title).join(" · ")}</p>
-        </a>
-      )}
-
-      {!narrated && plan.issues.length > 0 && (
-        <a href="#problems" className="mt-5 block rounded-2xl bg-ink p-5 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50">
-          <p className="text-4xl font-extrabold text-accent">{plan.issues.length}</p>
-          <p className="text-lg font-semibold">problem{plan.issues.length === 1 ? "" : "s"} found on camera</p>
-          <p className="mt-1 text-sm text-white/70">{plan.issues.map((i) => i.title).join(" · ")}</p>
         </a>
       )}
 
