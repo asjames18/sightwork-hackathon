@@ -45,7 +45,9 @@ export interface ZoneOptions {
  * jump between clips is 0.2-0.8 (0.28-0.30 between clips joined into one 64 s test take), and
  * colour drift from a clip's first frame reaches ~0.41 at the 90th percentile. One sanctuary looks alike from everywhere (nearest frame in another
  * clip: combined distance 0.15-0.30), so the revisit bar is set low: a real return to a spot scores
- * well under 0.1, and a missed revisit only widens the server's range instead of double-counting.
+ * well under 0.1. The cost of a missed revisit: segment.ts sums per-zone maxima, so an area that comes
+ * back under a new id is counted again (tools/test/zoneCounting.test.ts, "known limit"); totals are a
+ * floor-plus-overlap estimate, not exact.
  */
 const ZONE_DEFAULTS: Required<ZoneOptions> = {
   cutThreshold: 0.25,
