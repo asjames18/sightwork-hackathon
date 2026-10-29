@@ -370,7 +370,7 @@ export async function runTranscribe(
     const rawText = buildTranscript(rawTurns) as string;
     const prompt = deps.cleanupPrompt
       .replaceAll("{{raw_turns}}", rawText)
-      .replaceAll("{{space_type}}", input.spaceType ?? "church sanctuary")
+      .replaceAll("{{space_type}}", input.spaceType && input.spaceType.trim() ? input.spaceType : "room")
       .replaceAll("{{keyword_bias}}", (deps.keywordBias ?? DEFAULT_KEYWORD_BIAS).join(", "));
     const cleaned = await deps.callCleanup({ model: CLEANUP_MODEL, prompt });
     deps.tracker.record({
