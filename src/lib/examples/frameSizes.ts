@@ -24,6 +24,10 @@ export const FRAME_SIZES: Record<string, [number, number]> = {
   "/examples/sanctuary/f5.webp": [1024, 576],
   "/examples/sanctuary/f6.webp": [1024, 576],
   "/examples/sanctuary/f7.webp": [1024, 576],
+  "/examples/thumbs/classroom.webp": [720, 633],
+  "/examples/thumbs/office.webp": [720, 480],
+  "/examples/thumbs/sanctuary.webp": [720, 405],
+  "/examples/thumbs/warehouse.webp": [720, 480],
 };
 
 /** Copies a plan with width/height filled in on frames whose image size is known. */

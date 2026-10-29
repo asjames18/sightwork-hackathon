@@ -380,7 +380,7 @@ function ExamplePicker({ onPick }: { onPick: (id: string) => void }) {
       </ul>
       <p className="mt-2 text-xs text-ink/60">
         Sample photos are CC0 (free to use), via Wikimedia Commons.{" "}
-        <a href="/credits" className="underline underline-offset-2">
+        <a href="/credits" className="inline-block py-1 underline underline-offset-2">
           Credits
         </a>
       </p>
@@ -400,7 +400,14 @@ function ExampleCard({ example, onPick, wide = false }: { example: Example; onPi
     >
       <span className={`relative block shrink-0 bg-ink ${wide ? "aspect-video w-full sm:w-1/2" : "w-28 sm:aspect-[4/3] sm:w-full"}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={example.thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={example.thumb}
+          alt=""
+          loading={wide ? "eager" : "lazy"}
+          fetchPriority={wide ? "high" : undefined}
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
         <span
           className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white ${
             real ? "bg-safe-dark" : "bg-ink/80"

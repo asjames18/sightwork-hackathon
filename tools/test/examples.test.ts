@@ -92,3 +92,12 @@ for (const [name, plan] of general) {
     assert.doesNotMatch(text, CHURCH, text.match(CHURCH)?.[0]);
   });
 }
+
+test("card thumbnails on /start exist and stay small (under 100 KB each)", async () => {
+  const { statSync } = await import("node:fs");
+  for (const e of EXAMPLES) {
+    const file = path.join(process.cwd(), "public", e.thumb);
+    assert.ok(existsSync(file), `${e.id}: ${e.thumb} missing`);
+    assert.ok(statSync(file).size < 100 * 1024, `${e.id}: ${e.thumb} is ${Math.round(statSync(file).size / 1024)} KB`);
+  }
+});
