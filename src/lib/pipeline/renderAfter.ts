@@ -103,7 +103,7 @@ export interface RenderAfterOutput {
   error?: string;
 }
 
-const DEFAULT_SPACE_TYPE = "church sanctuary";
+const DEFAULT_SPACE_TYPE = "room";
 
 const KEEP_LIST =
   "camera angle, framing, room layout, architecture, windows, lighting direction, existing furniture positions, signage text";
