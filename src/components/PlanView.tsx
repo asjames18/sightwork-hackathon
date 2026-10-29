@@ -310,22 +310,55 @@ export function PlanView({
 
       <Section title="Do the work in this order" id="steps">
         {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
-        <ol className="space-y-3">
-          {plan.workOrder.map((step) => (
-            <li key={step.order} className="flex gap-3 rounded-2xl bg-white p-4">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink font-bold text-white">{step.order}</span>
-              <div className="min-w-0">
-                <p className="font-bold">{step.title}</p>
-                <p className="text-sm text-ink/75">{step.detail}</p>
-                <p className="mt-1 text-sm text-ink/70">
-                  {[step.trade, step.hours && `${range(step.hours, " h")}`, step.dependsOn && `after step ${step.dependsOn}`, step.fixes?.length && `fixes #${step.fixes.join(", #")}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {plan.workOrder.length > 0 && (
+          <ol className="rounded-2xl bg-white px-4 py-2 sm:px-5">
+            {plan.workOrder.map((step, i) => {
+              const last = i === plan.workOrder.length - 1;
+              const volunteer = !!step.trade && /volunteer/i.test(step.trade);
+              const chip = "inline-flex min-h-7 items-center rounded-full px-2.5 text-sm font-medium";
+              return (
+                <li key={step.order} className="relative flex gap-3 py-3">
+                  {!last && (
+                    <span aria-hidden="true" className="absolute top-12 bottom-0 left-4 w-0.5 -translate-x-1/2 bg-ink/15" />
+                  )}
+                  <span
+                    aria-hidden="true"
+                    className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-bold text-white tabular-nums"
+                  >
+                    {step.order}
+                  </span>
+                  <div className="min-w-0 pt-1">
+                    <p className="font-bold">
+                      <span className="sr-only">Step {step.order}: </span>
+                      {step.title}
+                    </p>
+                    <p className="text-sm text-ink/75">{step.detail}</p>
+                    {(step.trade || step.hours || step.dependsOn || (step.fixes && step.fixes.length > 0)) && (
+                      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
+                        {step.trade && (
+                          <li
+                            className={
+                              volunteer
+                                ? `${chip} bg-safe/10 text-safe-dark`
+                                : `${chip} border border-ink/20 bg-ink/[0.04] text-ink`
+                            }
+                          >
+                            {volunteer ? "Volunteer" : `Paid: ${step.trade}`}
+                          </li>
+                        )}
+                        {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
+                        {step.dependsOn && <li className={`${chip} bg-ink/[0.06] text-ink/80`}>After step {step.dependsOn}</li>}
+                        {step.fixes && step.fixes.length > 0 && (
+                          <li className={`${chip} bg-ink/[0.06] text-ink/80`}>Fixes #{step.fixes.join(", #")}</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </Section>
 
       <Section title="Materials" id="materials">
