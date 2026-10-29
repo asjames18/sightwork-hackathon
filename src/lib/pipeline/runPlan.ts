@@ -109,6 +109,14 @@ export interface RunPlanDeps {
    * subsetting: the reason step sees every request frame.
    */
   reasonMaxFrames?: number;
+  /**
+   * SAM pool size for the segment step (segment.ts: at most this
+   * many SAM calls in flight; default DEFAULT_SEGMENT_CONCURRENCY
+   * when unset). The route may lower it under a tight spike budget
+   * or raise it when latency matters; unset keeps runSegment's
+   * own default, so existing callers are untouched.
+   */
+  segmentConcurrency?: number;
   /** Called with each running status, in stage order. When optional
    * steps were skipped earlier in the run, the status carries the
    * cumulative skipped list (Grok Bot, 2026-10-27 5:45 PM: the
@@ -355,6 +363,12 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
     (!Number.isInteger(deps.reasonMaxFrames) || deps.reasonMaxFrames < 1)
   ) {
     throw new Error("runPlan: reasonMaxFrames must be a whole number >= 1 when given");
+  }
+  if (
+    deps.segmentConcurrency !== undefined &&
+    (!Number.isInteger(deps.segmentConcurrency) || deps.segmentConcurrency < 1)
+  ) {
+    throw new Error("runPlan: segmentConcurrency must be a whole number >= 1 when given");
   }
   for (const field of ["reasonPrompt", "costPrompt", "onStatus"] as const) {
     if (deps[field] !== undefined && typeof deps[field] !== "function") {
@@ -623,7 +637,10 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   let segmentation: Awaited<ReturnType<typeof runSegment>> | null = null;
   try {
     segmentation = await runSegment(
-      { frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })) },
+      {
+        frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })),
+        concurrency: deps.segmentConcurrency,
+      },
       deps.segment,
     );
   } catch (err) {
