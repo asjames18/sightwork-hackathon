@@ -107,6 +107,18 @@ export function PlanView({
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
+  // Hero proof frame for the top of the plan when there's no after picture: the plan's hero frame, else the worst
+  // problem's proof frame. It borrows that problem's box and caption only when it is the same frame.
+  const topIssue = plan.issues.find((i) => i.status !== "mentioned_not_seen");
+  const topIssueProof = topIssue?.proofFrames?.[0];
+  const topIssueIndex = topIssueProof?.frameIndex ?? topIssue?.frameIndex;
+  const topProofIndex = plan.heroFrameIndex !== undefined && hero ? plan.heroFrameIndex : topIssueIndex;
+  const topProof =
+    topProofIndex !== undefined && frames[topProofIndex]
+      ? topProofIndex === topIssueIndex && topIssue
+        ? { frame: frames[topProofIndex], box: topIssueProof?.box, caption: topIssueProof?.caption ?? topIssue.title }
+        : { frame: frames[topProofIndex], box: undefined, caption: "Your walkthrough" }
+      : undefined;
   // Summary stat row: never show a slot that can be empty, so "not mentioned" needs narration and cost needs a costRange.
   const stats: { label: string; value: string; accent?: boolean; small?: boolean }[] = [
     { label: narrated ? "Problems found" : "Problems found on camera", value: String(plan.issues.length) },
@@ -188,6 +200,13 @@ export function PlanView({
             <img src={plan.afterImageUrl} alt="AI concept of the finished space" className="block aspect-[4/3] max-h-[70vh] w-full object-cover" />
             <figcaption className="bg-ink px-3 py-1.5 text-sm text-white/80">{plan.afterImageLabel ?? AFTER_IMAGE_LABEL}</figcaption>
           </figure>
+        </Section>
+      )}
+
+      {/* No after picture: lead with the hero proof frame instead, so the top never shows an empty slot. */}
+      {!plan.afterImageUrl && topProof && (
+        <Section title="From your video" className="mt-6!">
+          <ProofFrame frame={topProof.frame} box={topProof.box} caption={topProof.caption} outlineUnavailable={!masks} />
         </Section>
       )}
 
