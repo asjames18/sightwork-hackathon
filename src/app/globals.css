@@ -119,3 +119,9 @@ main h1[tabindex="-1"]:focus {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* Direct links to a plan (/start?view=example): hidden until the plan replaces the upload screen. */
+html.sw-opening body > header,
+html.sw-opening body > main {
+  visibility: hidden;
+}

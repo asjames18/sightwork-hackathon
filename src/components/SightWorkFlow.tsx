@@ -50,9 +50,14 @@ export function SightWorkFlow() {
     if (view === "last") {
       const saved = loadLastPlan();
       if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+      else document.documentElement.classList.remove("sw-opening");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The direct-link plan is on screen: show the app (app/start/page.tsx hid it to avoid an upload-screen flash).
+  useEffect(() => {
+    if (stage.kind === "plan") document.documentElement.classList.remove("sw-opening");
+  }, [stage.kind]);
   // When the job finishes, show every step passed (not step 1) for the frame before the plan opens,
   // so the bar never snaps back to the start.
   const current = !job ? 0 : job.state === "done" ? PLAN_STEPS.length : PLAN_STEPS.indexOf(job.step);
@@ -97,20 +102,23 @@ export function SightWorkFlow() {
     <>
       <header className="sticky top-0 z-20 print:hidden border-b border-ink/10 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
         <div className={`mx-auto flex min-h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 ${width}`}>
-          <button
-            type="button"
-            onClick={startOver}
-            aria-label="SightWork, start a new walkthrough"
-            className="-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 text-xl font-extrabold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <span>
+          {/* The tagline sits beside the button, not in it, so the button's spoken name starts with the
+              word you see ("SightWork"), as voice-control users expect. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={startOver}
+              aria-label="SightWork, start a new walkthrough"
+              className="-mx-2 flex min-h-11 items-center rounded-lg px-2 text-xl font-extrabold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
               Sight<span className="text-accent">Work</span>
-            </span>
-            {/* The upload screen's H1 already says this, so the tagline only shows on processing and plan. */}
-            {stage.kind !== "upload" && (
-              <span className="hidden text-sm font-medium tracking-normal text-ink/65 md:inline">Film a walkthrough. Get a work plan.</span>
+            </button>
+            {/* The upload screen's H1 already says this, and on the plan the header is full with Save PDF and
+                New walkthrough, so the tagline only shows while processing (from lg, on one line). */}
+            {stage.kind === "processing" && (
+              <span className="hidden whitespace-nowrap text-sm font-medium tracking-normal text-ink/65 lg:inline">Film a walkthrough. Get a work plan.</span>
             )}
-          </button>
+          </div>
           <div className="flex shrink-0 items-center gap-2">
             {/* Back to the landing's explainer. On phones the plan header already holds Save PDF and New, so it waits for sm there. */}
             <Link
@@ -124,7 +132,7 @@ export function SightWorkFlow() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  aria-label="Save this plan as a PDF or print it"
+                  aria-label="Save PDF or print this plan"
                   className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   Save PDF
