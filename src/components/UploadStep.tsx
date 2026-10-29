@@ -72,7 +72,6 @@ export function UploadStep({
   // Polite announcement for the length check; warnings and blocks have their own status/alert below.
   const liveText =
     check.kind === "reading" ? "Checking the video length." : check.kind === "ok" ? `Video is ${formatDuration(check.durationSec)} long. Ready to make your plan.` : "";
-  const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
   return (
     <section>
@@ -112,7 +111,7 @@ export function UploadStep({
           <button
             type="button"
             onClick={onExample}
-            className={`mt-3 min-h-[44px] w-full rounded-xl border border-ink/20 bg-white/60 px-5 py-2.5 text-center text-base font-semibold text-ink hover:border-ink/40 ${ring}`}
+            className="btn-secondary mt-3 w-full text-base"
           >
             See an example plan first
           </button>
@@ -121,7 +120,7 @@ export function UploadStep({
               <button
                 type="button"
                 onClick={onLastPlan}
-                className={`inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-ink underline decoration-ink/30 underline-offset-4 hover:decoration-ink ${ring}`}
+                className="btn-tertiary"
               >
                 Open my last plan
               </button>
@@ -160,7 +159,7 @@ export function UploadStep({
               type="button"
               onClick={() => input.current?.click()}
               aria-label="Change video"
-              className={`-my-2 min-h-[44px] shrink-0 rounded px-2 text-sm font-medium underline ${ring}`}
+              className="btn-tertiary -my-2 shrink-0 text-sm"
             >
               Change
             </button>
@@ -180,7 +179,7 @@ export function UploadStep({
               type="button"
               disabled={!canSend}
               onClick={() => onVideo(preview.file)}
-              className={`w-full rounded-xl bg-ink px-5 py-4 text-lg font-semibold text-white active:scale-[.99] disabled:cursor-not-allowed disabled:opacity-40 ${ring}`}
+              className="btn-primary w-full text-lg motion-safe:active:scale-[.99]"
             >
               {check.kind === "reading" ? "Checking video…" : "Make my work plan"}
             </button>
@@ -197,7 +196,7 @@ export function UploadStep({
         <button
           type="button"
           onClick={onExample}
-          className={`mt-4 min-h-[44px] w-full rounded text-center text-sm font-medium text-accent-dark underline ${ring}`}
+          className="btn-tertiary mt-4 w-full text-sm"
         >
           See an example plan first
         </button>
