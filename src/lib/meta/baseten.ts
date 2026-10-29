@@ -187,7 +187,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       };
 
       const started = Date.now();
-      let res: Awaited<ReturnType<typeof fetchImpl>>;
+      let res: Awaited<ReturnType<typeof fetchImpl>> | undefined;
       // Mirror the Meta callers: only a 404 naming model_not_found is
       // transient, so only that retries; any other error, or a 404
       // surviving all attempts, throws with the last response.
@@ -204,6 +204,9 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
           throw new Error(`baseten: ${res.status} ${detail}`);
         }
         await sleepImpl(BASETEN_RETRY_DELAYS_MS[attempt] ?? 500);
+      }
+      if (res === undefined) {
+        throw new Error("baseten: no response received");
       }
       const latencyMs = Date.now() - started;
       const parsed = (await res.json()) as Record<string, unknown>;
