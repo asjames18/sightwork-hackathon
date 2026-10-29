@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
 import { loadLastPlan } from "@/lib/client/lastPlan";
+import { EXAMPLES, type Example } from "@/lib/examples";
 
 /** Walkthroughs work best at 60 to 90 seconds; past this we warn, past the hard limit we block. */
 const SOFT_MAX_SEC = 95;
@@ -48,7 +49,8 @@ export function UploadStep({
   onLastPlan,
 }: {
   onVideo: (file: File) => void;
-  onExample: () => void;
+  /** Opens an example plan by id (the featured real run when omitted). */
+  onExample: (id?: string) => void;
   /** Reopens the last finished plan on this device; the link only shows when one is saved. */
   onLastPlan?: () => void;
 }) {
@@ -108,13 +110,6 @@ export function UploadStep({
             <span className="rounded-xl bg-accent-dark px-5 py-3 text-base font-semibold text-white">Record or choose a video</span>
             <span className="text-sm text-ink/70">MP4 or MOV, about 60 to 90 seconds</span>
           </button>
-          <button
-            type="button"
-            onClick={onExample}
-            className="btn-secondary mt-3 w-full text-base"
-          >
-            See an example plan first
-          </button>
           {savedPlan && onLastPlan ? (
             <p className="mt-2 text-center text-base">
               <button
@@ -127,6 +122,7 @@ export function UploadStep({
             </p>
           ) : null}
           <FilmingTips />
+          <ExamplePicker onPick={onExample} />
         </>
       ) : (
         <div
@@ -195,7 +191,7 @@ export function UploadStep({
       {preview ? (
         <button
           type="button"
-          onClick={onExample}
+          onClick={() => onExample()}
           className="btn-tertiary mt-4 w-full text-sm"
         >
           See an example plan first
@@ -251,5 +247,67 @@ function CameraIcon() {
       <rect x="2.5" y="6" width="13" height="12" rx="2.5" />
       <path d="M15.5 10.5 21 7.5v9l-5.5-3" />
     </svg>
+  );
+}
+
+/**
+ * Example plans before filming: the featured hand-written sample (kitchen renovation) as a wide card, then the real run and other samples
+ * for other kinds of spaces. Each card says "Real run" or "Sample" so nothing reads as a model result
+ * that wasn't one.
+ */
+function ExamplePicker({ onPick }: { onPick: (id: string) => void }) {
+  const [featured, ...samples] = EXAMPLES;
+  return (
+    <section aria-labelledby="examples-heading" className="mt-8">
+      <h2 id="examples-heading" className="text-lg font-extrabold">
+        See a plan first
+      </h2>
+      <p className="mt-1 text-sm text-ink/70">Samples on real photos of different spaces, plus one real SightWork run.</p>
+      <ExampleCard example={featured} onPick={onPick} wide />
+      <ul className="mt-3 grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+        {samples.map((e) => (
+          <li key={e.id}>
+            <ExampleCard example={e} onPick={onPick} />
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-ink/60">
+        Sample photos are CC0 (free to use) from Wikimedia Commons.{" "}
+        <a href="/examples/CREDITS.md" className="underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+          Credits
+        </a>
+      </p>
+    </section>
+  );
+}
+
+function ExampleCard({ example, onPick, wide = false }: { example: Example; onPick: (id: string) => void; wide?: boolean }) {
+  const real = example.kind === "real";
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(example.id)}
+      aria-label={`${real ? "Real run" : "Sample"}: ${example.title}. ${example.blurb}`}
+      className={`group mt-3 flex w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-ink/10 transition hover:ring-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:active:scale-[.99] ${
+        wide ? "flex-col sm:flex-row" : "flex-row sm:flex-col"
+      }`}
+    >
+      <span className={`relative block shrink-0 bg-ink ${wide ? "aspect-video w-full sm:w-1/2" : "w-28 sm:aspect-[4/3] sm:w-full"}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={example.thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <span
+          className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white ${
+            real ? "bg-safe-dark" : "bg-ink/80"
+          }`}
+        >
+          {real ? "Real run" : "Sample"}
+        </span>
+      </span>
+      <span className={`flex min-w-0 flex-col justify-center gap-1 ${wide ? "p-4 sm:p-5" : "p-3"}`}>
+        <span className={`font-bold leading-snug ${wide ? "text-lg" : "text-base"}`}>{example.title}</span>
+        <span className="text-sm text-ink/70">{example.blurb}</span>
+        <span className="mt-1 text-sm font-semibold text-accent-dark group-hover:underline">Open plan →</span>
+      </span>
+    </button>
   );
 }

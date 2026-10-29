@@ -1,6 +1,7 @@
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
+import type { Example } from "@/lib/examples";
 
 /** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
 const SEVERITY_BORDER: Record<Issue["severity"], string> = {
@@ -109,10 +110,13 @@ function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
 export function PlanView({
   plan,
   videoName,
+  example,
   onMakeYourOwn,
 }: {
   plan: WorkPlan;
   videoName: string | null;
+  /** Set when this plan was opened from the examples list: drives the "Real run" or "Sample" banner. */
+  example?: Example;
   /** Example banner's "Make your own": back to the empty upload stage. */
   onMakeYourOwn?: () => void;
 }) {
@@ -158,22 +162,27 @@ export function PlanView({
 
   return (
     <article>
-      {plan.meta?.isExample && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between print:block">
-          <p>
-            <strong>Example plan.</strong> Made-up data for a church sanctuary stage
-            {videoName ? `, shown because real analysis isn't connected yet (your video "${videoName}" was not sent anywhere)` : ""}.
-          </p>
-          {onMakeYourOwn && (
-            <button
-              type="button"
-              onClick={onMakeYourOwn}
-              className="btn-primary shrink-0 self-start text-sm sm:self-auto print:hidden"
-            >
-              Make your own
-            </button>
-          )}
-        </div>
+      {example ? (
+        <ExampleBanner example={example} videoName={videoName} onMakeYourOwn={onMakeYourOwn} />
+      ) : (
+        plan.meta?.isExample && (
+          <div className="mb-4 flex flex-col gap-3 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between print:block">
+            <p>
+              <strong>Example plan.</strong>{" "}
+              Sample data written by hand, not a real run
+              {videoName ? `, shown because real analysis isn't on in this preview (your video "${videoName}" was not sent anywhere)` : ""}.
+            </p>
+            {onMakeYourOwn && (
+              <button
+                type="button"
+                onClick={onMakeYourOwn}
+                className="btn-primary shrink-0 self-start text-sm sm:self-auto print:hidden"
+              >
+                Make your own
+              </button>
+            )}
+          </div>
+        )
       )}
 
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
@@ -487,5 +496,49 @@ export function PlanView({
 
       <MadeWith plan={plan} masks={masks} />
     </article>
+  );
+}
+
+/** Top-of-plan label for an example: green "Real run" for a real pipeline result, amber "Sample" for a hand-written one. */
+function ExampleBanner({ example, videoName, onMakeYourOwn }: { example: Example; videoName: string | null; onMakeYourOwn?: () => void }) {
+  const real = example.kind === "real";
+  return (
+    <div
+      className={`mb-4 flex flex-col gap-3 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between print:block ${
+        real ? "bg-emerald-50 text-emerald-950 ring-1 ring-emerald-700/20" : "bg-amber-100 text-amber-900"
+      }`}
+    >
+      <p>
+        <span
+          className={`mr-2 inline-block rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white ${
+            real ? "bg-safe-dark" : "bg-amber-800"
+          }`}
+        >
+          {real ? "Real run" : "Sample"}
+        </span>
+        {videoName && (
+          <>
+            <strong>Example shown in place of your plan.</strong> Real analysis isn&apos;t on in this preview, so your video
+            &ldquo;{videoName}&rdquo; was not sent anywhere.{" "}
+          </>
+        )}
+        {example.banner}
+        {example.credit && (
+          <>
+            {" "}
+            Photo:{" "}
+            <a href={example.credit.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+              {example.credit.author}
+            </a>
+            , {example.credit.license}.
+          </>
+        )}
+      </p>
+      {onMakeYourOwn && (
+        <button type="button" onClick={onMakeYourOwn} className="btn-primary shrink-0 self-start text-sm sm:self-auto print:hidden">
+          Make your own
+        </button>
+      )}
+    </div>
   );
 }

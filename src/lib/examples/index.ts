@@ -1,0 +1,89 @@
+/**
+ * The examples on /start. One real SightWork run (the featured card) and a few hand-written samples on
+ * free stock photos. Every example says which it is: "real" plans came from the pipeline unchanged except
+ * for image hosting and a covered logo; "sample" plans are illustrative and never claim a model ran.
+ */
+import type { WorkPlan } from "../types";
+import sanctuaryRun from "./sanctuary-run.json";
+import { classroomSample, officeSample, warehouseSample } from "./samples";
+import { kitchenSample } from "./kitchen";
+
+export type ExampleKind = "real" | "sample";
+
+export interface Example {
+  id: string;
+  kind: ExampleKind;
+  /** Card title, e.g. "Church sanctuary stage". */
+  title: string;
+  /** One line under the title on the card. */
+  blurb: string;
+  thumb: string;
+  plan: WorkPlan;
+  /** Shown on the plan's banner. */
+  banner: string;
+  /** Photo credit for samples (license and source page). */
+  credit?: { author: string; license: string; url: string };
+}
+
+/** Real run, Oct 29, 2026, 11:30 AM ET: frames and after picture re-hosted as files, church logo covered. */
+const sanctuaryPlan = { ...(sanctuaryRun as unknown as WorkPlan) };
+
+export const EXAMPLES: Example[] = [
+  {
+    id: "kitchen",
+    kind: "sample",
+    title: "Older home kitchen renovation",
+    blurb: "45-second walkthrough. 6 problems, 3 you didn't mention, 8 steps in order.",
+    thumb: "/examples/kitchen/f1.webp",
+    plan: kitchenSample,
+    banner:
+      "Sample plan written by hand on 7 stock photos from one kitchen renovation, with a sample narration, to show what a plan looks like. Not a SightWork run.",
+    credit: { author: "Tomwsulcer", license: "CC0", url: "https://commons.wikimedia.org/wiki/User:Tomwsulcer" },
+  },
+  {
+    id: "sanctuary",
+    kind: "real",
+    title: "Church sanctuary stage",
+    blurb: "A real run on a 44-second walkthrough: 4 problems, 64 chairs counted, AI after picture.",
+    thumb: "/examples/sanctuary/f5.webp",
+    plan: sanctuaryPlan,
+    banner:
+      "Real SightWork run from a 44-second walkthrough filmed Oct 29, 2026. SAM counted the room, Muse Spark Open wrote the plan and Muse Image drew the after picture, in about 3 minutes for $0.38 in model calls. Nothing here was edited except covering the church logo.",
+  },
+  {
+    id: "classroom",
+    kind: "sample",
+    title: "Vacant school classroom",
+    blurb: "Ceiling down, standing water: what to make safe first.",
+    thumb: "/examples/samples/classroom.webp",
+    plan: classroomSample,
+    banner: "Sample plan written by hand on one stock photo, to show the format for a classroom. Not a SightWork run.",
+    credit: { author: "Warren LeMay", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Classroom,_Log_Cabin_Association_Elementary_School,_Barkers_Creek,_NC_(46649210201).jpg" },
+  },
+  {
+    id: "office",
+    kind: "sample",
+    title: "Empty office before move-in",
+    blurb: "Door closer, floor covers and cleanup in the right order.",
+    thumb: "/examples/samples/office.webp",
+    plan: officeSample,
+    banner: "Sample plan written by hand on one stock photo, to show the format for an office. Not a SightWork run.",
+    credit: { author: "Sam X (Unsplash)", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Neglected_office_plants_(Unsplash).jpg" },
+  },
+  {
+    id: "warehouse",
+    kind: "sample",
+    title: "Warehouse floor",
+    blurb: "Blocked aisles, loose stock and rack checks.",
+    thumb: "/examples/samples/warehouse.webp",
+    plan: warehouseSample,
+    banner: "Sample plan written by hand on one stock photo, to show the format for a warehouse. Not a SightWork run.",
+    credit: { author: "Charly Birdsinger (Unsplash)", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Industrial_storage_area_(Unsplash).jpg" },
+  },
+];
+
+export const FEATURED_EXAMPLE = EXAMPLES[0];
+
+export function findExample(id: string | null | undefined): Example {
+  return EXAMPLES.find((e) => e.id === id) ?? FEATURED_EXAMPLE;
+}

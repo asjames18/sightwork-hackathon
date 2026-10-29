@@ -1,8 +1,8 @@
 import { ImageResponse } from "next/og";
 import { samplePlan } from "@/lib/mock/samplePlan";
 
-// Social card for the landing link, drawn from the example plan (example data, labeled as such).
-export const alt = "SightWork: film a walkthrough, get a work plan. Example plan card.";
+// Social card for the landing link, drawn from the featured sample plan (hand-written, on CC0 photos; labeled as a sample).
+export const alt = "SightWork: film a walkthrough, get a work plan. Sample plan card.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -40,8 +40,8 @@ export default function OpengraphImage() {
 
         <div style={{ display: "flex", flexDirection: "column", flex: 1, background: "#ffffff", borderRadius: 28, padding: 36, border: "1px solid #e4e1da" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 26, fontWeight: 700 }}>Example plan</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", background: INK, borderRadius: 999, padding: "6px 14px" }}>EXAMPLE</div>
+            <div style={{ fontSize: 26, fontWeight: 700 }}>Sample plan</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", background: INK, borderRadius: 999, padding: "6px 14px" }}>SAMPLE</div>
           </div>
           <div style={{ display: "flex", gap: 14, marginTop: 24 }}>
             {counts.map((c) => (

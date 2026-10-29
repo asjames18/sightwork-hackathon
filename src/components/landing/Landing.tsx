@@ -19,10 +19,10 @@ const steps = [
   },
 ];
 
-/** Said-vs-saw strip from the EXAMPLE plan (src/lib/mock/samplePlan.ts), as agreed in the handoff. */
+/** Said-vs-saw strip from the featured SAMPLE plan (src/lib/examples/kitchen.ts): CC0 photos, hand-written plan. */
 const matched = [
-  { said: "We need more chairs up front.", saw: "Gaps in the front rows" },
-  { said: "That light up there is out.", saw: "One dark fixture" },
+  { said: "Ceiling's opened up here, we'll need new drywall over all of this.", saw: "Loose plaster and lath hanging overhead" },
+  { said: "The fireplace front is cracked, I want that fixed.", saw: "Facade split at the top corner" },
 ];
 
 /**
@@ -32,16 +32,16 @@ const matched = [
 const gets = [
   { title: "Problems, worst first.", body: "Safety items rise to the top, each with the frame and second where it shows." },
   { title: "What you said vs. what we saw.", body: "Every request matched to the video, plus anything you missed." },
-  { title: "Counts.", body: "Chairs, lights, speakers and more, counted from the video as an approximate range." },
+  { title: "Counts.", body: "Fixtures, furniture, equipment and more, counted from the video as an approximate range." },
   { title: "Work steps in order.", body: "Fix the leak before the ceiling tile. Who does it, about how long, and what it fixes." },
   { title: "Materials.", body: "A shopping list for the work." },
 ];
 
 const audiences = [
-  { title: "Churches and ministries.", body: "Turn a Sunday walkthrough into a volunteer work-day list." },
-  { title: "Schools and campuses.", body: "Classrooms, gyms and auditoriums checked before the next term." },
   { title: "Facilities and property teams.", body: "A consistent first look at any room, with photos attached." },
   { title: "Small contractors and handypeople.", body: "Scope a job from a walkthrough before you price it." },
+  { title: "Schools and campuses.", body: "Classrooms, gyms and auditoriums checked before the next term." },
+  { title: "Churches and nonprofits.", body: "Turn a walkthrough into a volunteer work-day list." },
 ];
 
 /** Fine print. Cost and after-picture lines join only if those steps run at submission. */
@@ -118,7 +118,7 @@ export function Landing() {
         <section aria-labelledby="catch-heading" className="border-t border-ink/10 bg-white">
           <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
             <h2 id="catch-heading" className="max-w-2xl text-[28px] font-extrabold leading-tight">
-              You mention five things. SightWork finds three more.
+              You mention three things. SightWork finds three more.
             </h2>
             <ul className="mt-6 grid gap-3">
               {matched.map((row) => (
@@ -139,11 +139,11 @@ export function Landing() {
               <li className="rounded-2xl border border-accent-dark/30 border-l-4 border-l-accent-dark bg-paper p-4">
                 <p className="text-base font-bold">
                   <span className="block text-xs font-semibold uppercase tracking-wide text-accent-dark">Not mentioned</span>
-                  Exit sign is dark.
+                  Shutoff valve under the sink is leaking.
                 </p>
               </li>
             </ul>
-            <p className="mt-4 text-sm text-ink/70">Example plan, made-up data.</p>
+            <p className="mt-4 text-sm text-ink/70">Sample plan on free-to-use (CC0) photos of a real kitchen renovation. The narration and plan are written by hand to show the format.</p>
           </div>
         </section>
 
@@ -230,8 +230,8 @@ export function Landing() {
 }
 
 /**
- * Hero visual: a phone frame showing the top of the real plan screen, rendered from the EXAMPLE plan
- * (public/landing/example-plan.webp, 600x1408, ~54 KB). Labeled "Example" with a solid chip that stays
+ * Hero visual: a phone frame showing the top of the real plan screen, rendered from the featured SAMPLE plan
+ * (kitchen renovation on CC0 photos; public/landing/sample-plan.webp, 600x1408). Labeled "Sample" with a solid chip that stays
  * legible at 375 px. Decorative copy of on-page content, so the image alt describes it briefly.
  * Swap in a before/after crop once the after image runs at submission.
  */
@@ -241,8 +241,8 @@ function HeroPhone() {
       <div className="rounded-[2.5rem] bg-ink p-2.5 shadow-2xl shadow-ink/25">
         <div className="relative aspect-[9/17] overflow-hidden rounded-[2rem] bg-white">
           <Image
-            src="/landing/example-plan.webp"
-            alt="SightWork plan screen for an example church stage: 3 problems you didn't mention, then problem 1, a dark exit sign, with its proof frame."
+            src="/landing/sample-plan.webp"
+            alt="SightWork plan screen for a sample kitchen renovation: 6 problems, 3 you didn't mention, 8 work steps, then a frame from the walkthrough."
             width={600}
             height={1408}
             sizes="(min-width: 1024px) 280px, 260px"
@@ -252,7 +252,7 @@ function HeroPhone() {
         </div>
       </div>
       <figcaption className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-ink px-3 py-1 text-[13px] font-semibold uppercase tracking-wide text-white shadow">
-        Example
+        Sample
       </figcaption>
     </figure>
   );

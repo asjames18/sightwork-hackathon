@@ -1,0 +1,442 @@
+{
+ "spaceName": "Sanctuary stage",
+ "generatedFrom": "Walkthrough video, 8 frames, 44 s",
+ "inventory": [
+  {
+   "label": "Padded chairs (main floor)",
+   "count": 64,
+   "confidence": 0.78,
+   "method": "sam",
+   "zone": "main floor"
+  },
+  {
+   "label": "Ceiling light fixtures",
+   "count": 4,
+   "confidence": 0.61,
+   "method": "sam",
+   "zone": "ceiling"
+  },
+  {
+   "label": "Exit signs",
+   "count": 2,
+   "confidence": 0.6,
+   "method": "sam",
+   "zone": "walls over egress doors"
+  },
+  {
+   "label": "Speakers",
+   "count": 7,
+   "confidence": 0.69,
+   "method": "sam",
+   "zone": "stage and walls"
+  },
+  {
+   "label": "Projection screens",
+   "count": 1,
+   "confidence": 0.66,
+   "method": "sam",
+   "zone": "stage"
+  },
+  {
+   "label": "Potted plants",
+   "count": 6,
+   "confidence": 0.72,
+   "method": "sam",
+   "zone": "stage front"
+  },
+  {
+   "label": "Stage platform sections",
+   "count": 1,
+   "confidence": 0.71,
+   "method": "sam",
+   "zone": "stage"
+  }
+ ],
+ "issues": [
+  {
+   "rank": 1,
+   "title": "Loose cables and extension cords across stage floor create trip hazard",
+   "detail": "Loose coiled audio/power cables and white extension cord/power strip lying unsecured across the black stage platform on both sides of the pulpit and near the keyboards. Cords cross walkways where speakers and musicians walk, creating a trip and snag hazard. Visible as tangled coils near the Roland keyboard on the left and across the center and right side of the deck.",
+   "severity": "high",
+   "frameIndex": 6,
+   "frameTimeSec": 38,
+   "unmentioned": true,
+   "status": "unmentioned",
+   "mention": null,
+   "proofFrames": [
+    {
+     "frameIndex": 6,
+     "tSec": 38,
+     "caption": "Loose cables and extension cord snaking across black stage floor on right side near red keyboard",
+     "box": [
+      721,
+      688,
+      999,
+      917
+     ]
+    },
+    {
+     "frameIndex": 5,
+     "tSec": 32,
+     "caption": "Coiled cables on stage floor near keyboards on both sides of pulpit",
+     "box": [
+      664,
+      550,
+      910,
+      726
+     ]
+    },
+    {
+     "frameIndex": 6,
+     "tSec": 38,
+     "caption": "Extension cord/power strip at stage edge on right side",
+     "box": [
+      906,
+      722,
+      960,
+      741
+     ]
+    }
+   ],
+   "confidence": 0.87,
+   "category": "safety",
+   "hazard": "trip_cable"
+  },
+  {
+   "rank": 2,
+   "title": "Exposed wiring and unmounted power strip on stage floor",
+   "detail": "Extension cords and tangled wiring are exposed on the stage deck without cable covers, cord protectors, or mounted power strips. A white power strip/extension cord sits on the floor on the right side with multiple cords plugged in, and coiled wires are left loose in the center near the drum shield. Risk of electrical damage, disconnection and shock.",
+   "severity": "high",
+   "frameIndex": 5,
+   "frameTimeSec": 32,
+   "unmentioned": true,
+   "status": "unmentioned",
+   "mention": null,
+   "proofFrames": [
+    {
+     "frameIndex": 5,
+     "tSec": 32,
+     "caption": "Exposed tangled wiring cluster in center of stage near drum shield",
+     "box": [
+      664,
+      550,
+      910,
+      726
+     ]
+    },
+    {
+     "frameIndex": 5,
+     "tSec": 32,
+     "caption": "Coiled cables on floor next to Roland keyboard on left side",
+     "box": [
+      372,
+      538,
+      460,
+      573
+     ]
+    },
+    {
+     "frameIndex": 6,
+     "tSec": 38,
+     "caption": "Unmounted power strip/extension cord on floor at stage edge",
+     "box": [
+      906,
+      722,
+      960,
+      741
+     ]
+    }
+   ],
+   "confidence": 0.84,
+   "category": "safety",
+   "hazard": "exposed_wiring"
+  },
+  {
+   "rank": 3,
+   "title": "Stage steps without handrails or accessible ramp",
+   "detail": "The stage platform is accessed by two sets of steps on the left and right with corrugated metal skirting. No handrails, guardrails, or ramp/lift are present. This blocks an accessible route to the pulpit, drums and keyboards and is a fall hazard.",
+   "severity": "high",
+   "frameIndex": 4,
+   "frameTimeSec": 26,
+   "unmentioned": true,
+   "status": "unmentioned",
+   "mention": null,
+   "proofFrames": [
+    {
+     "frameIndex": 4,
+     "tSec": 26,
+     "caption": "Wide view showing both left and right stage stairways with no handrails or ramp",
+     "box": [
+      103,
+      583,
+      860,
+      737
+     ]
+    },
+    {
+     "frameIndex": 5,
+     "tSec": 32,
+     "caption": "Closer view of right-side stage steps without rail and metal skirting",
+     "box": [
+      835,
+      590,
+      956,
+      766
+     ]
+    }
+   ],
+   "confidence": 0.82,
+   "category": "safety",
+   "hazard": "ada_path"
+  },
+  {
+   "rank": 4,
+   "title": "Worn, dirty stage floor with debris left on deck",
+   "detail": "The black stage deck finish shows heavy scuffing, dirt, dust and scattered white debris across the surface. A white tissue box/carton and small trash are left on the front lip of the stage on the left side. Floor needs deep cleaning and repaint/reseal to restore durable finish.",
+   "severity": "low",
+   "frameIndex": 5,
+   "frameTimeSec": 32,
+   "unmentioned": true,
+   "status": "unmentioned",
+   "mention": null,
+   "proofFrames": [
+    {
+     "frameIndex": 5,
+     "tSec": 32,
+     "caption": "Stage platform floor with scuffs, dirt, and tissue box left on front edge",
+     "box": [
+      32,
+      635,
+      996,
+      969
+     ]
+    },
+    {
+     "frameIndex": 6,
+     "tSec": 38,
+     "caption": "Close view of dirty stage deck with dust and cable clutter",
+     "box": [
+      0,
+      620,
+      998,
+      950
+     ]
+    }
+   ],
+   "confidence": 0.71,
+   "category": "cosmetic"
+  }
+ ],
+ "materials": [
+  {
+   "item": "Low-profile floor cord covers / cable protectors",
+   "qty": "3 pieces",
+   "forIssues": [
+    1,
+    2
+   ],
+   "note": "For any cable crossings that must remain on stage"
+  },
+  {
+   "item": "Gaff tape and reusable cable ties",
+   "qty": "1 roll and 1 pack",
+   "forIssues": [
+    1,
+    2
+   ]
+  },
+  {
+   "item": "Mounted surge-protected power strips with covers",
+   "qty": "2",
+   "forIssues": [
+    2
+   ],
+   "note": "Wall or floor-mount, stage-rated; remove cords from floor"
+  },
+  {
+   "item": "Handrail kits for stage steps",
+   "qty": "2 sets",
+   "forIssues": [
+    3
+   ],
+   "note": "42 in height, code-compliant, anchored to stage framing"
+  },
+  {
+   "item": "ADA ramp evaluation / portable ramp",
+   "qty": "1",
+   "forIssues": [
+    3
+   ],
+   "note": "Consult contractor for permanent ramp or lift option"
+  },
+  {
+   "item": "Heavy-duty floor cleaner/degreaser",
+   "qty": "1 gallon",
+   "forIssues": [
+    4
+   ]
+  },
+  {
+   "item": "Non-slip stage floor paint / deck coating (black)",
+   "qty": "2 gallons",
+   "forIssues": [
+    4
+   ],
+   "note": "For recoating after cleaning"
+  },
+  {
+   "item": "Trash bags and cleaning supplies",
+   "qty": "1 set",
+   "forIssues": [
+    4
+   ]
+  }
+ ],
+ "workOrder": [
+  {
+   "order": 1,
+   "title": "Secure and cover all stage cables",
+   "detail": "Power down stage. Gather and untangle loose audio and power cables, reroute along walls and under drum riser where possible, mount power strips off the floor, and install low-profile cord covers over any remaining crossings. Use gaff tape and ties for temporary runs and test connections. Eliminates immediate trip and electrical hazard.",
+   "trade": "electrician / AV tech",
+   "hours": [
+    2,
+    3
+   ],
+   "fixes": [
+    1,
+    2
+   ]
+  },
+  {
+   "order": 2,
+   "title": "Install handrails and plan accessible access",
+   "detail": "Install code-compliant handrails on both left and right stage stairways, verify height and anchoring into stage framing. Measure and evaluate for portable or permanent ADA ramp or lift to stage; obtain contractor quote if permanent work is needed. Provides support and an accessible route.",
+   "trade": "carpenter / handyman",
+   "hours": [
+    4,
+    6
+   ],
+   "fixes": [
+    3
+   ]
+  },
+  {
+   "order": 3,
+   "title": "Declutter and deep clean stage deck",
+   "detail": "Remove tissue box, trash and debris from stage, sweep and vacuum, then mop with heavy-duty cleaner/degreaser. Let floor dry completely. Prepares surface for refinishing and improves appearance.",
+   "trade": "volunteer / janitorial",
+   "hours": [
+    2,
+    3
+   ],
+   "fixes": [
+    4
+   ]
+  },
+  {
+   "order": 4,
+   "title": "Repaint and seal stage floor",
+   "detail": "Lightly scuff/sand worn areas, apply non-slip black deck paint/coating to entire stage platform per manufacturer instructions, allow proper cure time. Reinstall equipment keeping cables off floor. Restores durable, cleanable finish.",
+   "trade": "painter",
+   "hours": [
+    6,
+    8
+   ],
+   "dependsOn": 3,
+   "fixes": [
+    4
+   ]
+  }
+ ],
+ "afterImageUrl": "/examples/sanctuary/after.webp",
+ "transcript": null,
+ "frames": [
+  {
+   "index": 0,
+   "tSec": 0,
+   "url": "/examples/sanctuary/f0.webp"
+  },
+  {
+   "index": 1,
+   "tSec": 6,
+   "url": "/examples/sanctuary/f1.webp"
+  },
+  {
+   "index": 2,
+   "tSec": 14,
+   "url": "/examples/sanctuary/f2.webp"
+  },
+  {
+   "index": 3,
+   "tSec": 20,
+   "url": "/examples/sanctuary/f3.webp"
+  },
+  {
+   "index": 4,
+   "tSec": 26,
+   "url": "/examples/sanctuary/f4.webp"
+  },
+  {
+   "index": 5,
+   "tSec": 32,
+   "url": "/examples/sanctuary/f5.webp"
+  },
+  {
+   "index": 6,
+   "tSec": 38,
+   "url": "/examples/sanctuary/f6.webp"
+  },
+  {
+   "index": 7,
+   "tSec": 42,
+   "url": "/examples/sanctuary/f7.webp"
+  }
+ ],
+ "transcriptTurns": [],
+ "transcriptSummary": null,
+ "saidVsSeen": [
+  {
+   "status": "unmentioned",
+   "said": null,
+   "seen": {
+    "summary": "Loose cables and extension cords lying unsecured across stage floor near keyboards",
+    "frameIndex": 6
+   },
+   "issueRank": 1
+  },
+  {
+   "status": "unmentioned",
+   "said": null,
+   "seen": {
+    "summary": "Exposed tangled wiring and unmounted power strip on stage deck",
+    "frameIndex": 5
+   },
+   "issueRank": 2
+  },
+  {
+   "status": "unmentioned",
+   "said": null,
+   "seen": {
+    "summary": "Stage steps on both sides with no handrails or ramp",
+    "frameIndex": 4
+   },
+   "issueRank": 3
+  },
+  {
+   "status": "unmentioned",
+   "said": null,
+   "seen": {
+    "summary": "Worn dirty stage floor with debris and box left on edge",
+    "frameIndex": 5
+   },
+   "issueRank": 4
+  }
+ ],
+ "costRange": null,
+ "heroFrameIndex": 6,
+ "meta": {
+  "costUsd": 0.3814,
+  "planProvider": "baseten"
+ },
+ "afterImageLabel": "AI concept, not a render"
+}

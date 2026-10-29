@@ -1,5 +1,5 @@
 /**
- * EXAMPLE DATA ONLY. The same made-up sanctuary stage as samplePlan, shaped the way a run
+ * EXAMPLE DATA ONLY. The same hand-written kitchen renovation sample as samplePlan, shaped the way a run
  * looks when only the plan step is available (Muse Spark Open on Baseten) and the Meta-only
  * steps are off: no SAM outlines, model-only counts, no after image. Used to build and check
  * the graceful fallback states. Open it with `?mock=nometa`.
@@ -9,7 +9,7 @@ import { samplePlan } from "./samplePlan";
 
 export const planNoMeta: WorkPlan = {
   ...samplePlan,
-  generatedFrom: "EXAMPLE: walkthrough video, 12 frames, 78 s, narrated (plan only, no outlines or after image)",
+  generatedFrom: "SAMPLE: walkthrough, 7 frames, 45 s, narrated (plan only, no outlines or after image)",
   inventory: samplePlan.inventory.map((item) => ({ ...item, method: "model" as const })),
   issues: samplePlan.issues.map((issue) => ({
     ...issue,
@@ -33,7 +33,7 @@ export const planNoMeta: WorkPlan = {
  */
 export const planNoCost: WorkPlan = {
   ...planNoMeta,
-  generatedFrom: "EXAMPLE: walkthrough video, 12 frames, 78 s, narrated (plan only, cost step failed)",
+  generatedFrom: "SAMPLE: walkthrough, 7 frames, 45 s, narrated (plan only, cost step failed)",
   costRange: null,
   meta: {
     ...planNoMeta.meta,

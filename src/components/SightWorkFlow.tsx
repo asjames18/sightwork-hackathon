@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PLAN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
-import { pickMockPlan } from "@/lib/mock/pickMockPlan";
+import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
@@ -14,7 +14,7 @@ import { PlanView } from "./PlanView";
 type Stage =
   | { kind: "upload" }
   | { kind: "processing"; file: File; run: number }
-  | { kind: "plan"; plan: WorkPlan; videoName: string | null };
+  | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example };
 
 /** Mock by default; NEXT_PUBLIC_SIGHTWORK_RUNNER=api or `?runner=api` switches to POST /api/plan. */
 const runPlanJob = selectedPlanJob;
@@ -25,12 +25,16 @@ export function SightWorkFlow() {
 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
-      setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name });
+      // The preview (mock) runner ends on an example plan: keep its Real run / Sample label.
+      setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name, example: EXAMPLES.find((e) => e.plan === job.plan) });
       saveLastPlan(job.plan, stage.file.name);
     }
   }, [job, stage]);
 
-  const showExample = () => setStage({ kind: "plan", plan: pickMockPlan(), videoName: null });
+  const showExample = (id?: string) => {
+    const example = findExample(id);
+    setStage({ kind: "plan", plan: example.plan, videoName: null, example });
+  };
   // Falls back to staying on upload if the saved plan was cleared since the link showed.
   const showLastPlan = () => {
     const saved = loadLastPlan();
@@ -42,7 +46,7 @@ export function SightWorkFlow() {
   // `?view=last` reopens the last finished plan on this device (falls back to the upload screen).
   useEffect(() => {
     const view = new URLSearchParams(window.location.search).get("view");
-    if (view === "example") showExample();
+    if (view === "example") showExample(new URLSearchParams(window.location.search).get("ex") ?? undefined);
     if (view === "last") {
       const saved = loadLastPlan();
       if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
@@ -155,11 +159,11 @@ export function SightWorkFlow() {
           videoFile={stage.file}
           failure={job?.state === "failed" ? { message: job.message } : null}
           onRetry={() => setStage({ kind: "processing", file: stage.file, run: stage.run + 1 })}
-          onExample={showExample}
+          onExample={() => showExample()}
           skipped={skipped}
         />
       )}
-      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} onMakeYourOwn={startOver} />}
+      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} onMakeYourOwn={startOver} />}
       </main>
     </>
   );
