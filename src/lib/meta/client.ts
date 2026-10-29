@@ -16,6 +16,14 @@
  *   returned here is invoked, and tests inject a fake fetch instead.
  * - Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing, per the reason step's rule.
+ * - A transient 404 model_not_found is retried, up to 3 attempts with a
+ *   short backoff (250 ms, then 500 ms): the Oct 28 spike showed Meta's
+ *   entitlement cache serving 404s intermittently for a model that then
+ *   returns 200, and those 404s are not billed, so one bad hop no longer
+ *   fails the whole reason/cost/judge step. Any other error, or a 404
+ *   without model_not_found, still throws at once, and a 404 that
+ *   survives all 3 attempts throws with the last response. Same shape
+ *   as the SAM caller's retry (src/lib/meta/sam.ts).
  * - Cost: computed from the response's usage tokens at the standard-tier
  *   rates below, which the spike wiring may override via opts. When the
  *   web_search tool is used, one search query is charged by default
@@ -33,6 +41,8 @@ export interface MetaClientOptions {
   baseUrl?: string;
   /** Injectable fetch for tests. Defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests. Defaults to a real setTimeout wait. */
+  sleepImpl?: (ms: number) => Promise<void>;
   /** USD per 1M input tokens. Default: standard-tier Spark pricing. */
   inputPricePerMillion?: number;
   /** USD per 1M output tokens. Default: standard-tier Spark pricing. */
@@ -67,6 +77,11 @@ const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_INPUT_PRICE_PER_MILLION = 1.25;
 const DEFAULT_OUTPUT_PRICE_PER_MILLION = 4.25;
 const DEFAULT_WEB_SEARCH_COST_USD = 0.0025;
+
+/** Total attempts for a transient 404 model_not_found. */
+const MAX_SPARK_ATTEMPTS = 3;
+/** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
+const SPARK_RETRY_DELAYS_MS = [250, 500];
 
 function readEnv(name: string): string | undefined {
   try {
@@ -105,6 +120,8 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
   }
   const baseUrl = (opts.baseUrl ?? readEnv("META_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const sleepImpl =
+    opts.sleepImpl ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const inputPrice = opts.inputPricePerMillion ?? DEFAULT_INPUT_PRICE_PER_MILLION;
   const outputPrice = opts.outputPricePerMillion ?? DEFAULT_OUTPUT_PRICE_PER_MILLION;
   const webSearchCost = opts.webSearchCostUsd ?? DEFAULT_WEB_SEARCH_COST_USD;
@@ -171,18 +188,32 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
       };
 
       const started = Date.now();
-      const res = await fetchImpl(`${baseUrl}/responses`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const latencyMs = Date.now() - started;
-
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`meta: ${res.status} ${detail}`);
+      let parsed: Record<string, unknown> | null = null;
+      let lastStatus = 0;
+      let lastDetail = "";
+      for (let attempt = 0; attempt < MAX_SPARK_ATTEMPTS; attempt++) {
+        const res = await fetchImpl(`${baseUrl}/responses`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          parsed = (await res.json()) as Record<string, unknown>;
+          break;
+        }
+        lastStatus = res.status;
+        lastDetail = await res.text();
+        // Only a 404 naming model_not_found is transient (spike, Oct 28:
+        // unbilled, then 200 for the same model). Anything else throws at
+        // once, as before, and so does a 404 that survives all attempts.
+        const transient = res.status === 404 && lastDetail.includes("model_not_found");
+        if (!transient || attempt === MAX_SPARK_ATTEMPTS - 1) break;
+        await sleepImpl(SPARK_RETRY_DELAYS_MS[attempt] ?? 500);
       }
-      const parsed = (await res.json()) as Record<string, unknown>;
+      if (parsed === null) {
+        throw new Error(`meta: ${lastStatus} ${lastDetail}`);
+      }
+      const latencyMs = Date.now() - started;
       const text = extractText(parsed);
       if (text === null) {
         throw new Error("meta: response had no text output");
