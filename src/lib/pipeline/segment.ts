@@ -18,7 +18,11 @@
  * - Request budget (rule 1, rewritten Oct 26): hazards get 60% of
  *   the cap on evenly spaced frames, scene-change frames first
  *   (22 by default); counts run on an evenly spaced subset of those
- *   hazard frames (17 by default). Short videos whose frames x
+ *   hazard frames (17 by default), except that when zoneIds are
+ *   given the count subset keeps at least one frame per zone (the
+ *   middle of its longest run), filled evenly — otherwise a short
+ *   zone at the end of the walk gets no count frame and adds 0
+ *   (finding B, Oct 29). Short videos whose frames x
  *   hazard concepts fit in 60% of the cap get hazards on every
  *   frame and the count pass takes the rest, as before.
  * - If the count pass still gets fewer than 6 frames, drop plants,
@@ -238,7 +242,11 @@ export function parseInstances(raw: unknown, concept: string, frameIndex: number
 export interface SegmentPlan {
   /** Hazard-pass frames: 60% of the cap, evenly spaced, scene-change frames first. */
   hazardFrames: number[];
-  /** Count-pass frames: an evenly spaced subset of hazardFrames. */
+  /**
+   * Count-pass frames: an evenly spaced subset of hazardFrames,
+   * except that when zoneIds are given every zone keeps at least
+   * one frame (see evenlySpacedCoveringZones).
+   */
   countFrames: number[];
   /** Count labels dropped to fit the cap (empty when none). */
   droppedLabels: string[];
@@ -278,6 +286,62 @@ function evenlySpaced(candidates: number[], count: number): number[] {
   return [...new Set(picked)].sort((a, b) => a - b);
 }
 
+/** Zone key for a frame index: its zoneId, or "u" when unzoned (unzoned frames form their own zone, as in the per-zone count sum). */
+function zoneKey(zoneId: number | undefined): string {
+  return typeof zoneId === "number" ? String(zoneId) : "u";
+}
+
+/**
+ * Evenly spaced picks that keep at least one frame per zone
+ * (finding B, Oct 29): one representative per zone — the middle
+ * of its longest run of consecutive candidates, a steady view
+ * rather than a cut frame — then the remaining slots filled
+ * evenly. When there are more zones than slots, the zones with
+ * the most candidate frames win (earlier zone on a tie). With no
+ * zoneIds, or a single zone, this is exactly evenlySpaced, so a
+ * take without zones plans exactly as before. Pipeline-local
+ * copy of the same rule as client zoneCoverage.coverZones, kept
+ * here so the server step does not import client code.
+ * zoneIds is indexed by frame index, as candidates are frame indices.
+ */
+function evenlySpacedCoveringZones(
+  candidates: number[],
+  zoneIds: (number | undefined)[],
+  count: number,
+): number[] {
+  if (count <= 0 || candidates.length === 0) return [];
+  if (count >= candidates.length) return [...candidates];
+  const hasZone = candidates.some((i) => typeof zoneIds[i] === "number");
+  const zoneKeys = new Set(candidates.map((i) => zoneKey(zoneIds[i])));
+  if (!hasZone || zoneKeys.size <= 1) return evenlySpaced(candidates, count);
+
+  const runs = new Map<string, { best: number[]; cur: number[] }>();
+  let prevKey: string | null = null;
+  for (const idx of candidates) {
+    const k = zoneKey(zoneIds[idx]);
+    let z = runs.get(k);
+    if (!z) runs.set(k, (z = { best: [], cur: [] }));
+    if (k !== prevKey) z.cur = [];
+    z.cur.push(idx);
+    if (z.cur.length > z.best.length) z.best = [...z.cur];
+    prevKey = k;
+  }
+  let reps = [...runs.values()].map((z) => z.best[Math.floor((z.best.length - 1) / 2)]);
+  if (reps.length > count) {
+    const size = (r: number) =>
+      candidates.filter((i) => zoneKey(zoneIds[i]) === zoneKey(zoneIds[r])).length;
+    reps = reps
+      .map((r, order) => ({ r, order, n: size(r) }))
+      .sort((a, b) => b.n - a.n || a.order - b.order)
+      .slice(0, count)
+      .map((x) => x.r);
+  }
+  const chosen = new Set(reps);
+  const rest = candidates.filter((i) => !chosen.has(i));
+  for (const i of evenlySpaced(rest, count - chosen.size)) chosen.add(i);
+  return [...chosen].sort((a, b) => a - b);
+}
+
 /**
  * Plan the SAM request budget for a frame count (prompt 02, rule 1).
  * Hazards get 60% of the cap on evenly spaced frames, scene-change
@@ -293,6 +357,8 @@ export function planSegmentFrames(opts: {
   frameCount: number;
   sceneFrameIndices?: number[];
   maxRequests?: number;
+  /** One entry per frame, indexed by frame index; omit for an unzoned take. */
+  zoneIds?: (number | undefined)[];
 }): SegmentPlan {
   const frameCount = opts.frameCount;
   const maxRequests = opts.maxRequests ?? DEFAULT_MAX_SAM_REQUESTS;
@@ -301,6 +367,17 @@ export function planSegmentFrames(opts: {
   }
   if (!Number.isInteger(maxRequests) || maxRequests < 0) {
     throw new Error(`segment: maxRequests must be a whole number >= 0, got ${maxRequests}`);
+  }
+  if (opts.zoneIds !== undefined) {
+    if (opts.zoneIds.length !== frameCount) {
+      throw new Error(`segment: zoneIds must have ${frameCount} entries, got ${opts.zoneIds.length}`);
+    }
+    for (let i = 0; i < opts.zoneIds.length; i++) {
+      const z = opts.zoneIds[i];
+      if (z !== undefined && (!Number.isInteger(z) || z < 0)) {
+        throw new Error(`segment: frame ${i} zoneId must be a whole number >= 0`);
+      }
+    }
   }
   const scene = validateSceneIndices(opts.sceneFrameIndices ?? [], frameCount);
   const allFrames = Array.from({ length: frameCount }, (_, i) => i);
@@ -375,7 +452,7 @@ export function planSegmentFrames(opts: {
       countBudget = countFramesFor(droppedLabels);
     }
   }
-  const countFrames = evenlySpaced(hazardFrames, countBudget);
+  const countFrames = evenlySpacedCoveringZones(hazardFrames, opts.zoneIds ?? [], countBudget);
 
   return {
     hazardFrames,
@@ -581,6 +658,7 @@ export async function runSegment(
     frameCount: input.frames.length,
     sceneFrameIndices: input.sceneFrameIndices,
     maxRequests: input.maxRequests,
+    zoneIds: input.frames.map((f) => f.zoneId),
   });
   if (input.frames.length === 0) {
     return {
