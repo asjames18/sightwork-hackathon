@@ -31,6 +31,23 @@ export function isNarrated(plan: WorkPlan): boolean {
   return Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
 }
 
+/**
+ * Quiet metadata row under the plan title, e.g. "78 s · 12 frames · narrated". The plan step writes generatedFrom as
+ * "Walkthrough video, N frames, D s, narrated"; read the numbers from it, and fall back to the raw line if it doesn't parse.
+ */
+export function planMetaParts(plan: WorkPlan): string[] | null {
+  const text = plan.generatedFrom ?? "";
+  const secs = text.match(/(\d+(?:\.\d+)?)\s*s\b/);
+  const frameCount = text.match(/(\d+)\s*frames?\b/);
+  if (!secs && !frameCount) return null;
+  const parts: string[] = [];
+  if (secs) parts.push(`${Math.round(Number(secs[1]))} s`);
+  const n = frameCount ? Number(frameCount[1]) : (plan.frames?.length ?? 0);
+  if (n > 0) parts.push(`${n} ${n === 1 ? "frame" : "frames"}`);
+  parts.push(isNarrated(plan) ? "narrated" : "no narration");
+  return parts;
+}
+
 function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
   if (!narrated)
     return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
@@ -101,6 +118,7 @@ export function PlanView({
 }) {
   const frames = plan.frames ?? [];
   const narrated = isNarrated(plan);
+  const metaParts = planMetaParts(plan);
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
@@ -159,7 +177,14 @@ export function PlanView({
       )}
 
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
-      <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
+      {metaParts ? (
+        <p className="mt-1 text-sm text-ink/70">
+          <span className="sr-only">Walkthrough video: </span>
+          {metaParts.join(" · ")}
+        </p>
+      ) : (
+        plan.generatedFrom && <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
+      )}
 
       {plan.issues.length > 0 && (
         <a
