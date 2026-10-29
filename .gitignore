@@ -24,3 +24,7 @@ tools/frames/test/
 .DS_Store
 *.log
 .vercel
+
+# Playwright e2e output
+e2e/.results/
+playwright-report/
