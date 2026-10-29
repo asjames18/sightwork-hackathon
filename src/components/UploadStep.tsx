@@ -274,8 +274,8 @@ function ExamplePicker({ onPick }: { onPick: (id: string) => void }) {
         ))}
       </ul>
       <p className="mt-2 text-xs text-ink/60">
-        Sample photos are CC0 (free to use) from Wikimedia Commons.{" "}
-        <a href="/examples/CREDITS.md" className="underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+        Sample photos are CC0 (free to use), via Wikimedia Commons.{" "}
+        <a href="/credits" className="underline underline-offset-2">
           Credits
         </a>
       </p>
@@ -289,7 +289,6 @@ function ExampleCard({ example, onPick, wide = false }: { example: Example; onPi
     <button
       type="button"
       onClick={() => onPick(example.id)}
-      aria-label={`${real ? "Real run" : "Sample"}: ${example.title}. ${example.blurb}`}
       className={`group mt-3 flex w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-ink/10 transition hover:ring-ink/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-safe:active:scale-[.99] ${
         wide ? "flex-col sm:flex-row" : "flex-row sm:flex-col"
       }`}
@@ -308,7 +307,9 @@ function ExampleCard({ example, onPick, wide = false }: { example: Example; onPi
       <span className={`flex min-w-0 flex-col justify-center gap-1 ${wide ? "p-4 sm:p-5" : "p-3"}`}>
         <span className={`font-bold leading-snug ${wide ? "text-lg" : "text-base"}`}>{example.title}</span>
         <span className="text-sm text-ink/70">{example.blurb}</span>
-        <span className="mt-1 text-sm font-semibold text-accent-dark group-hover:underline">Open plan →</span>
+        <span className="mt-1 text-sm font-semibold text-accent-dark group-hover:underline">
+          Open plan <span aria-hidden>→</span>
+        </span>
       </span>
     </button>
   );
