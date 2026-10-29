@@ -337,8 +337,11 @@ export async function runRenderAfter(
       skipped: "no-frames",
     };
   }
-  if (typeof heroFrame.url !== "string" || heroFrame.url.length === 0) {
-    // No usable image to edit: skip without spending a paid call.
+  if (typeof heroFrame.url !== "string" || heroFrame.url.trim().length === 0) {
+    // No usable image to edit: skip without spending a paid call. A
+    // whitespace-only URL is unusable too: the old length check
+    // accepted it, so it would have reached the image caller inside
+    // the try and surfaced as a model failure instead of this clean skip.
     return {
       afterImageUrl: null,
       heroFrameIndex: hero,
