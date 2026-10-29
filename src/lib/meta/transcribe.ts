@@ -164,6 +164,20 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
     if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || Buffer.from(b64, "base64").length === 0) {
       throw new Error("asr: audioWavBase64 must be valid base64 audio data");
     }
+    // Valid base64 is not necessarily WAV: a PNG or other payload
+    // would otherwise ride along on a paid ASR call and only fail at
+    // the provider. Reject anything without a WAV header ("RIFF" at
+    // bytes 0-3, "WAVE" at bytes 8-11) here, before any fetch, like
+    // the image callers reject non-image base64 at the same point.
+    // A payload too short to hold the header fails.
+    const wavHead = Buffer.from(b64, "base64");
+    if (
+      wavHead.length < 12 ||
+      wavHead.toString("ascii", 0, 4) !== "RIFF" ||
+      wavHead.toString("ascii", 8, 12) !== "WAVE"
+    ) {
+      throw new Error("asr: audioWavBase64 must decode to WAV audio (RIFF/WAVE header)");
+    }
     // A whitespace-only keyword would otherwise ride along on a paid
     // ASR call and only fail (or silently do nothing) at the provider:
     // the old check accepted any string. Reject it here, before any
