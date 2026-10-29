@@ -476,6 +476,18 @@ export function validateRunPlanRequest(request: PlanRequest): void {
         `runPlan: frames[${i}].tSec must not be earlier than the previous frame`,
       );
     }
+    // Proposal B contract (types.ts): an optional zoneId per frame,
+    // one small integer from 0 per physical area. A direct runPlan
+    // caller gets the same fail-fast as runSegment instead of
+    // silently counting a bad zone id as its own zone.
+    if (
+      frame.zoneId !== undefined &&
+      (!Number.isInteger(frame.zoneId) || frame.zoneId < 0)
+    ) {
+      throw new Error(
+        `runPlan: frames[${i}].zoneId must be a whole number >= 0 when given`,
+      );
+    }
     // Parity with the route validator (src/lib/pipeline/planRequest.ts):
     // a frame timestamp past durationSec would mislabel that proof
     // frame's time on the plan screen, while the route already fails
@@ -638,7 +650,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   try {
     segmentation = await runSegment(
       {
-        frames: request.frames.map((f) => ({ tSec: f.tSec, dataUrl: f.dataUrl })),
+        frames: request.frames.map((f) => ({
+          tSec: f.tSec,
+          dataUrl: f.dataUrl,
+          ...(f.zoneId !== undefined ? { zoneId: f.zoneId } : {}),
+        })),
         concurrency: deps.segmentConcurrency,
       },
       deps.segment,
