@@ -308,6 +308,43 @@ export async function runTranscribe(
   if (head.slice(0, 4) !== "RIFF" || head.slice(8, 12) !== "WAVE") {
     throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
   }
+  // A WAV in a format Meta transcribe refuses (anything but mono
+  // s16le at 16000 or 24000 Hz) used to pass the header check and
+  // spend a paid ASR call, only to fail at the provider with a 400
+  // (spike, Oct 28: 8 kHz rejected). The route validator already
+  // rejects it on "uploading"; a direct runTranscribe caller gets
+  // the same fail-fast here, before any fetch. The fmt chunk is
+  // found by scanning RIFF chunks, not by assuming it sits at
+  // offset 12, so a leading chunk does not break it. A WAV with no
+  // fmt chunk in the decoded head passes, like the route validator,
+  // and is left to the provider.
+  {
+    const fmtHead = Buffer.from(input.audioWavBase64.replace(/\s/g, "").slice(0, 268), "base64");
+    let off = 12;
+    while (off + 8 <= fmtHead.length) {
+      const id = fmtHead.subarray(off, off + 4).toString("latin1");
+      const size = fmtHead.readUInt32LE(off + 4);
+      if (id === "fmt " && size >= 16 && off + 8 + 16 <= fmtHead.length) {
+        const format = fmtHead.readUInt16LE(off + 8);
+        const channels = fmtHead.readUInt16LE(off + 10);
+        const sampleRate = fmtHead.readUInt32LE(off + 12);
+        const bits = fmtHead.readUInt16LE(off + 22);
+        if (
+          format !== 1 ||
+          channels !== 1 ||
+          (sampleRate !== 16000 && sampleRate !== 24000) ||
+          bits !== 16
+        ) {
+          throw new Error(
+            `transcribe: audio must be mono s16le WAV at 16000 or 24000 Hz ` +
+              `(got format ${format}, ${channels} channel(s), ${sampleRate} Hz, ${bits}-bit)`,
+          );
+        }
+        break;
+      }
+      off += 8 + size + (size % 2);
+    }
+  }
 
   const res = await deps.callTranscribe({
     model: TRANSCRIBE_MODEL,
