@@ -150,3 +150,17 @@ test("/start links to /credits from the examples", async ({ page }) => {
   await expect(page).toHaveURL(/\/credits$/);
   await expect(page.getByRole("heading", { level: 1, name: "Example image credits" })).toBeVisible();
 });
+
+test("/start sample cards: featured image loads first, the rest lazy from small thumbnails; Credits link is a 24 px+ target", async ({ page }) => {
+  await page.goto("/start");
+  const imgs = page.locator("section button img");
+  await expect(imgs.first()).toHaveAttribute("loading", "eager");
+  await expect(imgs.first()).toHaveAttribute("fetchpriority", "high");
+  const count = await imgs.count();
+  expect(count).toBeGreaterThan(1);
+  for (let i = 1; i < count; i++) await expect(imgs.nth(i)).toHaveAttribute("loading", "lazy");
+  for (const src of await imgs.evaluateAll((els) => els.map((e) => e.getAttribute("src") ?? "")))
+    expect(src.startsWith("/examples/thumbs/") || src === "/examples/kitchen/f1.webp").toBe(true);
+  const box = await page.locator('a[href="/credits"]').first().boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(24);
+});
