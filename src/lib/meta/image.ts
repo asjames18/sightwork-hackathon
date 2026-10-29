@@ -146,7 +146,11 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
     if (typeof req.prompt !== "string" || req.prompt.trim().length === 0) {
       throw new Error("image: prompt must be a non-empty string");
     }
-    if (typeof req.image !== "string" || req.image.length === 0) {
+    // A whitespace-only image would otherwise spend a paid Image call
+    // and only fail at the provider: the old length check accepted it.
+    // Reject it here, before any fetch, like the SAM caller does for
+    // its dataUrl. Valid images still pass through unchanged.
+    if (typeof req.image !== "string" || req.image.trim().length === 0) {
       throw new Error("image: image must be a non-empty string");
     }
     const wanted = req.n ?? 1;
