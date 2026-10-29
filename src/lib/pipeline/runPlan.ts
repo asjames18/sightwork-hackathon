@@ -408,6 +408,17 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     if (request[field] !== undefined && typeof request[field] !== "string") {
       throw new Error(`runPlan: ${field} must be a string when given`);
     }
+    // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+    // an empty string means "not given", but a spaces-only label would
+    // print as a blank label on the plan screen, so a direct runPlan
+    // caller gets the same fail-fast here instead of only via the route.
+    if (
+      typeof request[field] === "string" &&
+      request[field].length > 0 &&
+      request[field].trim().length === 0
+    ) {
+      throw new Error(`runPlan: ${field} must not be blank when given`);
+    }
   }
   if (request.audioWavBase64 !== undefined && typeof request.audioWavBase64 !== "string") {
     throw new Error("runPlan: audioWavBase64 must be a string when given");
