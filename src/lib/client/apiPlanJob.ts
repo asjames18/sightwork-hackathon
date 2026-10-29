@@ -91,6 +91,13 @@ export function createApiPlanJob(buildRequest: BuildPlanRequest, endpoint = "/ap
 
     report({ state: "running", step: "uploading" });
 
+    // The server answers 401 to any run without a tester code (src/proxy.ts), so don't spend the time
+    // reading frames and audio and uploading megabytes just to hear that.
+    if (!loadTestCode()) {
+      fail(messageForStatus(401));
+      return;
+    }
+
     let body: PlanRequest;
     try {
       body = await buildRequest(file, signal);

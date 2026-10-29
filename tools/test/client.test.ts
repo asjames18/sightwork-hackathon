@@ -143,22 +143,29 @@ describe("API runner (fake fetch, nothing leaves the machine)", () => {
       ["uploading", "listening", "comparing", "done"],
     );
   });
-  test("401 shows the tester-code sentence on the step it was on", async () => {
-    const { statuses } = await runApi({ status: 401 });
+  test("no tester code saved: fails at once, nothing is uploaded", async () => {
+    const { statuses, sent } = await runApi({ chunks: ['{"state":"done","plan":{"issues":[]}}'] });
+    assert.equal(sent.body, undefined, "no request sent");
+    const last = statuses.at(-1);
+    assert.ok(last?.state === "failed" && /tester code/.test(last.message) && last.step === "uploading");
+  });
+  test("401 (wrong code) shows the tester-code sentence on the step it was on", async () => {
+    const { statuses } = await runApi({ status: 401, code: "wrong" });
     const last = statuses.at(-1);
     assert.ok(last?.state === "failed" && /tester code/.test(last.message) && last.step === "uploading");
   });
   test("a stream that ends without done is a dropped connection", async () => {
-    const { statuses } = await runApi({ chunks: ['{"state":"running","step":"planning"}\n'] });
+    const { statuses } = await runApi({ code: "c", chunks: ['{"state":"running","step":"planning"}\n'] });
     const last = statuses.at(-1);
     assert.ok(last?.state === "failed" && /connection dropped/.test(last.message) && last.step === "planning");
   });
   test("a network error fails cleanly", async () => {
-    const { statuses } = await runApi({ throws: true });
+    const { statuses, sent } = await runApi({ throws: true, code: "c" });
+    assert.ok(sent.body, "request was attempted");
     assert.equal(statuses.at(-1)?.state, "failed");
   });
   test("nothing after the final line is shown", async () => {
-    const { statuses } = await runApi({ chunks: ['{"state":"failed","step":"looking","message":"x"}\n{"state":"running","step":"planning"}\n'] });
+    const { statuses } = await runApi({ code: "c", chunks: ['{"state":"failed","step":"looking","message":"x"}\n{"state":"running","step":"planning"}\n'] });
     assert.deepEqual(statuses.map((s) => s.state), ["running", "failed"]);
   });
 });
