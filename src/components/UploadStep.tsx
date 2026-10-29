@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
 import { loadLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
+
+/** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
+function isVideoFile(f: File): boolean {
+  return f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|3gp)$/i.test(f.name);
+}
 
 // Whether a finished plan is saved on this device. The server render and the first client render
 // both say no, so there's no hydration mismatch; another tab saving or clearing one updates it.
@@ -42,6 +47,53 @@ export function UploadStep({
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
   useEffect(() => { if (preview) card.current?.focus(); }, [preview]);
 
+  const pick = useCallback((file: File) => {
+    setDropError(false);
+    setCheck({ kind: "reading" });
+    setPreview({ url: URL.createObjectURL(file), file });
+  }, []);
+  // Desktop: drop a video anywhere on the upload screen (dropping it outside a target used to make the
+  // browser open the file in the tab and leave the app). The drop zone lights up while a file is dragged.
+  const [dragging, setDragging] = useState(false);
+  const [dropError, setDropError] = useState(false);
+  useEffect(() => {
+    if (preview) return;
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setDragging(true);
+    };
+    const leave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      const file = Array.from(e.dataTransfer?.files ?? []).find(isVideoFile);
+      if (file) pick(file);
+      else setDropError(true);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", drop);
+    };
+  }, [preview, pick]);
+
   const durationSec = check.kind === "ok" || check.kind === "warn" ? check.durationSec : null;
   const canSend = check.kind === "ok" || check.kind === "warn";
   // Polite announcement for the length check; warnings and blocks have their own status/alert below.
@@ -67,8 +119,7 @@ export function UploadStep({
           // Clear so picking the same file again still fires a change.
           e.target.value = "";
           if (!file) return;
-          setCheck({ kind: "reading" });
-          setPreview({ url: URL.createObjectURL(file), file });
+          pick(file);
         }}
       />
 
@@ -77,12 +128,23 @@ export function UploadStep({
           <button
             type="button"
             onClick={() => input.current?.click()}
-            className="mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-ink/20 bg-white px-6 py-7 text-center transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99]"
+            className={`mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-7 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99] ${
+              dragging ? "border-dashed border-accent-dark bg-accent/5" : "border-ink/20 bg-white hover:border-ink/40"
+            }`}
           >
             <CameraIcon />
-            <span className="rounded-xl bg-accent-dark px-5 py-3 text-base font-semibold text-white">Record or choose a video</span>
-            <span className="text-sm text-ink/70">MP4 or MOV, about 60 to 90 seconds</span>
+            <span className="rounded-xl bg-accent-dark px-5 py-3 text-base font-semibold text-white">
+              {dragging ? "Drop your video here" : "Record or choose a video"}
+            </span>
+            <span className="text-sm text-ink/70">
+              MP4 or MOV, about 60 to 90 seconds<span className="hidden [@media(pointer:fine)]:inline">. Or drag it here.</span>
+            </span>
           </button>
+          {dropError && (
+            <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+              That file isn&apos;t a video. Drop an MP4 or MOV walkthrough.
+            </p>
+          )}
           {savedPlan && onLastPlan ? (
             <p className="mt-2 text-center text-base">
               <button
