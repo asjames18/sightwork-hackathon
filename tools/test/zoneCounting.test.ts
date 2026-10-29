@@ -103,10 +103,11 @@ describe("client -> route: zone ids on a one-take request", () => {
     assert.deepEqual(validatePlanRequest(request(true)), []);
     assert.doesNotThrow(() => validateRunPlanRequest(request(true)));
   });
-  test("runPlan rejects a bad zone id before any step runs", () => {
-    for (const zoneId of [-1, 1.5]) {
+  test("the route (a7f202a) and runPlan both reject a bad zone id before any step runs", () => {
+    for (const zoneId of [-1, 1.5, "1" as unknown as number]) {
       const r = request(true);
       r.frames[3] = { ...r.frames[3], zoneId };
+      assert.ok(validatePlanRequest(r).some((p) => p.includes("frames[3].zoneId")), `route rejects ${JSON.stringify(zoneId)}`);
       assert.throws(() => validateRunPlanRequest(r), /zoneId/);
     }
   });
