@@ -714,7 +714,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   try {
     const reasonInput: ReasonInput = {
       frames: (reasonSubset ? reasonSubset.map((i) => request.frames[i]) : request.frames).map(
-        (f) => ({ tSec: f.tSec, dataUrl: f.dataUrl }),
+        (f) => ({
+          tSec: f.tSec,
+          dataUrl: f.dataUrl,
+          ...(f.zoneId !== undefined ? { zoneId: f.zoneId } : {}),
+        }),
       ),
       segmentation: reasonSegmentation,
       transcript,
