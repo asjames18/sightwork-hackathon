@@ -488,7 +488,13 @@ export async function runRenderAfter(
           // Bad judge answer: keep the first candidate, never drop a good image.
           picked = candidates[0];
         }
-      } catch {
+      } catch (err) {
+        // A spike-cap throw is a spending stop, not a bad judge
+        // answer: rethrow it so the outer catch reports
+        // cap-exceeded instead of silently returning a candidate
+        // whose judge call already breached the cap.
+        const message = err instanceof Error ? err.message : String(err);
+        if (/spike cap/i.test(message)) throw err;
         picked = candidates[0];
       }
     }
