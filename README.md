@@ -39,6 +39,8 @@ npm run dev
 Then open http://localhost:3000 for the landing page, or http://localhost:3000/start to go straight to the app.
 To check the TypeScript types without starting the app, run `npm run typecheck`.
 
+To run the local checks, run `npm test` (Node 22.18 or newer, no extra packages). They cover the example plans (every image exists at the size the page reserves, every reference points at a real frame or problem, samples are labeled and credited), the upload screen's length check, the API runner's stream handling against a fake server, and the tester-code gate. Nothing in them calls a model or the network.
+
 ### Preview with example data (no API calls, no keys)
 By default the browser uses a built-in example run, so every screen works without any keys. These links jump straight to a screen (older `/?view=` style links still work and redirect to `/start` with the query kept):
 - `http://localhost:3000/start?view=example` opens the example plan.
