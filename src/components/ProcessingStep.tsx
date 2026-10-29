@@ -13,6 +13,18 @@ const LABELS: Record<PlanStep, string> = {
   done: "Done",
 };
 
+/** One plain sentence for the step in progress (fixed per step; the status stream carries no live details). */
+const NOW_LINE: Record<PlanStep, string> = {
+  uploading: "Sending your video. Bigger files take a little longer.",
+  listening: "Turning what you said into a list of requests.",
+  looking: "Picking frames from your walkthrough to study.",
+  counting: "Counting what's there, roughly.",
+  comparing: "Checking what you asked for against what's in the room.",
+  planning: "Ranking the problems and putting the work steps in order.",
+  picturing: "Drawing a picture of the finished space.",
+  done: "Wrapping up your plan.",
+};
+
 /** Spoken state for each step, since the circle icons are visual only ("skipped" already shows as text). */
 const STATE_TEXT = {
   done: "Done.",
@@ -67,12 +79,9 @@ export function ProcessingStep({
       </p>
 
       <div className="mt-5">
-        <div className="flex items-baseline justify-between text-sm">
-          <span className="font-semibold">
-            Step {position} of {total}
-          </span>
-          {!failed && <span className="text-ink/65">Keep this tab open</span>}
-        </div>
+        <p className="text-sm font-semibold">
+          Step {position} of {total}
+        </p>
         <div
           role="progressbar"
           aria-label="Plan progress"
@@ -86,6 +95,7 @@ export function ProcessingStep({
             style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
           />
         </div>
+        {!failed && <p className="mt-2 text-sm text-ink/65">Usually about a minute. Keep this tab open.</p>}
       </div>
 
       <ol className="mt-5 divide-y divide-ink/5 rounded-2xl border border-ink/10 bg-white px-3 sm:px-4">
@@ -102,7 +112,7 @@ export function ProcessingStep({
                     : state === "skipped"
                       ? "border border-dashed border-ink/30 bg-white text-ink/65"
                     : state === "now"
-                      ? "bg-accent-dark text-white motion-safe:animate-pulse"
+                      ? "bg-accent-dark text-white ring-2 ring-accent/40 ring-offset-2 motion-safe:animate-pulse"
                       : state === "failed"
                         ? "bg-red-600 text-white"
                         : "bg-ink/10 text-ink/70"
@@ -118,9 +128,18 @@ export function ProcessingStep({
                 >
                   {LABELS[s]}
                 </span>
+                {state === "now" && (
+                  <span className="mt-0.5 flex items-start gap-2 text-sm text-ink/80">
+                    <span
+                      aria-hidden="true"
+                      className="mt-[3px] inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-accent/30 border-t-accent-dark motion-safe:animate-spin"
+                    />
+                    {NOW_LINE[s]}
+                  </span>
+                )}
                 {(ENGINE[s] || state === "skipped") && (
-                  <span className={`block text-sm text-ink/70`}>
-                    {ENGINE[s]}
+                  <span className="block text-sm text-ink/65">
+                    {ENGINE[s] && (s === "uploading" ? ENGINE[s] : <>via {ENGINE[s]}</>)}
                     {state === "skipped" ? (
                       <span>{ENGINE[s] ? " · " : ""}skipped this run</span>
                     ) : (
