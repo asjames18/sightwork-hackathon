@@ -19,8 +19,13 @@ type Stage =
 /** Mock by default; NEXT_PUBLIC_SIGHTWORK_RUNNER=api or `?runner=api` switches to POST /api/plan. */
 const runPlanJob = selectedPlanJob;
 
-export function SightWorkFlow() {
-  const [stage, setStage] = useState<Stage>({ kind: "upload" });
+/** `initialExampleId`: open on that example plan (prerendered example pages), instead of the upload screen. */
+export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string } = {}) {
+  const [stage, setStage] = useState<Stage>(() => {
+    if (!initialExampleId) return { kind: "upload" };
+    const example = findExample(initialExampleId);
+    return { kind: "plan", plan: example.plan, videoName: null, example };
+  });
   const job = usePlanJob(runPlanJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
 
   useEffect(() => {
@@ -42,11 +47,13 @@ export function SightWorkFlow() {
   };
 
   // `?view=example` opens straight on the example plan: a direct link for screen checks at
-  // phone, tablet and desktop widths, and a one-tap fallback during the demo.
+  // phone, tablet and desktop widths, and a one-tap fallback during the demo. On the server it's rewritten
+  // to the prerendered /start/example/<id> page (initialExampleId); this client path is the fallback.
   // `?view=last` reopens the last finished plan on this device (falls back to the upload screen).
   useEffect(() => {
     const view = new URLSearchParams(window.location.search).get("view");
-    if (view === "example") showExample(new URLSearchParams(window.location.search).get("ex") ?? undefined);
+    // Prerendered example pages already start on the plan.
+    if (view === "example" && !initialExampleId) showExample(new URLSearchParams(window.location.search).get("ex") ?? undefined);
     if (view === "last") {
       const saved = loadLastPlan();
       if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
@@ -54,7 +61,7 @@ export function SightWorkFlow() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // The direct-link plan is on screen: show the app (app/start/page.tsx hid it to avoid an upload-screen flash).
+  // The `?view=last` plan is on screen: show the app (app/start/page.tsx hid it to avoid an upload-screen flash).
   useEffect(() => {
     if (stage.kind === "plan") document.documentElement.classList.remove("sw-opening");
   }, [stage.kind]);
