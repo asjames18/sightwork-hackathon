@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -71,7 +72,8 @@ export function Landing() {
       </header>
 
       <main id="top">
-        <section className="mx-auto w-full max-w-5xl px-4 pb-16 pt-12 sm:px-6 md:pt-16">
+        <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-16">
+          <div>
           <h1 className="max-w-2xl text-[32px] font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             Walk the room. Get the work plan.
           </h1>
@@ -84,6 +86,8 @@ export function Landing() {
             <Link href="/start?view=example" className={secondary}>See an example plan</Link>
           </div>
           <p className="mt-4 text-sm text-ink/70">Free to try in this demo. No account needed.</p>
+          </div>
+          <HeroPhone />
         </section>
 
         <section aria-labelledby="how-heading" className="border-t border-ink/10">
@@ -220,5 +224,34 @@ export function Landing() {
         Built for the Meta AI Developer Hackathon 2026.
       </footer>
     </>
+  );
+}
+
+/**
+ * Hero visual: a phone frame showing the top of the real plan screen, rendered from the EXAMPLE plan
+ * (public/landing/example-plan.webp, 600x1408, ~54 KB). Labeled "Example" with a solid chip that stays
+ * legible at 375 px. Decorative copy of on-page content, so the image alt describes it briefly.
+ * Swap in a before/after crop once the after image runs at submission.
+ */
+function HeroPhone() {
+  return (
+    <figure className="relative mx-auto w-full max-w-[260px] sm:max-w-[280px] lg:max-w-[300px]">
+      <div className="rounded-[2.5rem] bg-ink p-2.5 shadow-2xl shadow-ink/25">
+        <div className="relative aspect-[9/17] overflow-hidden rounded-[2rem] bg-white">
+          <Image
+            src="/landing/example-plan.webp"
+            alt="SightWork plan screen for an example church stage: 3 problems you didn't mention, then problem 1, a dark exit sign, with its proof frame."
+            width={600}
+            height={1408}
+            sizes="(min-width: 1024px) 280px, 260px"
+            priority
+            className="h-full w-full object-cover object-top"
+          />
+        </div>
+      </div>
+      <figcaption className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-ink px-3 py-1 text-[13px] font-semibold uppercase tracking-wide text-white shadow">
+        Example
+      </figcaption>
+    </figure>
   );
 }
