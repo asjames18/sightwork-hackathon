@@ -105,6 +105,16 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
   }
   const baseUrl = (opts.baseUrl ?? readEnv("BASETEN_API_BASE_URL") ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const model = opts.model ?? BASETEN_MODEL;
+  // A blank or non-string configured model would otherwise be sent to
+  // Baseten and only fail at the provider, spending a paid call: the
+  // request's model is deliberately ignored (this caller always uses
+  // its configured model), so the configured model is the one that
+  // must be checked. Reject it here, at caller creation, like the
+  // token prices below, so a misconfigured model fails fast before
+  // any Baseten call. The default hackathon model is unchanged.
+  if (typeof model !== "string" || model.trim().length === 0) {
+    throw new Error(`baseten: model must be a non-empty string, got ${JSON.stringify(opts.model)}`);
+  }
   const fetchImpl = opts.fetchImpl ?? fetch;
   const inputPrice = opts.inputPricePerMillion ?? DEFAULT_INPUT_PRICE_PER_MILLION;
   const outputPrice = opts.outputPricePerMillion ?? DEFAULT_OUTPUT_PRICE_PER_MILLION;
