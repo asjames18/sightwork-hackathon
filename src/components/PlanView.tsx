@@ -168,7 +168,7 @@ export function PlanView({
             <button
               type="button"
               onClick={onMakeYourOwn}
-              className="min-h-11 shrink-0 self-start rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-900 sm:self-auto print:hidden"
+              className="btn-primary shrink-0 self-start text-sm sm:self-auto print:hidden"
             >
               Make your own
             </button>
