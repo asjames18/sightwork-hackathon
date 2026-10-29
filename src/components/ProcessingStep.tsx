@@ -75,8 +75,16 @@ export function ProcessingStep({
   const total = Math.max(work.length, 1);
   const position = Math.min(current + 1, total);
   const percent = Math.round(((failed ? current : current + 0.5) / total) * 100);
+  // One short polite announcement per step change. The whole section used to be the live region, so a
+  // screen reader re-read every changed row (icons, state words, the "now" line) and, on failure, the
+  // error twice (the alert card is its own live region).
+  const nowStep = work[Math.min(current, work.length - 1)];
+  const announce = failed || !nowStep ? "" : `Step ${position} of ${total}: ${LABELS[nowStep]}.`;
   return (
-    <section aria-live="polite">
+    <section>
+      <p aria-live="polite" className="sr-only">
+        {announce}
+      </p>
       <h1 className="text-2xl font-extrabold sm:text-3xl">{failed ? "We couldn't finish your plan" : "Working on your plan"}</h1>
       <div className="mt-2 flex min-w-0 items-center gap-3">
         {thumb && (
@@ -106,6 +114,7 @@ export function ProcessingStep({
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={current}
+          aria-valuetext={failed ? `Stopped at step ${position} of ${total}` : `Step ${position} of ${total}`}
           className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink/10"
         >
           <div
