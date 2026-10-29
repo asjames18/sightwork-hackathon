@@ -25,7 +25,10 @@
  *   { startSec, endSec, text } (startMs/1000, endMs/1000, transcript).
  *   No narration is a 200 with an empty transcript and turns: [];
  *   the caller returns turns: [] and the step turns that into
- *   transcript null, transcriptTurns [] — not an error.
+ *   transcript null, transcriptTurns [] — not an error. But when
+ *   turns carry no spoken text and the flat transcript is
+ *   non-empty, the caller keeps it as one turn (0 to audio
+ *   duration) instead of dropping it — see the fallback below.
  * - Cost: $0.18/hour, billed by whole seconds rounded down:
  *   floor(audioDurationMs/1000)/3600*0.18. There is no usage field,
  *   so the caller computes it (spike: 42 s cost $0.0021). When the
@@ -229,7 +232,24 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
             : turns.length > 0
               ? turns[turns.length - 1].endSec * 1000
               : 0;
-        return { turns, latencyMs, costUsd: computeAsrCostUsd(durationMs, pricePerHour) };
+        // Flat-transcript fallback: the provider also returns a flat
+        // `transcript` string, and one wire mode returns turns: []
+        // with only that flat string. The step turns an empty turn
+        // list into transcript null, so a flat-only response used
+        // to drop the narration entirely. When no turn carries
+        // spoken text but the flat transcript is non-empty, keep
+        // it as a single turn spanning the audio, so the plan
+        // shows the narration instead of "No narration". Turns
+        // with spoken text always win; the flat string never
+        // overrides them.
+        const flatTranscript =
+          typeof parsed.transcript === "string" ? parsed.transcript.trim() : "";
+        const hasSpokenTurn = turns.some((t) => t.text.trim().length > 0);
+        const finalTurns =
+          !hasSpokenTurn && flatTranscript
+            ? [{ startSec: 0, endSec: durationMs / 1000, text: flatTranscript }]
+            : turns;
+        return { turns: finalTurns, latencyMs, costUsd: computeAsrCostUsd(durationMs, pricePerHour) };
       }
       lastStatus = res.status;
       lastDetail = await res.text();
