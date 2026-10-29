@@ -237,33 +237,104 @@ export function UploadStep({
   );
 }
 
-/** What makes a walkthrough read well. Shown before a video is picked; no narration is needed. */
-export const FILMING_TIPS: { title: string; detail: string }[] = [
-  { title: "Walk slowly, edge to edge", detail: "Pan across every wall, row and corner so nothing is counted twice or missed." },
-  { title: "Pause on problems", detail: "Hold for a second on damage, stains or broken items so they get a clear proof frame." },
-  { title: "Talking is optional", detail: "Say what needs work if you like. A silent walkthrough still gets a full plan." },
+/**
+ * "How to film": what makes a walkthrough read well, shown before a video is picked. Based on capture
+ * guidance for walkthrough scanning and video inspection apps (slow, steady, well lit, each area once,
+ * name the area, say the problems). Wording stays general so it fits any kind of space.
+ */
+export const FILMING_TIPS: { icon: TipIcon; title: string; detail: string }[] = [
+  { icon: "walk", title: "Walk slowly", detail: "About 1 to 2 feet a second, phone steady in both hands." },
+  { icon: "light", title: "Lights on", detail: "Turn on the lights and open the blinds. Dark corners hide damage." },
+  { icon: "distance", title: "Stay 3 to 6 feet from walls", detail: "Close enough for detail, far enough to fit whole items." },
+  { icon: "once", title: "Cover each area once", detail: "One pass per area, so items aren\u2019t counted twice." },
+  { icon: "pin", title: "Name each area", detail: "Say it as you walk in, like \u201cnow the hallway.\u201d" },
+  { icon: "speak", title: "Point out problems", detail: "Say what needs work. SightWork also looks for what you don\u2019t mention." },
 ];
 
 function FilmingTips() {
   return (
-    <ul
-      aria-label="Tips for a good walkthrough"
-      className="mt-5 divide-y divide-ink/10 rounded-xl bg-white/70"
+    <section aria-labelledby="film-tips-heading" className="mt-6 rounded-2xl bg-white/70 p-4 ring-1 ring-ink/10 sm:p-5">
+      <h2 id="film-tips-heading" className="text-lg font-extrabold">
+        How to film
+      </h2>
+      <p className="mt-0.5 text-sm text-ink/70">One steady take of 60 to 90 seconds. Talking is optional, but it helps.</p>
+      <ul className="mt-3 grid grid-cols-1 gap-x-5 gap-y-2.5 sm:gap-y-3 sm:grid-cols-2">
+        {FILMING_TIPS.map((t) => (
+          <li key={t.title} className="flex gap-3">
+            <span
+              aria-hidden
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent-dark"
+            >
+              <TipGlyph icon={t.icon} />
+            </span>
+            <p className="min-w-0 text-sm leading-snug text-ink/70">
+              <span className="font-semibold text-ink sm:block">
+                {t.title}
+                <span className="sm:hidden">.</span>
+              </span>{" "}
+              {t.detail}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+type TipIcon = "walk" | "light" | "distance" | "once" | "pin" | "speak";
+
+/** Small outline glyphs for the filming tips (decorative; the text carries the meaning). */
+function TipGlyph({ icon }: { icon: TipIcon }) {
+  const paths: Record<TipIcon, React.ReactNode> = {
+    walk: (
+      <>
+        <circle cx="13" cy="4.5" r="1.75" />
+        <path d="m9 21 2.5-6.5L14 17v4M7.5 12l2.5-4.5 3.5 1 2 3.5 2.5 1M11.5 14.5 13 9" />
+      </>
+    ),
+    light: (
+      <>
+        <path d="M9 18h6M10 21h4" />
+        <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z" />
+      </>
+    ),
+    distance: (
+      <>
+        <path d="M3 4v16M21 4v16" />
+        <path d="M7 12h10M9.5 9.5 7 12l2.5 2.5M14.5 9.5 17 12l-2.5 2.5" />
+      </>
+    ),
+    once: (
+      <>
+        <path d="M4 17c3-8 9-11 16-10" />
+        <path d="m16.5 4 3.5 3-3.5 3.5" />
+      </>
+    ),
+    pin: (
+      <>
+        <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21Z" />
+        <circle cx="12" cy="10" r="2.25" />
+      </>
+    ),
+    speak: (
+      <>
+        <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 16h-8l-4.5 3.5V16H5a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 5 5Z" />
+        <path d="M12 8v3.5M12 13.5v.01" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[18px] w-[18px]"
     >
-      {FILMING_TIPS.map((t, i) => (
-        <li key={t.title} className="flex gap-3 px-3 py-2.5">
-          <span
-            aria-hidden
-            className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/10 text-xs font-bold"
-          >
-            {i + 1}
-          </span>
-          <p className="min-w-0 text-sm text-ink/70">
-            <span className="font-semibold text-ink">{t.title}.</span> {t.detail}
-          </p>
-        </li>
-      ))}
-    </ul>
+      {paths[icon]}
+    </svg>
   );
 }
 
