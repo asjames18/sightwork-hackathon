@@ -225,6 +225,18 @@ export function validatePlanRequest(body: unknown): string[] {
           problems.push(`frames[${i}].dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`);
         }
       }
+      // zoneId is optional (types.ts: PlanRequest frames), but when
+      // present it must be a whole number >= 0, the same rule segment
+      // enforces: an unvalidated zoneId used to pass this boundary
+      // and fail deep inside segment instead of fast on "uploading".
+      if (
+        frame.zoneId !== undefined &&
+        (typeof frame.zoneId !== "number" ||
+          !Number.isInteger(frame.zoneId) ||
+          frame.zoneId < 0)
+      ) {
+        problems.push(`frames[${i}].zoneId must be a whole number >= 0 when given`);
+      }
     });
   }
 
