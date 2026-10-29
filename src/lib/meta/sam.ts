@@ -119,7 +119,9 @@ function parseNumber(fields: Record<string, string>, key: string): number {
  * are read; mask tokens are ignored. Boxes arrive in source pixels with
  * w/h on the token and are normalized to 0-1000 here, as the segment
  * step expects. A box token without a score fails loudly: without `c`
- * the segment step cannot apply its minScore filter.
+ * the segment step cannot apply its minScore filter. A box outside the
+ * image fails loudly too, instead of riding on as an out-of-range
+ * normalized box the segment step would have to reject.
  */
 export function parseSamOutput(outputText: string): SamInstance[] {
   const instances: SamInstance[] = [];
@@ -148,6 +150,16 @@ export function parseSamOutput(outputText: string): SamInstance[] {
     ];
     if (box[0] > box[2] || box[1] > box[3]) {
       throw new Error("sam: box token has an inverted box");
+    }
+    // Normalized boxes are promised 0-1000 (see SamInstance): a token
+    // past the image edge used to pass here and only fail downstream
+    // in the segment step's 0-1000 check, with a segment: message that
+    // hid that the SAM output itself was out of range. Fail here, at
+    // the SAM boundary, naming the normalized box.
+    if (box.some((v) => v < 0 || v > 1000)) {
+      throw new Error(
+        `sam: box token is outside the image (normalized box ${box.join(",")})`,
+      );
     }
     instances.push({ score, box });
   }
@@ -239,3 +251,4 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
     throw new Error(`sam: ${lastStatus} ${lastDetail}`);
   };
 }
+
