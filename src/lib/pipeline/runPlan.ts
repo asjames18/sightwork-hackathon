@@ -374,7 +374,7 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
  * empty-frames request paid for transcription before the segment step
  * failed. This fails fast, before the first step, with the same
  * "runPlan: ..." phrasing as validateRunPlanDeps. Shape only: it does not
- * re-check image headers, WAV format, or frame order, which stay with the
+ * re-check image headers or WAV format, which stay with the
  * route validator and the step validators.
  */
 export function validateRunPlanRequest(request: PlanRequest): void {
@@ -412,6 +412,16 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     if (frame.tSec < prevTsec) {
       throw new Error(
         `runPlan: frames[${i}].tSec must not be earlier than the previous frame`,
+      );
+    }
+    // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+    // a frame timestamp past durationSec would mislabel that proof
+    // frame's time on the plan screen, while the route already fails
+    // fast on the same input. A direct runPlan caller gets the same
+    // fail-fast here instead of only via the route.
+    if (frame.tSec > request.durationSec) {
+      throw new Error(
+        `runPlan: frames[${i}].tSec must not exceed durationSec`,
       );
     }
     prevTsec = frame.tSec;
