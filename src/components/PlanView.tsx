@@ -15,7 +15,7 @@ const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${uni
 
 function Section({ title, children, id, className }: { title: string; children: React.ReactNode; id?: string; className?: string }) {
   return (
-    <section id={id} className={className ? `mt-10 ${className}` : "mt-10"}>
+    <section id={id} className={className ? `mt-10 scroll-mt-32 ${className}` : "mt-10 scroll-mt-32"}>
       <h2 className="mb-3 text-xl font-extrabold">{title}</h2>
       {children}
     </section>
@@ -127,6 +127,17 @@ export function PlanView({
     ...(plan.costRange ? [{ label: "Rough cost", value: `${usd(plan.costRange.low)}–${usd(plan.costRange.high)}`, small: true }] : []),
   ];
 
+  // Sticky section chips: one per section that actually renders, so no chip points at nothing.
+  const showSaid = narrated && !!plan.saidVsSeen && plan.saidVsSeen.length > 0;
+  const chips: { href: string; label: string }[] = [
+    { href: "#problems", label: "Problems" },
+    ...(showSaid ? [{ href: "#said-vs-saw", label: "Said vs saw" }] : []),
+    { href: "#counts", label: "Counts" },
+    { href: "#steps", label: "Steps" },
+    { href: "#materials", label: "Materials" },
+    ...(plan.costRange ? [{ href: "#cost", label: "Cost" }] : []),
+  ];
+
   return (
     <article>
       {plan.meta?.isExample && (
@@ -210,6 +221,24 @@ export function PlanView({
         </Section>
       )}
 
+      <nav
+        aria-label="Plan sections"
+        className="sticky top-[calc(3.5rem+1px+env(safe-area-inset-top))] z-10 -mx-4 mt-6 border-b border-ink/10 bg-paper/90 backdrop-blur supports-[backdrop-filter]:bg-paper/75 sm:-mx-6 print:hidden"
+      >
+        <ul className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+          {chips.map((c) => (
+            <li key={c.href} className="shrink-0">
+              <a
+                href={c.href}
+                className="inline-flex min-h-11 items-center rounded-full border border-ink/15 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+              >
+                {c.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
         {plan.issues.length > 0 && !masks && (
@@ -243,7 +272,7 @@ export function PlanView({
       </Section>
 
       {narrated && plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
-        <Section title="What you said vs. what we saw">
+        <Section title="What you said vs. what we saw" id="said-vs-saw">
           <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
             {plan.saidVsSeen.map((row, i) => (
               <li key={i} className="grid gap-1 p-3 text-sm sm:grid-cols-2 sm:gap-3">
@@ -261,7 +290,7 @@ export function PlanView({
         </Section>
       )}
 
-      <Section title="What's there">
+      <Section title="What's there" id="counts">
         {plan.inventory.length === 0 && <Empty>Nothing was counted in this video.</Empty>}
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {plan.inventory.map((item) => (
@@ -279,7 +308,7 @@ export function PlanView({
         )}
       </Section>
 
-      <Section title="Do the work in this order">
+      <Section title="Do the work in this order" id="steps">
         {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
         <ol className="space-y-3">
           {plan.workOrder.map((step) => (
@@ -299,7 +328,7 @@ export function PlanView({
         </ol>
       </Section>
 
-      <Section title="Materials">
+      <Section title="Materials" id="materials">
         {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
         <ul className={plan.materials.length ? "divide-y divide-ink/10 rounded-2xl bg-white" : "hidden"}>
           {plan.materials.map((m) => (
@@ -330,7 +359,7 @@ export function PlanView({
       )}
 
       {plan.costRange && (
-        <Section title="What it might cost">
+        <Section title="What it might cost" id="cost">
           <div className="rounded-2xl bg-white p-5">
             <p className="text-3xl font-extrabold tabular-nums">
               <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
