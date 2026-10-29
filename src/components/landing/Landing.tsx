@@ -44,6 +44,14 @@ const audiences = [
   { title: "Churches and nonprofits.", body: "Turn a walkthrough into a volunteer work-day list." },
 ];
 
+/** The Meta models in the pipeline, in the order a run uses them. All four ran on the featured real run (Oct 29). */
+const metaModels = [
+  { name: "Muse Voice Transcribe", role: "Turns what you say on the walkthrough into text." },
+  { name: "SAM 3.1", role: "Outlines and counts what's in the room, frame by frame." },
+  { name: "Muse Spark Open", role: "Compares what you said with what it saw, then writes the plan. Meta open weights, on Baseten." },
+  { name: "Muse Image", role: "Draws an AI concept of the finished space." },
+];
+
 /** Fine print. Cost and after-picture lines join only if those steps run at submission. */
 const finePrint = [
   "Counts are approximate, from what the camera saw.",
@@ -55,7 +63,7 @@ const secondary = `inline-flex min-h-[44px] items-center justify-center rounded-
 /**
  * Landing page at /. Static server component, no client JS.
  * Copy is word for word from the agreed Conclusion in the design handoff: header, hero, how it works,
- * the said-vs-saw band, what you get, who it's for, built on Meta's open models, fine print,
+ * the said-vs-saw band, what you get, who it's for, built on Meta's models, fine print,
  * closing CTA and footer.
  */
 export function Landing() {
@@ -178,12 +186,17 @@ export function Landing() {
 
         <section aria-labelledby="meta-heading" className="border-t border-ink/10">
           <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
-            <h2 id="meta-heading" className="text-[28px] font-extrabold leading-tight">Built on Meta&apos;s open models</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink/75">
-              SightWork plans the work with Muse Spark Open, Meta&apos;s open-weights model, running on Baseten, and reads your
-              narration with Muse Voice Transcribe.
-            </p>
-            <p className="mt-3 text-sm text-ink/70">Built for the Meta AI Developer Hackathon 2026.</p>
+            <h2 id="meta-heading" className="text-[28px] font-extrabold leading-tight">Built on Meta&apos;s models</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink/75">Four Meta models, one job each.</p>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {metaModels.map((m) => (
+                <li key={m.name} className="rounded-2xl border border-ink/10 bg-white p-5">
+                  <h3 className="text-lg font-bold">{m.name}</h3>
+                  <p className="mt-2 text-base leading-relaxed text-ink/75">{m.role}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-sm text-ink/70">Built for the Meta AI Developer Hackathon 2026.</p>
           </div>
         </section>
 
