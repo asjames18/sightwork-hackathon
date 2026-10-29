@@ -391,6 +391,12 @@ export function validateRunPlanRequest(request: PlanRequest): void {
   if (!Array.isArray(request.frames) || request.frames.length === 0) {
     throw new Error("runPlan: frames must be a non-empty array");
   }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+  // frames must arrive in walkthrough order (non-decreasing tSec) —
+  // the reason subset picks evenly spaced frames by position, so an
+  // out-of-order request would silently mis-order the comparison, while
+  // the route already fails fast on the same input.
+  let prevTsec = 0;
   request.frames.forEach((frame, i) => {
     if (
       frame === null ||
@@ -403,6 +409,12 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     ) {
       throw new Error(`runPlan: frames[${i}] has no valid tSec/dataUrl`);
     }
+    if (frame.tSec < prevTsec) {
+      throw new Error(
+        `runPlan: frames[${i}].tSec must not be earlier than the previous frame`,
+      );
+    }
+    prevTsec = frame.tSec;
   });
   for (const field of ["spaceName", "spaceType", "region"] as const) {
     if (request[field] !== undefined && typeof request[field] !== "string") {
