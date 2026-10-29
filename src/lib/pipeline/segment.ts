@@ -26,11 +26,16 @@
  *   is set only when the split had to drop concepts.
  * - "exit sign" is in both lists, so it is run once (in the hazard
  *   pass) and the result is reused for the count pass; no second call.
- * - Counts are never summed across frames (frames overlap as the
- *   camera pans). For each concept, count = the max instance count
- *   seen in any single frame; confidence = the mean SAM score of the
- *   instances in that frame, rounded to 2 decimals. A label whose max
- *   count is 0 is omitted.
+ * - Counts are summed across zones, never across frames in one zone
+ *   (frames overlap as the camera pans). For each concept, a zone's
+ *   count = the max instance count seen in any single count frame
+ *   in that zone; total = the sum of the per-zone maxima, floored
+ *   at the whole-video single-frame max. Confidence = the mean SAM
+ *   score of the instances in each zone's best frame, rounded to 2
+ *   decimals. A label whose total is 0 is omitted. Frames without a
+ *   zoneId form their own zone (omit zoneId everywhere and the take
+ *   is one zone, as before); a numbered zone never merges with
+ *   unzoned frames.
  * - flaggedFrames = sorted, unique indices of frames with at least
  *   one hazard-concept instance at or above minScore.
  * - hazardHits = for each flagged frame and hazard key, the
@@ -140,6 +145,13 @@ export interface SegmentFrame {
   tSec: number;
   /** Data URL of the still image, attached to the model call in order. */
   dataUrl: string;
+  /**
+   * Browser zone id from PlanRequest.frames (proposal B): frames
+   * from the same physical area share one small integer from 0.
+   * Omit it and the frame joins the unzoned zone; omit it on every
+   * frame and the take counts as one zone, as before.
+   */
+  zoneId?: number;
 }
 
 export interface SegmentInput {
@@ -457,6 +469,12 @@ export function validateSegmentInput(input: SegmentInput): void {
     ) {
       throw new Error(`segment: frame ${i} has no valid tSec/dataUrl`);
     }
+    if (
+      f.zoneId !== undefined &&
+      (!Number.isInteger(f.zoneId) || f.zoneId < 0)
+    ) {
+      throw new Error(`segment: frame ${i} zoneId must be a whole number >= 0`);
+    }
     // Parity with the route validator (src/lib/pipeline/planRequest.ts)
     // and validateRunPlanRequest/validateReasonRequest: a frame
     // dataUrl must be a data:image base64 URL carrying a real image
@@ -648,31 +666,58 @@ export async function runSegment(
   }
   assemble(await runWithConcurrency(countTasks, concurrency));
 
-  const perConcept = new Map<string, { frameIndex: number; count: number; scores: number[] }>();
+  // Per-zone best frame per concept: the zone key is the frame's
+  // zoneId, or "unzoned" when the client sent none (unzoned frames
+  // share one zone but never merge with a numbered zone). Ties keep
+  // the earliest frame, as the old single-zone max did.
+  const zoneKeyFor = (frameIndex: number): string => {
+    const z = input.frames[frameIndex].zoneId;
+    return z === undefined ? "unzoned" : `zone:${z}`;
+  };
+  const perZone = new Map<
+    string,
+    Map<string, { frameIndex: number; count: number; scores: number[] }>
+  >();
   for (const concept of activeCounts) {
+    const zones = new Map<string, { frameIndex: number; count: number; scores: number[] }>();
     for (const frameIndex of plan.countFrames) {
       const kept = results.get(`${concept.prompt}|${frameIndex}`) ?? [];
-      const prev = perConcept.get(concept.label);
-      // Max-per-frame floor; ties keep the earliest frame.
+      const key = zoneKeyFor(frameIndex);
+      const prev = zones.get(key);
       if (prev === undefined || kept.length > prev.count) {
-        perConcept.set(concept.label, {
+        zones.set(key, {
           frameIndex,
           count: kept.length,
           scores: kept.map((inst) => inst.score),
         });
       }
     }
+    perZone.set(concept.label, zones);
   }
 
   const counts = activeCounts
     .map((concept) => {
-      const best = perConcept.get(concept.label);
-      if (best === undefined || best.count === 0) return null;
-      const mean = best.scores.reduce((a, b) => a + b, 0) / best.scores.length;
+      const zones = perZone.get(concept.label);
+      if (zones === undefined) return null;
+      let total = 0;
+      let scoreSum = 0;
+      let scoreCount = 0;
+      let floor = 0;
+      for (const best of zones.values()) {
+        total += best.count;
+        scoreSum += best.scores.reduce((a, b) => a + b, 0);
+        scoreCount += best.scores.length;
+        if (best.count > floor) floor = best.count;
+      }
+      if (total === 0) return null;
+      // The sum already meets the floor when zones partition the
+      // frames (a single frame sits in exactly one zone); the max
+      // guards the count anyway, per proposal B.
+      total = Math.max(total, floor);
       return {
         label: concept.label,
-        count: best.count,
-        confidence: Math.round(mean * 100) / 100,
+        count: total,
+        confidence: Math.round((scoreSum / scoreCount) * 100) / 100,
       };
     })
     .filter((c) => c !== null);
