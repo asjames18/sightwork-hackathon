@@ -1,6 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
-import { test, expect, WALKTHROUGH, SHORT_CLIP } from "./helpers";
+import { test, expect, WALKTHROUGH, SHORT_CLIP, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
 
 // Every test uses both fixtures, so /api stays blocked and console errors fail the test.
 test.beforeEach(async ({ apiCalls, pageErrors }) => {
@@ -9,17 +7,6 @@ test.beforeEach(async ({ apiCalls, pageErrors }) => {
 });
 
 const UPLOAD_H1 = "Film a walkthrough. Get a work plan.";
-
-async function expectNoAxeViolations(page: Page, label: string) {
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
-    .analyze();
-  expect(violations.map((v) => `${v.id} (${v.nodes.length})`), `axe on ${label}`).toEqual([]);
-}
-
-async function expectNoSideScroll(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-}
 
 test("landing opens the upload screen with the filming tips", async ({ page }) => {
   await page.goto("/");
