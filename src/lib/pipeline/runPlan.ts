@@ -365,6 +365,63 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
   }
 }
 
+
+/**
+ * Shape check for a direct runPlan caller. The route already deep-validates
+ * the body with validatePlanRequest (src/lib/pipeline/planRequest.ts), but
+ * runPlan is also callable on its own, and until now it trusted the request
+ * outright: a non-object request threw a bare TypeError, and an
+ * empty-frames request paid for transcription before the segment step
+ * failed. This fails fast, before the first step, with the same
+ * "runPlan: ..." phrasing as validateRunPlanDeps. Shape only: it does not
+ * re-check image headers, WAV format, or frame order, which stay with the
+ * route validator and the step validators.
+ */
+export function validateRunPlanRequest(request: PlanRequest): void {
+  if (request === null || typeof request !== "object" || Array.isArray(request)) {
+    throw new Error("runPlan: request is not an object");
+  }
+  if (
+    typeof request.durationSec !== "number" ||
+    !Number.isFinite(request.durationSec) ||
+    request.durationSec < 0
+  ) {
+    throw new Error("runPlan: durationSec must be a number >= 0");
+  }
+  if (!Array.isArray(request.frames) || request.frames.length === 0) {
+    throw new Error("runPlan: frames must be a non-empty array");
+  }
+  request.frames.forEach((frame, i) => {
+    if (
+      frame === null ||
+      typeof frame !== "object" ||
+      typeof frame.tSec !== "number" ||
+      !Number.isFinite(frame.tSec) ||
+      frame.tSec < 0 ||
+      typeof frame.dataUrl !== "string" ||
+      frame.dataUrl.trim().length === 0
+    ) {
+      throw new Error(`runPlan: frames[${i}] has no valid tSec/dataUrl`);
+    }
+  });
+  for (const field of ["spaceName", "spaceType", "region"] as const) {
+    if (request[field] !== undefined && typeof request[field] !== "string") {
+      throw new Error(`runPlan: ${field} must be a string when given`);
+    }
+  }
+  if (request.audioWavBase64 !== undefined && typeof request.audioWavBase64 !== "string") {
+    throw new Error("runPlan: audioWavBase64 must be a string when given");
+  }
+  if (
+    request.laborBasis !== undefined &&
+    request.laborBasis !== "volunteer" &&
+    request.laborBasis !== "contractor" &&
+    request.laborBasis !== "mixed"
+  ) {
+    throw new Error("runPlan: laborBasis must be volunteer, contractor, or mixed when given");
+  }
+}
+
 /**
  * Run the full pipeline for one request. The segment stage covers both
  * the "looking" and "counting" UI steps (one SAM pass does hazards and
@@ -418,6 +475,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // listening: transcribe the narration, or null when there is none.
   assertNotAborted(deps.signal);
   validateRunPlanDeps(deps);
+  validateRunPlanRequest(request);
   emit("listening");
   let transcript: string | null;
   let transcriptTurns: NonNullable<WorkPlan["transcriptTurns"]>;
