@@ -102,7 +102,10 @@ export function SightWorkFlow() {
             <span>
               Sight<span className="text-accent">Work</span>
             </span>
-            <span className="hidden text-sm font-medium tracking-normal text-ink/65 md:inline">Film a walkthrough. Get a work plan.</span>
+            {/* The upload screen's H1 already says this, so the tagline only shows on processing and plan. */}
+            {stage.kind !== "upload" && (
+              <span className="hidden text-sm font-medium tracking-normal text-ink/65 md:inline">Film a walkthrough. Get a work plan.</span>
+            )}
           </button>
           <div className="flex shrink-0 items-center gap-2">
             {/* Back to the landing's explainer. On phones the plan header already holds Save PDF and New, so it waits for sm there. */}
