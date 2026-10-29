@@ -284,7 +284,8 @@ function shapeProblems(json: unknown): string[] {
  * or garbage result. Shape-only checks for segmentation: runReason
  * never reads it directly (it rides into the prompt through
  * buildReasonPrompt), so flaggedFrames are checked as integers >= 0
- * but not range-checked against frames here.
+ * but not range-checked against frames here, and counts are checked
+ * as whole numbers, since a fractional count is not a count.
  */
 export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): void {
   if (!input || typeof input !== "object") {
@@ -315,13 +316,16 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
       throw new Error("reason: segmentation.counts must be an array");
     }
     seg.counts.forEach((c, i) => {
+      // Counts are whole instances (the segment step takes a max over
+      // frames): a fractional count used to pass this check and ride
+      // into the reason prompt as nonsense like "2.5 chairs".
       if (
         !c ||
         typeof c !== "object" ||
         typeof c.label !== "string" ||
         c.label.trim().length === 0 ||
         typeof c.count !== "number" ||
-        !Number.isFinite(c.count) ||
+        !Number.isInteger(c.count) ||
         c.count < 0 ||
         typeof c.confidence !== "number" ||
         !Number.isFinite(c.confidence) ||
@@ -408,3 +412,4 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   if (best !== null) return { ...best.output, warnings: best.errs };
   throw new Error(`reason: no schema-valid result after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
+
