@@ -144,6 +144,7 @@ export function SightWorkFlow() {
           steps={PLAN_STEPS}
           current={current}
           videoName={stage.file.name}
+          videoFile={stage.file}
           failure={job?.state === "failed" ? { message: job.message } : null}
           onRetry={() => setStage({ kind: "processing", file: stage.file, run: stage.run + 1 })}
           onExample={showExample}

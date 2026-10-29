@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlanStep } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS } from "@/lib/client/engines";
 
@@ -41,6 +41,7 @@ export function ProcessingStep({
   steps,
   current,
   videoName,
+  videoFile,
   failure,
   onRetry,
   onExample,
@@ -50,6 +51,8 @@ export function ProcessingStep({
   steps: PlanStep[];
   current: number;
   videoName: string;
+  /** The picked video, used only to show its first frame as a small thumbnail next to the name. */
+  videoFile?: File | null;
   failure?: StepFailure | null;
   onRetry?: () => void;
   onExample?: () => void;
@@ -59,6 +62,7 @@ export function ProcessingStep({
   skipped?: readonly PlanStep[];
 }) {
   const ENGINE = engines ?? currentStepEngines();
+  const thumb = useObjectUrl(videoFile);
   const failed = Boolean(failure);
   // When a run stops, move keyboard and screen-reader focus to "Try again" (focus also scrolls it into
   // view on a phone, where the failure card sits below the step list).
@@ -74,9 +78,23 @@ export function ProcessingStep({
   return (
     <section aria-live="polite">
       <h1 className="text-2xl font-extrabold sm:text-3xl">{failed ? "We couldn't finish your plan" : "Working on your plan"}</h1>
-      <p className="mt-1 truncate text-sm text-ink/65" title={videoName}>
-        {videoName}
-      </p>
+      <div className="mt-2 flex min-w-0 items-center gap-3">
+        {thumb && (
+          // First frame of the walkthrough (the #t fragment makes phones paint a frame without playing).
+          <video
+            aria-hidden="true"
+            tabIndex={-1}
+            src={`${thumb}#t=0.1`}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-12 w-16 shrink-0 rounded-lg bg-ink/10 object-cover"
+          />
+        )}
+        <p className="min-w-0 truncate text-sm text-ink/70" title={videoName}>
+          {videoName}
+        </p>
+      </div>
 
       <div className="mt-5">
         <p className="text-sm font-semibold">
@@ -183,4 +201,19 @@ export function ProcessingStep({
       )}
     </section>
   );
+}
+
+/** A blob URL for the picked file, revoked when the file changes or the screen goes away. */
+function useObjectUrl(file?: File | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => {
+      URL.revokeObjectURL(u);
+      setUrl(null);
+    };
+  }, [file]);
+  return file ? url : null;
 }
