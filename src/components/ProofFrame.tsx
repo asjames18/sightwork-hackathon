@@ -21,14 +21,14 @@ export function ProofFrame({
   caption,
   outlineUnavailable = false,
   priority = false,
-  frameOnlyLabel = "Frame only, outline coming soon",
+  frameOnlyLabel = "Frame only, outlines off this run",
 }: {
   frame: PlanFrame | undefined;
   box?: Box;
   caption?: string;
   outlineUnavailable?: boolean;
   priority?: boolean;
-  /** Badge on a frame with no box when outlines are unavailable (samples say just "Frame only"). */
+  /** Badge on a frame with no box when outlines are unavailable. Real runs say outlines were off this run (as "Made with" does); samples say just "Frame only". */
   frameOnlyLabel?: string;
 }) {
   if (!frame)

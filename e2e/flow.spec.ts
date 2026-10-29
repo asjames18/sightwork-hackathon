@@ -116,3 +116,27 @@ test("the server gate answers 401 to an API call with no tester code", async ({ 
   expect(res.status()).toBe(401);
   expect(res.headers()["cache-control"]).toContain("no-store");
 });
+
+test("a step failure (?fail=planning) shows the error card, and Try again runs it again", async ({ page }) => {
+  await page.goto("/start?fail=planning");
+  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
+  const retry = page.getByRole("button", { name: "Try again" });
+  await expect(retry).toBeFocused();
+  await expectNoAxeViolations(page, "failure card");
+  await retry.click();
+  await expect(page.getByRole("heading", { level: 1, name: "Working on your plan" })).toBeVisible();
+});
+
+test("?mock=nometa: SAM and the after picture show as skipped, the plan still comes back", async ({ page }) => {
+  await page.goto("/start?mock=nometa");
+  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  // Looking and Counting flip to skipped once Comparing starts (the step state is announced as text).
+  await expect(page.getByText(/skipped this run/i).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Off this run").first()).toBeVisible();
+  // The stand-in plan is hand-written, so its frames don't promise outlines.
+  await expect(page.getByText(/coming soon/i)).toHaveCount(0);
+});

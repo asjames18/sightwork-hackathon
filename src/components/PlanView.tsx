@@ -64,7 +64,7 @@ function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
 }
 
 /** Where the after picture goes when there isn't one yet: the real frame, dimmed, with a plain note. */
-function AfterSlot({ frame }: { frame: PlanFrame | undefined }) {
+function AfterSlot({ frame, sample = false }: { frame: PlanFrame | undefined; sample?: boolean }) {
   return (
     <figure className="relative overflow-hidden rounded-2xl bg-ink">
       {frame ? (
@@ -74,10 +74,14 @@ function AfterSlot({ frame }: { frame: PlanFrame | undefined }) {
         <div aria-hidden className="aspect-video w-full bg-gradient-to-br from-ink to-ink/70" />
       )}
       <figcaption className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-4 text-center text-white">
-        <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">Coming soon</span>
+        <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+          {sample ? "Real runs only" : "Coming soon"}
+        </span>
         <span className="text-lg font-bold sm:text-xl">After picture</span>
         <span className="max-w-sm text-sm text-white/75">
-          An AI concept of the finished space will show here. The plan above is complete without it.
+          {sample
+            ? "On a real run, Muse Image draws an AI concept of the finished space here. This sample was written by hand."
+            : "An AI concept of the finished space will show here. The plan above is complete without it."}
         </span>
       </figcaption>
     </figure>
@@ -126,8 +130,9 @@ export function PlanView({
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
-  // Hand-written samples never ran the outline step, so they don't promise outlines "coming soon".
-  const sample = example?.kind === "sample";
+  // Hand-written samples (example cards, or the stand-in plan shown after a preview upload) never ran the
+  // outline step, so their frames just say "Frame only".
+  const sample = example?.kind === "sample" || (!example && plan.meta?.isExample === true);
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
@@ -490,11 +495,11 @@ export function PlanView({
         )}
       </div>
 
-      {/* The "coming soon" placeholder is screen-only: a saved PDF shows just the finished plan.
+      {/* The after-picture placeholder is screen-only: a saved PDF shows just the finished plan.
           When the after-image step was skipped this run, no slot at all: "Made with" already says it was off. */}
       {!plan.afterImageUrl && !plan.meta?.skipped?.afterImage && plan.workOrder.length > 0 && (
         <Section title="After the work" className="print:hidden">
-          <AfterSlot frame={slotFrame} />
+          <AfterSlot frame={slotFrame} sample={sample} />
         </Section>
       )}
 
