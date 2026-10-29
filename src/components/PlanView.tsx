@@ -273,11 +273,17 @@ export function PlanView({
               : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
-        <ol className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <ol className="flex flex-col gap-3">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
             return (
-              <li key={issue.rank} className={`min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm ${SEVERITY_BORDER[issue.severity]}`}>
+              <li
+                key={issue.rank}
+                className={`min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm ${SEVERITY_BORDER[issue.severity]} ${
+                  issue.status !== "mentioned_not_seen" ? "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] md:items-start md:gap-4" : ""
+                }`}
+              >
+                <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
                   <span className="text-xs font-semibold uppercase tracking-wide text-ink/70">{SEVERITY_LABEL[issue.severity]} priority</span>
@@ -285,8 +291,9 @@ export function PlanView({
                 </div>
                 <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
                 <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
+                </div>
                 {issue.status !== "mentioned_not_seen" && (
-                  <div className="mt-3">
+                  <div className="mt-3 min-w-0 md:mt-0">
                     <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} outlineUnavailable={!masks} />
                   </div>
                 )}
