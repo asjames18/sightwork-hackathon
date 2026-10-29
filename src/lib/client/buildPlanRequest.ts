@@ -1,5 +1,6 @@
 import type { LaborBasis, PlanRequest } from "@/lib/types";
 import type { BuildPlanRequest } from "./apiPlanJob";
+import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -25,6 +26,11 @@ export interface BuildOptions {
   audioSampleRate?: number;
   /** Total request budget in bytes (the route caps at 10 MB). Default 9 MB, leaving room for JSON. */
   maxRequestBytes?: number;
+  /**
+   * Group the take into zones and send each frame's zoneId (proposal B). Default true. Off, or when
+   * the browser can't read pixels back, frames go without zoneId and the pipeline sees one zone.
+   */
+  zones?: boolean;
 }
 
 const DEFAULTS = {
@@ -33,6 +39,7 @@ const DEFAULTS = {
   longSide: 1024,
   audioSampleRate: 16000,
   maxRequestBytes: 9 * 1024 * 1024,
+  zones: true,
 };
 
 /** Sample rates the transcribe step accepts. */
@@ -190,6 +197,28 @@ async function extractNarration(file: File, sampleRate: number, signal: AbortSig
   return isSilent(mono) ? null : encodeWav(mono, sampleRate);
 }
 
+/**
+ * Adds zoneId to each frame when there's one signature per frame. Anything else (zones off, a
+ * browser that refused getImageData) leaves the frames as they are.
+ */
+export function withZoneIds(frames: PlanRequest["frames"], signatures: (FrameSignature | null)[]): PlanRequest["frames"] {
+  if (frames.length === 0 || signatures.length !== frames.length || signatures.some((s) => s === null)) return frames;
+  const ids = assignZones(signatures as FrameSignature[]);
+  return frames.map((f, i) => ({ ...f, zoneId: ids[i] }));
+}
+
+/** Small RGBA thumbnail of the current canvas, signed for zone grouping. Null if pixels can't be read. */
+function signCanvas(source: HTMLCanvasElement, thumb: CanvasRenderingContext2D | null): FrameSignature | null {
+  if (!thumb) return null;
+  try {
+    thumb.drawImage(source, 0, 0, SIGNATURE_SIDE, SIGNATURE_SIDE);
+    const { data } = thumb.getImageData(0, 0, SIGNATURE_SIDE, SIGNATURE_SIDE);
+    return frameSignature(data, SIGNATURE_SIDE, SIGNATURE_SIDE);
+  } catch {
+    return null;
+  }
+}
+
 /** Encodes the canvas at the highest quality that fits maxChars. */
 function encodeFrame(canvas: HTMLCanvasElement, maxChars: number): string {
   let url = "";
@@ -238,12 +267,23 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       const g = canvas.getContext("2d");
       if (!g) throw new BuildRequestError("This browser can't read video frames. Try Chrome or Safari.");
 
-      const frames: PlanRequest["frames"] = [];
+      let thumb: CanvasRenderingContext2D | null = null;
+      if (o.zones) {
+        const tc = document.createElement("canvas");
+        tc.width = SIGNATURE_SIDE;
+        tc.height = SIGNATURE_SIDE;
+        thumb = tc.getContext("2d", { willReadFrequently: true });
+      }
+
+      let frames: PlanRequest["frames"] = [];
+      const signatures: (FrameSignature | null)[] = [];
       for (const t of times) {
         await seek(video, t, signal);
         g.drawImage(video, 0, 0, w, h);
         frames.push({ tSec: t, dataUrl: encodeFrame(canvas, perFrame) });
+        if (o.zones) signatures.push(signCanvas(canvas, thumb));
       }
+      if (o.zones) frames = withZoneIds(frames, signatures);
       video.removeAttribute("src");
       video.load();
 
