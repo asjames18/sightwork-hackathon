@@ -29,6 +29,9 @@ export interface PlanFrame {
   /** Image URL (http(s), relative, or data: URL). */
   url: string;
   reason?: FrameReason;
+  /** Pixel size of the image when known (bundled example frames), so the page can reserve its space before it loads. */
+  width?: number;
+  height?: number;
 }
 
 /** A pointer to a frame that proves something, with an optional box. */

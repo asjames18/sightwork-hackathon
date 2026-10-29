@@ -7,6 +7,7 @@ import type { WorkPlan } from "../types";
 import sanctuaryRun from "./sanctuary-run.json";
 import { classroomSample, officeSample, warehouseSample } from "./samples";
 import { kitchenSample } from "./kitchen";
+import { withFrameSizes } from "./frameSizes";
 
 export type ExampleKind = "real" | "sample";
 
@@ -26,7 +27,7 @@ export interface Example {
 }
 
 /** Real run, Oct 29, 2026, 11:30 AM ET: frames and after picture re-hosted as files, church logo covered. */
-const sanctuaryPlan = { ...(sanctuaryRun as unknown as WorkPlan) };
+const sanctuaryPlan = withFrameSizes({ ...(sanctuaryRun as unknown as WorkPlan) });
 
 export const EXAMPLES: Example[] = [
   {
@@ -35,7 +36,7 @@ export const EXAMPLES: Example[] = [
     title: "Older home kitchen renovation",
     blurb: "45-second walkthrough. 6 problems, 3 you didn't mention, 8 steps in order.",
     thumb: "/examples/kitchen/f1.webp",
-    plan: kitchenSample,
+    plan: withFrameSizes(kitchenSample),
     banner:
       "Sample plan written by hand on 7 stock photos from one kitchen renovation, with a sample narration, to show what a plan looks like. Not a SightWork run.",
     credit: { author: "Tomwsulcer", license: "CC0", url: "https://commons.wikimedia.org/wiki/User:Tomwsulcer" },
@@ -56,7 +57,7 @@ export const EXAMPLES: Example[] = [
     title: "Vacant school classroom",
     blurb: "Ceiling down, standing water: what to make safe first.",
     thumb: "/examples/samples/classroom.webp",
-    plan: classroomSample,
+    plan: withFrameSizes(classroomSample),
     banner: "Sample plan written by hand on one stock photo, to show the format for a classroom. Not a SightWork run.",
     credit: { author: "Warren LeMay", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Classroom,_Log_Cabin_Association_Elementary_School,_Barkers_Creek,_NC_(46649210201).jpg" },
   },
@@ -66,7 +67,7 @@ export const EXAMPLES: Example[] = [
     title: "Empty office before move-in",
     blurb: "Door closer, floor covers and cleanup in the right order.",
     thumb: "/examples/samples/office.webp",
-    plan: officeSample,
+    plan: withFrameSizes(officeSample),
     banner: "Sample plan written by hand on one stock photo, to show the format for an office. Not a SightWork run.",
     credit: { author: "Sam X (Unsplash)", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Neglected_office_plants_(Unsplash).jpg" },
   },
@@ -76,7 +77,7 @@ export const EXAMPLES: Example[] = [
     title: "Warehouse floor",
     blurb: "Blocked aisles, loose stock and rack checks.",
     thumb: "/examples/samples/warehouse.webp",
-    plan: warehouseSample,
+    plan: withFrameSizes(warehouseSample),
     banner: "Sample plan written by hand on one stock photo, to show the format for a warehouse. Not a SightWork run.",
     credit: { author: "Charly Birdsinger (Unsplash)", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Industrial_storage_area_(Unsplash).jpg" },
   },

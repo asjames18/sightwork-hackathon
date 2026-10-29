@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Box, PlanFrame } from "@/lib/types";
 
 /**
@@ -9,17 +10,23 @@ import type { Box, PlanFrame } from "@/lib/types";
  * `outlineUnavailable`: the outline step (SAM) did not run for this plan, so a frame without a
  * box says so instead of looking broken, and a box that is there (from the plan step, not SAM) is drawn
  * dashed so it reads as a rough highlight. A missing frame shows a quiet placeholder.
+ *
+ * When the frame's pixel size is known (bundled examples), the frame box is sized up front from its aspect
+ * ratio (same 60vh / 45vh caps), so nothing below it jumps when the image arrives. `priority` loads it
+ * eagerly at high priority, for the frame near the top of the plan.
  */
 export function ProofFrame({
   frame,
   box,
   caption,
   outlineUnavailable = false,
+  priority = false,
 }: {
   frame: PlanFrame | undefined;
   box?: Box;
   caption?: string;
   outlineUnavailable?: boolean;
+  priority?: boolean;
 }) {
   if (!frame)
     return (
@@ -27,15 +34,27 @@ export function ProofFrame({
         Proof frame not available for this problem
       </div>
     );
+  const sized = Boolean(frame.width && frame.height);
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
-      <div className="relative mx-auto w-fit max-w-full">
+      <div
+        className={
+          sized
+            ? "relative mx-auto w-[min(100%,calc(60vh*var(--ar)))] lg:w-[min(100%,calc(45vh*var(--ar)))]"
+            : "relative mx-auto w-fit max-w-full"
+        }
+        style={sized ? ({ "--ar": String(frame.width! / frame.height!) } as CSSProperties) : undefined}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={frame.url}
           alt={caption ?? `Frame at ${frame.tSec} s`}
-          loading="lazy"
-          className="block h-auto max-h-[60vh] w-auto max-w-full lg:max-h-[45vh]"
+          width={frame.width}
+          height={frame.height}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
+          decoding="async"
+          className={sized ? "block h-auto w-full" : "block h-auto max-h-[60vh] w-auto max-w-full lg:max-h-[45vh]"}
         />
         {box && (
           <span

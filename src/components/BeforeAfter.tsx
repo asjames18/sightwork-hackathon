@@ -13,10 +13,10 @@ export function BeforeAfter({ before, after, label }: { before: string; after: s
     <figure>
       <div className="relative overflow-hidden rounded-xl bg-ink">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={after} alt="After (AI concept)" className="block aspect-[4/3] max-h-[70vh] w-full object-cover" />
+        <img src={after} alt="After (AI concept)" fetchPriority="high" className="block aspect-[4/3] max-h-[70vh] w-full object-cover" />
         <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={before} alt="Before (from your video)" className="block h-full w-full object-cover" />
+          <img src={before} alt="Before (from your video)" fetchPriority="high" className="block h-full w-full object-cover" />
         </div>
         <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-sm font-medium text-white">
           Before

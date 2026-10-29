@@ -251,7 +251,7 @@ export function PlanView({
       {/* No after picture: lead with the hero proof frame instead, so the top never shows an empty slot. */}
       {!plan.afterImageUrl && topProof && (
         <Section title="From your video" className="mt-6!">
-          <ProofFrame frame={topProof.frame} box={topProof.box} caption={topProof.caption} outlineUnavailable={!masks} />
+          <ProofFrame frame={topProof.frame} box={topProof.box} caption={topProof.caption} outlineUnavailable={!masks} priority />
         </Section>
       )}
 
