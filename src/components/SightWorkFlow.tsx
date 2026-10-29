@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { PLAN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { pickMockPlan } from "@/lib/mock/pickMockPlan";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
@@ -93,26 +94,35 @@ export function SightWorkFlow() {
             </span>
             <span className="hidden text-sm font-medium tracking-normal text-ink/65 md:inline">Film a walkthrough. Get a work plan.</span>
           </button>
-          {stage.kind === "plan" && (
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                aria-label="Save this plan as a PDF or print it"
-                className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Save PDF
-              </button>
-              <button
-                type="button"
-                onClick={startOver}
-                className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <span className="sm:hidden">New</span>
-                <span className="hidden sm:inline">New walkthrough</span>
-              </button>
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Back to the landing's explainer. On phones the plan header already holds Save PDF and New, so it waits for sm there. */}
+            <Link
+              href="/#how-heading"
+              className={`${stage.kind === "plan" ? "hidden sm:inline-flex" : "inline-flex"} min-h-11 items-center rounded-lg px-2 text-sm font-medium text-ink/70 underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+            >
+              How it works
+            </Link>
+            {stage.kind === "plan" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  aria-label="Save this plan as a PDF or print it"
+                  className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  Save PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={startOver}
+                  className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <span className="sm:hidden">New</span>
+                  <span className="hidden sm:inline">New walkthrough</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -131,7 +141,7 @@ export function SightWorkFlow() {
           skipped={skipped}
         />
       )}
-      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} />}
+      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} onMakeYourOwn={startOver} />}
       </main>
     </>
   );
