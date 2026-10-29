@@ -46,8 +46,13 @@ export interface UsageTracker {
   records(): readonly UsageRecord[];
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+// Costs are kept to 4 decimals, not 2: a sub-cent call (e.g. a SAM
+// segment at $0.0025) rounds to $0 at 2 decimals, so 120 such calls
+// logged $0 total and the spike cap never saw the spend. Four decimals
+// keeps a $0.0025 call exact and still rounds away float dust on the
+// running total (120 x $0.0025 sums to exactly $0.30).
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
 
 export function createUsageTracker(opts?: {
@@ -115,10 +120,10 @@ export function createUsageTracker(opts?: {
       if (!Number.isFinite(input.latencyMs) || input.latencyMs < 0) {
         throw new Error(`usage: latencyMs must be a finite number >= 0, got ${input.latencyMs}`);
       }
-      if (round2(total + input.costUsd) > spikeCapUsd) {
+      if (round4(total + input.costUsd) > spikeCapUsd) {
         throw new Error(
           `usage: spike cap $${spikeCapUsd} would be exceeded ` +
-            `($${round2(total)} spent + $${round2(input.costUsd)} for ${model}/${step})`,
+            `($${round4(total)} spent + $${round4(input.costUsd)} for ${model}/${step})`,
         );
       }
       // Normalize a supplied timestamp to ISO: a parseable but
@@ -130,24 +135,24 @@ export function createUsageTracker(opts?: {
         model,
         step,
         latencyMs: input.latencyMs,
-        costUsd: round2(input.costUsd),
+        costUsd: round4(input.costUsd),
         at: at === undefined ? new Date().toISOString() : new Date(at).toISOString(),
       };
       seen.push(rec);
-      total = round2(total + rec.costUsd);
+      total = round4(total + rec.costUsd);
       // A copy, not the live log entry: a caller mutating the
       // returned record must not rewrite the spike log line.
       return { ...rec };
     },
     canSpend(costUsd: number): boolean {
-      return Number.isFinite(costUsd) && costUsd >= 0 && round2(total + costUsd) <= spikeCapUsd;
+      return Number.isFinite(costUsd) && costUsd >= 0 && round4(total + costUsd) <= spikeCapUsd;
     },
     totals(): UsageTotals {
       return {
         calls: seen.length,
         spikeTotalUsd: total,
-        remainingSpikeUsd: round2(spikeCapUsd - total),
-        remainingCreditUsd: round2(creditTotalUsd - total),
+        remainingSpikeUsd: round4(spikeCapUsd - total),
+        remainingCreditUsd: round4(creditTotalUsd - total),
       };
     },
     records(): readonly UsageRecord[] {
