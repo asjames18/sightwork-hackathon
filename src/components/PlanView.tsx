@@ -328,7 +328,7 @@ export function PlanView({
       >
         {plan.inventory.length === 0 && <Empty>Nothing was counted in this video.</Empty>}
         {/* Tiles grow to fill their row, so an odd last row (3 + 2, or 2 + 1 on phones) has no empty slot; four tiles stay 2 + 2. */}
-        <ul className="flex flex-wrap gap-3">
+        <ul className="flex flex-wrap gap-3 print:break-inside-avoid">
           {plan.inventory.map((item) => (
             <li key={item.label} className={`min-w-0 grow basis-[calc(50%-0.375rem)] rounded-2xl bg-white p-4 ${plan.inventory.length === 4 ? "" : "sm:basis-[calc(33.333%-0.5rem)]"}`}>
               <p className="text-3xl font-extrabold tabular-nums">{item.range ? range(item.range) : item.count}</p>
