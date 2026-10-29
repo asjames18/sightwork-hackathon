@@ -72,7 +72,13 @@ export interface PlanRequest {
   /** What kind of space was filmed, e.g. "classroom", "office", "church sanctuary". The client sends "room"; the reason and cost prompts also fall back to "room". */
   spaceType?: string;
   durationSec: number;
-  frames: { tSec: number; dataUrl: string }[];
+  /**
+   * Frames in time order. `zoneId` is optional: when the browser groups the take into
+   * zones (scene cuts plus a perceptual hash, so a revisited area gets its earlier id),
+   * frames from the same physical area share one small integer, starting at 0.
+   * Omit it and the pipeline treats the take as one zone.
+   */
+  frames: { tSec: number; dataUrl: string; zoneId?: number }[];
   /** Narration as base64 WAV (mono, 16-bit PCM, 16 or 24 kHz). */
   audioWavBase64?: string;
   /** Region for cost estimates, e.g. "Sebring, FL". Omit it and costRange is null. */
