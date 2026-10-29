@@ -23,13 +23,38 @@ const matched = [
   { said: "That light up there is out.", saw: "One dark fixture" },
 ];
 
+/**
+ * "What you get". The cost line and the after-picture tile are left out on purpose: the agreed copy
+ * shows them only if the cost step and Muse Image actually run at submission.
+ */
+const gets = [
+  { title: "Problems, worst first.", body: "Safety items rise to the top, each with the frame and second where it shows." },
+  { title: "What you said vs. what we saw.", body: "Every request matched to the video, plus anything you missed." },
+  { title: "Counts.", body: "Chairs, lights, speakers and more, counted from the video as an approximate range." },
+  { title: "Work steps in order.", body: "Fix the leak before the ceiling tile. Who does it, about how long, and what it fixes." },
+  { title: "Materials.", body: "A shopping list for the work." },
+];
+
+const audiences = [
+  { title: "Churches and ministries.", body: "Turn a Sunday walkthrough into a volunteer work-day list." },
+  { title: "Schools and campuses.", body: "Classrooms, gyms and auditoriums checked before the next term." },
+  { title: "Facilities and property teams.", body: "A consistent first look at any room, with photos attached." },
+  { title: "Small contractors and handypeople.", body: "Scope a job from a walkthrough before you price it." },
+];
+
+/** Fine print. Cost and after-picture lines join only if those steps run at submission. */
+const finePrint = [
+  "Counts are approximate, from what the camera saw.",
+  "Your video's frames and narration are sent to the AI providers to build your plan, and we don't keep a copy on our servers. The finished plan is saved on your device.",
+];
+
 const secondary = `inline-flex min-h-[44px] items-center justify-center rounded-xl border border-ink/20 bg-white/60 px-6 py-3 text-base font-semibold text-ink hover:border-ink/40 ${ring}`;
 
 /**
  * Landing page at /. Static server component, no client JS.
- * Copy is word for word from the agreed Conclusion in the design handoff. Shipped so far: header,
- * hero, how it works, the said-vs-saw band, closing CTA and footer; the remaining middle sections
- * (what you get, who it's for, built on Meta's open models, fine print) follow in later commits.
+ * Copy is word for word from the agreed Conclusion in the design handoff: header, hero, how it works,
+ * the said-vs-saw band, what you get, who it's for, built on Meta's open models, fine print,
+ * closing CTA and footer.
  */
 export function Landing() {
   return (
@@ -113,6 +138,57 @@ export function Landing() {
               </li>
             </ul>
             <p className="mt-4 text-sm text-ink/70">Example plan, made-up data.</p>
+          </div>
+        </section>
+
+        <section aria-labelledby="get-heading" className="border-t border-ink/10">
+          <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
+            <h2 id="get-heading" className="text-[28px] font-extrabold leading-tight">What you get</h2>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {gets.map((item) => (
+                <li key={item.title} className="rounded-2xl border border-ink/10 bg-white p-5">
+                  <h3 className="text-lg font-bold">{item.title}</h3>
+                  <p className="mt-2 text-base leading-relaxed text-ink/75">{item.body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-base text-ink/75">Plus: save the whole plan as a PDF to share with your team.</p>
+          </div>
+        </section>
+
+        <section aria-labelledby="who-heading" className="border-t border-ink/10 bg-white">
+          <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
+            <h2 id="who-heading" className="text-[28px] font-extrabold leading-tight">Who it&apos;s for</h2>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+              {audiences.map((item) => (
+                <li key={item.title} className="rounded-2xl border border-ink/10 bg-paper p-5">
+                  <h3 className="text-lg font-bold">{item.title}</h3>
+                  <p className="mt-2 text-base leading-relaxed text-ink/75">{item.body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section aria-labelledby="meta-heading" className="border-t border-ink/10">
+          <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
+            <h2 id="meta-heading" className="text-[28px] font-extrabold leading-tight">Built on Meta&apos;s open models</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink/75">
+              SightWork plans the work with Muse Spark Open, Meta&apos;s open-weights model, running on Baseten, and reads your
+              narration with Muse Voice Transcribe.
+            </p>
+            <p className="mt-3 text-sm text-ink/70">Built for the Meta AI Developer Hackathon 2026.</p>
+          </div>
+        </section>
+
+        <section aria-labelledby="fine-heading" className="border-t border-ink/10 bg-white">
+          <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
+            <h2 id="fine-heading" className="text-[28px] font-extrabold leading-tight">The honest fine print</h2>
+            <ul className="mt-6 grid max-w-2xl list-disc gap-3 pl-5 text-base leading-relaxed text-ink/75 marker:text-ink/50">
+              {finePrint.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </div>
         </section>
 
