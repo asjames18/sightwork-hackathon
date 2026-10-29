@@ -17,7 +17,11 @@
  *   frameIndex of the highest-ranked issue whose fix is visible; otherwise
  *   the frame closest to the middle of the video. Whatever is picked is
  *   returned as heroFrameIndex so the wiring can write it back to the
- *   plan and the UI shows the right "before" frame.
+ *   plan and the UI shows the right "before" frame. If the picked frame
+ *   has no visible changes, the step falls back to the highest-ranked
+ *   issue frame that does (recomputing the changes) before skipping:
+ *   a reason step that points at a frame with nothing to fix must not
+ *   silently drop the after image when a ranked issue frame has work.
  * - Visible changes only: issues that appear in the hero frame
  *   (frameIndex or a proof frame), and only the work steps that fix them
  *   and describe something seen (paint, cables, chairs, lights, signs,
@@ -162,6 +166,26 @@ export function pickHeroFrameIndex(plan: WorkPlan): number | null {
  * line (Grok Bot owns the prompt wording); duplicate steps collapse.
  * Empty when nothing visible changes in this frame.
  */
+/**
+ * Fallback hero when the picked frame has no visible changes: the
+ * frameIndex of the highest-ranked issue (rank ascending) that is not
+ * the tried frame, exists in plan.frames, and yields a non-empty
+ * visible-changes list. Null when no ranked issue frame qualifies, so
+ * the caller keeps the original hero and reports the skip.
+ */
+export function pickFallbackHeroFrameIndex(plan: WorkPlan, tried: number): number | null {
+  const ranked = [...plan.issues].sort((a, b) => a.rank - b.rank);
+  const seen = new Set<number>([tried]);
+  for (const issue of ranked) {
+    const candidate = issue.frameIndex;
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    if (!plan.frames?.some((f) => f.index === candidate)) continue;
+    if (buildVisibleChanges(plan, candidate).length > 0) return candidate;
+  }
+  return null;
+}
+
 export function buildVisibleChanges(plan: WorkPlan, hero: number): string[] {
   const heroIssues = plan.issues.filter(
     (issue) =>
@@ -357,11 +381,22 @@ export async function runRenderAfter(
 ): Promise<RenderAfterOutput> {
   validateRenderAfterInput(input);
   const { plan } = input;
-  const hero = pickHeroFrameIndex(plan);
+  let hero = pickHeroFrameIndex(plan);
   if (hero === null) {
     return { afterImageUrl: null, heroFrameIndex: null, visibleChanges: [], skipped: "no-frames" };
   }
-  const visibleChanges = buildVisibleChanges(plan, hero);
+  let visibleChanges = buildVisibleChanges(plan, hero);
+  if (visibleChanges.length === 0) {
+    // The reason step's hero can point at a frame with nothing to
+    // fix (real run 2026-10-29: hero 1, both ranked issues on frames
+    // 6 and 5) while a ranked issue frame has visible work. Fall
+    // back to that frame and recompute before giving up on the image.
+    const fallback = pickFallbackHeroFrameIndex(plan, hero);
+    if (fallback !== null) {
+      hero = fallback;
+      visibleChanges = buildVisibleChanges(plan, hero);
+    }
+  }
   if (visibleChanges.length === 0) {
     return {
       afterImageUrl: null,
