@@ -108,7 +108,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   return (
     <>
       <header className="sticky top-0 z-20 print:hidden border-b border-ink/10 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
-        <div className={`mx-auto flex min-h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 ${width}`}>
+        <div className={`mx-auto flex min-h-14 w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1 sm:px-6 ${width}`}>
           {/* The tagline sits beside the button, not in it, so the button's spoken name starts with the
               word you see ("SightWork"), as voice-control users expect. */}
           <div className="flex min-w-0 items-center gap-2">
@@ -126,7 +126,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
               <span className="hidden whitespace-nowrap text-sm font-medium tracking-normal text-ink/65 lg:inline">Film a walkthrough. Get a work plan.</span>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* Back to the landing's explainer. On phones the plan header already holds Save PDF and New, so it waits for sm there. */}
             <Link
               href="/#how-heading"
