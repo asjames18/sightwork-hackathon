@@ -40,6 +40,7 @@ import {
   type WorkPlan,
 } from "../types";
 import { estimateCost, type CostDeps, type CostInput } from "./cost";
+import { MAX_PLAN_FRAMES } from "./planRequest";
 import {
   runReason,
   type ReasonDeps,
@@ -373,9 +374,10 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
  * outright: a non-object request threw a bare TypeError, and an
  * empty-frames request paid for transcription before the segment step
  * failed. This fails fast, before the first step, with the same
- * "runPlan: ..." phrasing as validateRunPlanDeps. Shape only: it does not
- * re-check image headers or WAV format, which stay with the
- * route validator and the step validators.
+ * "runPlan: ..." phrasing as validateRunPlanDeps. Shape only: it mirrors
+ * the route validator's frame and image checks so a direct caller fails
+ * fast the same way; WAV format stays with the route validator and the
+ * step validators.
  */
 /**
  * True when the string is valid base64, by the same rule the route
@@ -427,6 +429,15 @@ export function validateRunPlanRequest(request: PlanRequest): void {
   }
   if (!Array.isArray(request.frames) || request.frames.length === 0) {
     throw new Error("runPlan: frames must be a non-empty array");
+  }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+  // the browser builder sends at most 48 frames, and the route
+  // rejects more before any model call is spent. A direct runPlan
+  // caller with 49+ frames inside durationSec used to pass here and
+  // only hit the reason step's image limit mid-run; it gets the same
+  // fail-fast here instead of only via the route.
+  if (request.frames.length > MAX_PLAN_FRAMES) {
+    throw new Error(`runPlan: frames must not exceed ${MAX_PLAN_FRAMES}`);
   }
   // Parity with the route validator (src/lib/pipeline/planRequest.ts):
   // frames must arrive in walkthrough order (non-decreasing tSec) —
