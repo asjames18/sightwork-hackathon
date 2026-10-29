@@ -116,6 +116,38 @@ export function parseImageResults(body: Record<string, unknown>, outputFormat: s
   return images;
 }
 
+/** Base64 alphabet plus up to two padding chars, length a multiple of 4. */
+function isBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  return /^[A-Za-z0-9+/]*={0,2}$/.test(stripped) && stripped.length % 4 === 0;
+}
+
+/**
+ * True when the base64 string decodes to a real image header, by the
+ * same magic-byte rule the route validator uses: JPEG (FF D8 FF),
+ * PNG (89 50 4E 47 0D 0A 1A 0A), GIF ("GIF87a"/"GIF89a"), or WebP
+ * ("RIFF" + "WEBP" at bytes 8-11). Only the first 12 bytes are
+ * decoded, with atob (not Buffer) so this pure module stays free of
+ * node types. A payload too short to hold any header fails.
+ */
+function isImageBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  const chunk = stripped.slice(0, 16);
+  if (chunk.length < 8) return false;
+  const head = atob(chunk.length % 4 === 0 ? chunk : chunk.slice(0, chunk.length - (chunk.length % 4)));
+  const b = (i: number): number => head.charCodeAt(i);
+  if (head.length >= 3 && b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return true;
+  if (
+    head.length >= 8 &&
+    b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47 &&
+    b(4) === 0x0d && b(5) === 0x0a && b(6) === 0x1a && b(7) === 0x0a
+  ) return true;
+  if (head.length >= 6 && head.slice(0, 6) === "GIF87a") return true;
+  if (head.length >= 6 && head.slice(0, 6) === "GIF89a") return true;
+  if (head.length >= 12 && head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WEBP") return true;
+  return false;
+}
+
 export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   const apiKey = opts.apiKey ?? readEnv("MODEL_API_KEY") ?? readEnv("META_API_KEY");
   if (!apiKey) {
@@ -162,12 +194,28 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
     if (typeof req.prompt !== "string" || req.prompt.trim().length === 0) {
       throw new Error("image: prompt must be a non-empty string");
     }
-    // A whitespace-only image would otherwise spend a paid Image call
-    // and only fail at the provider: the old length check accepted it.
-    // Reject it here, before any fetch, like the SAM caller does for
-    // its dataUrl. Valid images still pass through unchanged.
+    // Parity with the segment step's validateSegmentInput and the
+    // route validator: image must be a data:image base64 URL
+    // carrying a real image header. A bare string, a data:text URL,
+    // garbage base64, or a text blob re-labelled as an image used to
+    // pass the non-empty check here and spend a paid Image call, only
+    // to fail at the provider, while the route already rejected the
+    // same input. A direct Image caller gets the same fail-fast here,
+    // before any fetch. Valid images still pass through unchanged.
     if (typeof req.image !== "string" || req.image.trim().length === 0) {
       throw new Error("image: image must be a non-empty string");
+    }
+    if (!req.image.startsWith("data:image/") || !req.image.includes(";base64,")) {
+      throw new Error("image: image must be a data:image base64 URL");
+    }
+    {
+      const payload = req.image.slice(req.image.indexOf(";base64,") + 8);
+      if (payload.length === 0 || !isBase64(payload)) {
+        throw new Error("image: image must carry valid base64 image data");
+      }
+      if (!isImageBase64(payload)) {
+        throw new Error("image: image must carry image data (JPEG, PNG, WebP, or GIF)");
+      }
     }
     const wanted = req.n ?? 1;
     if (!Number.isInteger(wanted) || wanted < 1) {
