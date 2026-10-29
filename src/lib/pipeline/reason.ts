@@ -47,7 +47,7 @@ import {
 } from "../types";
 import type { UsageTracker } from "./usage";
 
-/** SAM segmentation result, per prompt 02. Counts are per-frame maxima. */
+/** SAM segmentation result, per prompt 02. Counts are summed across zones (each zone's best frame), floored at the whole-video single-frame max; with no zones the take is one zone, so the count is the old single-frame max. */
 export interface SegmentationResult {
   counts: { label: string; count: number; confidence: number }[];
   /** Sorted, unique frame indices with a hazard-concept instance. */
@@ -57,6 +57,8 @@ export interface SegmentationResult {
 /** One frame handed to the reason step, in array order. */
 export interface ReasonFrame {
   tSec: number;
+  /** Browser zone id from PlanRequest.frames (proposal B), printed in the reason frame list when given; omit it and the frame is unzoned. */
+  zoneId?: number;
   /** Data URL of the still image, attached to the model call in order. */
   dataUrl: string;
 }
