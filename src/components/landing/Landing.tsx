@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LastPlanLink } from "./LastPlanLink";
 
 const ring = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const primary = `inline-flex min-h-[44px] items-center justify-center rounded-xl bg-accent-dark px-6 py-3 text-base font-semibold text-white hover:bg-ink ${ring}`;
@@ -85,6 +86,7 @@ export function Landing() {
             <Link href="/start" className={primary}>Film a walkthrough</Link>
             <Link href="/start?view=example" className={secondary}>See an example plan</Link>
           </div>
+          <LastPlanLink />
           <p className="mt-4 text-sm text-ink/70">Free to try in this demo. No account needed.</p>
           </div>
           <HeroPhone />
