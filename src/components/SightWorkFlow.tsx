@@ -107,7 +107,8 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
 
   return (
     <>
-      <header className="sticky top-0 z-20 print:hidden border-b border-ink/10 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
+      {/* Opaque on purpose: a see-through header over the dark before/after picture dropped the orange "Work" below 3:1 (axe). */}
+      <header className="sticky top-0 z-20 print:hidden border-b border-ink/10 bg-paper pt-[env(safe-area-inset-top)]">
         <div className={`mx-auto flex min-h-14 w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1 sm:px-6 ${width}`}>
           {/* The tagline sits beside the button, not in it, so the button's spoken name starts with the
               word you see ("SightWork"), as voice-control users expect. */}
