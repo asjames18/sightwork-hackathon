@@ -138,6 +138,20 @@ export function validateTranscribeInput(input: TranscribeInput): void {
   ) {
     throw new Error("transcribe: audioWavBase64 is not a string");
   }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts)
+  // and validateRunPlanRequest: an empty string means "not given"
+  // (runTranscribe returns no transcript), but a spaces-only string
+  // is truthy, so it rides past the no-audio skip into audioByteLength
+  // and dies there with a misleading "not a WAV file" error (0 bytes
+  // after stripping). A direct runTranscribe caller gets the same
+  // fail-fast here instead of only via the route.
+  if (
+    typeof input.audioWavBase64 === "string" &&
+    input.audioWavBase64.length > 0 &&
+    input.audioWavBase64.trim().length === 0
+  ) {
+    throw new Error("transcribe: audioWavBase64 must not be blank when given");
+  }
   if (
     input.spaceType !== undefined &&
     (typeof input.spaceType !== "string" || !input.spaceType.trim())
