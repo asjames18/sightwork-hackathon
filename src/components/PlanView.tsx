@@ -89,7 +89,16 @@ function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
   );
 }
 
-export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: string | null }) {
+export function PlanView({
+  plan,
+  videoName,
+  onMakeYourOwn,
+}: {
+  plan: WorkPlan;
+  videoName: string | null;
+  /** Example banner's "Make your own": back to the empty upload stage. */
+  onMakeYourOwn?: () => void;
+}) {
   const frames = plan.frames ?? [];
   const narrated = isNarrated(plan);
   const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
@@ -102,10 +111,21 @@ export function PlanView({ plan, videoName }: { plan: WorkPlan; videoName: strin
   return (
     <article>
       {plan.meta?.isExample && (
-        <p className="mb-4 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-          <strong>Example plan.</strong> Made-up data for a church sanctuary stage
-          {videoName ? `, shown because real analysis isn't connected yet (your video "${videoName}" was not sent anywhere)` : ""}.
-        </p>
+        <div className="mb-4 flex flex-col gap-3 rounded-xl bg-amber-100 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between print:block">
+          <p>
+            <strong>Example plan.</strong> Made-up data for a church sanctuary stage
+            {videoName ? `, shown because real analysis isn't connected yet (your video "${videoName}" was not sent anywhere)` : ""}.
+          </p>
+          {onMakeYourOwn && (
+            <button
+              type="button"
+              onClick={onMakeYourOwn}
+              className="min-h-11 shrink-0 self-start rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-900 sm:self-auto print:hidden"
+            >
+              Make your own
+            </button>
+          )}
+        </div>
       )}
 
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
