@@ -75,6 +75,9 @@ export const DEFAULT_MAX_SAM_REQUESTS = 300;
  */
 export const DEFAULT_SEGMENT_CONCURRENCY = 4;
 
+/** Max decoded bytes per segment frame, same shape as the SAM caller's 5 MB image cap. */
+const MAX_SEGMENT_IMAGE_BYTES = 5 * 1024 * 1024;
+
 /** One SAM concept: the noun phrase sent to the model and its output label. */
 export interface CountConcept {
   /** Noun phrase sent to SAM, e.g. "folding table". */
@@ -580,6 +583,24 @@ export function validateSegmentInput(input: SegmentInput): void {
         throw new Error(
           `segment: frame ${i} dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`,
         );
+      }
+      // Same shape as the SAM caller's 5 MB image cap and the reason
+      // step's frame cap: the segment frames are 1024 px JPEGs, but
+      // an over-cap frame here only surfaces at the SAM caller on
+      // the first call, after request budgeting, with a "sam:"
+      // error. Reject it at validation instead, before any SAM
+      // call, so a direct runSegment caller fails fast with the
+      // frame index. 5 MB decoded is wide headroom over a 1024 px
+      // JPEG frame, so no valid request changes.
+      {
+        const stripped = payload.replace(/\s/g, "");
+        const padding = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+        const decodedBytes = (stripped.length * 3) / 4 - padding;
+        if (decodedBytes > MAX_SEGMENT_IMAGE_BYTES) {
+          throw new Error(
+            `segment: frame ${i} dataUrl must be at most 5 MB, got ${decodedBytes} bytes`,
+          );
+        }
       }
     }
   }
