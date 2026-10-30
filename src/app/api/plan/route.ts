@@ -211,7 +211,7 @@ export async function POST(req: Request): Promise<Response> {
           tracker,
           planProvider: provider,
           segmentConcurrency,
-          // Baseten reason cap (Grok Bot, 2026-10-27 11:43 AM): the
+          // Baseten reason cap (2026-10-27): the
           // reason step takes at most 8 images in baseten mode;
           // runPlan subsets and remaps. Meta mode is untouched.
           reasonMaxFrames: provider === "baseten" ? REASON_MAX_FRAMES : undefined,
