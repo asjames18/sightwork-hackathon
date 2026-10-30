@@ -28,6 +28,16 @@
  *   a "Duplicate price for material index <n>" assumption line (the
  *   last price wins), so a model slip stays visible instead of
  *   silently overwriting the first price.
+ * - Ungrounded prices: a model price marked grounded: false is a
+ *   national-average guess at best, never a verified local price. It
+ *   is kept (dropping it would zero the material) but, when the
+ *   region names a US state, it is scaled by that state's materials
+ *   factor from ../regionalCost (BEA goods RPP / US average, rounded
+ *   to cents — the whole-dollar rounding in applyRegionalFactors
+ *   suits totals, not unit prices) and flagged per item, plus one
+ *   "Adjusted for <State> with state averages (estimate)" line.
+ *   With no recognizable state the price is kept unscaled and
+ *   flagged as not verified. Grounded prices are never scaled.
  * - Labor: volunteer basis pays only licensed trades (electrician,
  *   plumber, roofer); contractor pays every step; mixed pays every step
  *   whose trade is not "volunteer". Steps without hours add no labor.
@@ -53,6 +63,7 @@ import {
   type WorkStep,
 } from "../types";
 import type { UsageTracker } from "./usage";
+import { regionalFactors, stateFromRegion } from "../regionalCost";
 
 /** Reason output this step consumes, plus the cost request fields. */
 export interface CostInput {
@@ -219,11 +230,31 @@ export function computeCostRange(
   }
 
   const missing: string[] = [];
+  const ungrounded: string[] = [];
+  // An ungrounded model price is a national-average guess, not a
+  // verified local price: scale it by the region's state materials
+  // factor when the region names a US state, and flag it either way.
+  // Grounded prices pass through untouched. Unit prices are rounded
+  // to cents (applyRegionalFactors rounds to whole dollars, which
+  // suits totals but would zero a sub-dollar unit price).
+  const stateCode = stateFromRegion(region);
+  const factors = stateCode ? regionalFactors(stateCode) : null;
+  let anyScaled = false;
   const filled: MaterialItem[] = materials.map((m, i) => {
     const u = byIndex.get(i);
     if (!u) {
       missing.push(`No price for ${m.item}`);
       return { ...m, unitCost: [0, 0] as [number, number] };
+    }
+    if (!u.grounded) {
+      if (factors) {
+        anyScaled = true;
+        ungrounded.push(`Ungrounded price for ${m.item} (state-adjusted estimate)`);
+        const scale = (n: number) => Math.round(n * factors.materials * 100) / 100;
+        const [lo, hi] = u.unitCost;
+        return { ...m, unitCost: [scale(lo), scale(hi)] as [number, number] };
+      }
+      ungrounded.push(`Ungrounded price for ${m.item} (not verified)`);
     }
     return { ...m, unitCost: u.unitCost };
   });
@@ -265,6 +296,10 @@ export function computeCostRange(
       ...model.assumptions,
       COMPUTED_LINE,
       ...missing,
+      ...ungrounded,
+      ...(anyScaled && factors
+        ? [`Adjusted for ${factors.stateName} with state averages (estimate)`]
+        : []),
       ...[...ignored].sort((a, b) => a - b).map((n) => `Ignored price for material index ${n} (no such material)`),
       ...[...duplicates].sort((a, b) => a - b).map((n) => `Duplicate price for material index ${n} (kept the last price)`),
     ],
