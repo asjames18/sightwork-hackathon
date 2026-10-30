@@ -200,7 +200,7 @@ export function PlanView({
         plan.generatedFrom && <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
       )}
 
-      <SharePlanButton plan={plan} sample={sample} />
+      <SharePlanButton plan={plan} sample={sample} example={example} />
 
       {plan.issues.length > 0 && (
         <a

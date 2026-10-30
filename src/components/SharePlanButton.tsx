@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
-import { planToText, sharePlanText, type ShareResult } from "@/lib/client/planText";
+import type { Example } from "@/lib/examples";
+import { canShareFiles, planToText, sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { peekPlanPdf, prefersShareSheet, warmPlanPdf } from "@/lib/client/savePlanPdf";
 
 const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
   copied: "Plan copied. Paste it into a text or email.",
@@ -10,8 +12,12 @@ const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
   failed: "Couldn't share from this browser. Use Save PDF instead.",
 };
 
-/** Sends the plan as plain text: the phone's share sheet when there is one, else the clipboard. */
-export function SharePlanButton({ plan, sample = false }: { plan: WorkPlan; sample?: boolean }) {
+/**
+ * Sends the plan as plain text: the phone's share sheet when there is one, else the clipboard. When the share
+ * sheet takes files and the plan PDF is built (warmed in the background on phones), the PDF rides along, so the
+ * proof photos reach the teammate too.
+ */
+export function SharePlanButton({ plan, sample = false, example }: { plan: WorkPlan; sample?: boolean; example?: Example }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -20,12 +26,19 @@ export function SharePlanButton({ plan, sample = false }: { plan: WorkPlan; samp
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => warmPlanPdf(plan, label), [plan, sample, example?.id]);
+
   async function onShare() {
     if (busy) return;
     setBusy(true);
     setStatus("");
-    const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
-    const result = await sharePlanText(`Work plan: ${plan.spaceName}`, planToText(plan, { sample }), navigator, coarse);
+    const coarse = prefersShareSheet();
+    // Only a PDF that is already built: waiting for one here would let the tap go stale and iOS refuse the share.
+    const pdf = coarse ? peekPlanPdf(plan, label) : null;
+    const attach = pdf && canShareFiles(navigator, [pdf.file]) ? { files: [pdf.file], text: planToText(plan, { sample, pdfAttached: true }) } : null;
+    const result = await sharePlanText(`Work plan: ${plan.spaceName}`, planToText(plan, { sample }), navigator, coarse, attach);
     setBusy(false);
     if (result === "shared") return;
     setStatus(STATUS[result]);

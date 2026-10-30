@@ -62,20 +62,9 @@ test.describe("plan screen", () => {
     await expectNoAxeViolations(page, "plan with the slider at 0");
   });
 
-  test("Save PDF opens the print dialog, and the print view hides the screen-only parts", async ({ page }) => {
-    await page.addInitScript(() => {
-      (window as unknown as { __prints: number }).__prints = 0;
-      window.print = () => {
-        (window as unknown as { __prints: number }).__prints += 1;
-      };
-    });
+  test("the print view (the Save PDF fallback) hides the screen-only parts", async ({ page }) => {
     await page.goto(REAL_RUN);
-    const save = page.getByRole("button", { name: "Save PDF or print this plan" });
-    await expect(save).toBeVisible();
-    await expect(save).toHaveText("Save PDF");
-    await save.click();
-    expect(await page.evaluate(() => (window as unknown as { __prints: number }).__prints)).toBe(1);
-
+    await expect(page.getByRole("button", { name: "Save PDF" })).toBeVisible();
     await page.emulateMedia({ media: "print" });
     await expect(page.getByRole("navigation", { name: "Plan sections" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Make your own" })).toBeHidden();

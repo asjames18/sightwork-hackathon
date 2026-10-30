@@ -90,7 +90,7 @@ main h1[tabindex="-1"]:focus {
   outline: none;
 }
 
-/* Plan screen "Save PDF": the browser print dialog saves a clean, paper-white plan. */
+/* Print view: a clean, paper-white plan. Save PDF builds a real file (src/lib/client/planPdf.ts); this is its fallback. */
 @media print {
   @page {
     margin: 14mm;

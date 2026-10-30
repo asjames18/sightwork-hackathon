@@ -1,7 +1,7 @@
 /** Plan as plain text for "Send to your team", and the share-or-copy fallback. No network. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planToText, sharePlanText, type ShareNavigator } from "@/lib/client/planText";
+import { MAX_SHARE_CHARS, canShareFiles, planToText, sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { COST_LABEL, type WorkPlan } from "@/lib/types";
 
 function plan(extra: Partial<WorkPlan> = {}): WorkPlan {
@@ -25,44 +25,69 @@ function plan(extra: Partial<WorkPlan> = {}): WorkPlan {
   };
 }
 
-test("lists problems worst first, steps in order, materials, with labels", () => {
-  const t = planToText(plan());
-  assert.match(t, /^Work plan: Main sanctuary stage\n/);
+const DAY = new Date(2026, 9, 30, 17, 0);
+const COST = { low: 120, high: 340, currency: "USD" as const, label: COST_LABEL, region: "Sebring, FL", laborBasis: "volunteer" as const, assumptions: [] };
+
+test("header: space, city and state, date, and how many problems", () => {
+  const t = planToText(plan({ costRange: COST }), { date: DAY });
+  assert.match(t, /^Work plan: Main sanctuary stage\nSebring, FL · Oct 30, 2026\n2 problems, worst first\.\n/);
   assert.match(t, /Asked for: Get the stage ready for Sunday\./);
-  assert.match(t, /Problems, worst first \(2\):\n1\. Cable across the steps \(High\) \[not mentioned\]\n2\. Loose carpet seam \(Medium\)\n/);
+  // No region: just the date.
+  assert.match(planToText(plan(), { date: DAY }), /^Work plan: Main sanctuary stage\nOct 30, 2026\n2 problems, worst first\.\n/);
+  assert.match(planToText(plan({ issues: [plan().issues[1]] }), { date: DAY }), /\n1 problem\.\n/);
+});
+
+test("problems in plain words, worst first; steps in order; materials", () => {
+  const t = planToText(plan(), { date: DAY });
+  assert.match(t, /\n1\. Cable across the steps\n   High priority\. Spotted on video, not mentioned on the walk\.\n2\. Loose carpet seam\n   Medium priority\. Mentioned on the walk and seen on video\.\n/);
+  assert.doesNotMatch(t, /\[|\]/, "no bracket tags");
   assert.match(t, /Do the work in this order:\n1\. Cover the cable \(Volunteer, 0\.5-1 h\)\n2\. Re-tape the seam\n/);
   assert.match(t, /Materials:\n- Cable cover: 2\n/);
-  assert.doesNotMatch(t, /Rough cost/);
+  assert.doesNotMatch(t, /Cost:/);
   assert.doesNotMatch(t, /Example plan/);
 });
 
-test("no narration: no 'not mentioned' tags and no ask line", () => {
+test("ends with where it came from, never a dead-end pointer to photos", () => {
+  const t = planToText(plan(), { date: DAY });
+  assert.match(t, /\n\nMade with SightWork · sightwork\.vercel\.app$/);
+  assert.doesNotMatch(t, /Proof photos are in the full plan/);
+  assert.match(planToText(plan(), { date: DAY, pdfAttached: true }), /\n\nFull plan with proof photos in the attached PDF\.$/);
+});
+
+test("no narration: says seen on camera, no mention wording, no ask line", () => {
   const t = planToText(plan({ transcript: null, transcriptTurns: [] }));
-  assert.doesNotMatch(t, /not mentioned/);
+  assert.match(t, /High priority\. Seen on camera\./);
+  assert.doesNotMatch(t, /mentioned/);
   assert.doesNotMatch(t, /Asked for/);
 });
 
-test("cost line always carries the not-a-quote label and region", () => {
-  const t = planToText(
-    plan({ costRange: { low: 120, high: 340, currency: "USD", label: COST_LABEL, region: "Sebring, FL", laborBasis: "volunteer", assumptions: [] } }),
-  );
-  assert.match(t, /Rough cost: \$120-\$340 \(Rough estimate, not a quote, Sebring, FL\)/);
+test("cost line carries the range, the city and state, and the not-a-quote label", () => {
+  const t = planToText(plan({ costRange: COST }));
+  assert.match(t, /\n\nCost: \$120-\$340 for Sebring, FL\. Rough estimate, not a quote\.\n/);
 });
 
 test("an example plan says it is sample data, and an empty plan says so", () => {
   const t = planToText(plan({ issues: [], workOrder: [], materials: [], meta: { isExample: true } }));
-  assert.match(t, /Example plan with sample data/);
-  assert.match(t, /No problems found/);
+  assert.match(t, /No problems found\.\nExample plan with sample data, not a real run\./);
+  assert.match(t, /Nothing stood out/);
   assert.doesNotMatch(t, /Do the work/);
   assert.doesNotMatch(t, /Materials:/);
 });
 
-test("long plans are cut at a line break with a pointer to the full plan", () => {
+test("fits a text message by default; long plans are cut at a line and keep the sign-off", () => {
   const many = Array.from({ length: 200 }, (_, i) => ({ order: i + 1, title: `Step number ${i + 1} with some words`, detail: "" }));
-  const t = planToText(plan({ workOrder: many }), { maxChars: 800 });
-  assert.ok(t.length <= 800, `length ${t.length}`);
-  assert.match(t, /\n\.\.\.\nSee the full plan for the rest\.$/);
-  assert.match(t.split("\n...\n")[0], /\n[^\n]*$/);
+  const t = planToText(plan({ workOrder: many }));
+  assert.ok(t.length <= MAX_SHARE_CHARS && MAX_SHARE_CHARS <= 1600, `length ${t.length}`);
+  assert.match(t, /\n\.\.\.\nShortened for a text\.\n\nMade with SightWork · sightwork\.vercel\.app$/);
+  assert.match(t.split("\n...\n")[0], /\n\d+\. Step number \d+ with some words$/, "cut at a whole line");
+  const withPdf = planToText(plan({ workOrder: many }), { maxChars: 800, pdfAttached: true });
+  assert.ok(withPdf.length <= 800);
+  assert.match(withPdf, /The PDF has everything\.\n\nFull plan with proof photos in the attached PDF\.$/);
+});
+
+test("a real-sized plan stays short enough for a text", () => {
+  const t = planToText(plan({ costRange: COST }));
+  assert.ok(t.length < 700, `length ${t.length}`);
 });
 
 test("share: uses the share sheet when preferred and available", async () => {
@@ -95,4 +120,31 @@ test("share: fails cleanly with no share sheet and no clipboard, or a rejected c
 test("the sample flag from the screen overrides meta, both ways", () => {
   assert.match(planToText(plan(), { sample: true }), /Example plan with sample data/);
   assert.doesNotMatch(planToText(plan({ meta: { isExample: true } }), { sample: false }), /Example plan/);
+});
+
+test("share: attaches the PDF with its own text when the sheet takes files", async () => {
+  const pdf = new File([new Uint8Array([37, 80, 68, 70])], "sightwork-plan-2026-10-30.pdf", { type: "application/pdf" });
+  const seen: { text?: string; files?: File[] }[] = [];
+  const nav: ShareNavigator = {
+    canShare: (d) => !d.files || d.files[0]?.type === "application/pdf",
+    share: async (d) => { seen.push(d); },
+  };
+  assert.equal(canShareFiles(nav, [pdf]), true);
+  assert.equal(await sharePlanText("t", "plain", nav, true, { files: [pdf], text: "with pdf" }), "shared");
+  assert.deepEqual(seen.map((d) => [d.text, d.files?.length ?? 0]), [["with pdf", 1]]);
+});
+
+test("share: no file support sends the plain text; a refused file share falls back to text", async () => {
+  const pdf = new File([new Uint8Array([1])], "p.pdf", { type: "application/pdf" });
+  const sent: (string | undefined)[] = [];
+  const noFiles: ShareNavigator = { canShare: (d) => !d.files, share: async (d) => { sent.push(d.text); } };
+  assert.equal(canShareFiles(noFiles, [pdf]), false);
+  assert.equal(await sharePlanText("t", "plain", noFiles, true, { files: [pdf], text: "with pdf" }), "shared");
+  const refusesFiles: ShareNavigator = {
+    canShare: () => true,
+    share: async (d) => { if (d.files) throw Object.assign(new Error("no"), { name: "NotAllowedError" }); sent.push(d.text); },
+  };
+  assert.equal(await sharePlanText("t", "plain", refusesFiles, true, { files: [pdf], text: "with pdf" }), "shared");
+  assert.deepEqual(sent, ["plain", "plain"]);
+  assert.equal(canShareFiles({ share: async () => {}, canShare: () => { throw new TypeError("bad"); } }, [pdf]), false);
 });

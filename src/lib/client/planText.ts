@@ -1,43 +1,104 @@
-import { COST_LABEL, type WorkPlan } from "@/lib/types";
-import { planReview, reviewLine, verdictFor } from "@/lib/review";
+import { COST_LABEL, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
+import { planReview, reviewTally, verdictFor } from "@/lib/review";
 
-/** Longest share text we hand to the share sheet or clipboard; long plans are cut at a line with a pointer to the PDF. */
-export const MAX_SHARE_CHARS = 6000;
+/**
+ * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
+ * about 1,600 characters); long plans are cut at a line with a pointer to the PDF.
+ */
+export const MAX_SHARE_CHARS = 1600;
+
+/** Last line when no PDF rides along: the teammate has no link to the plan, so say where it came from. */
+export const SHARE_SIGNOFF = "Made with SightWork · sightwork.vercel.app";
+export const SHARE_SIGNOFF_PDF = "Full plan with proof photos in the attached PDF.";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const span = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}-${r[1]}${unit}`);
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 
-const SEVERITY: Record<string, string> = { high: "High", medium: "Medium", low: "Low" };
+const PRIORITY: Record<string, string> = { high: "High priority", medium: "Medium priority", low: "Low priority" };
+
+/** "Oct 30, 2026": the day the plan was shared or saved. */
+export function shareDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** City and state the plan was priced for ("Sebring, FL"), when it has one. */
+export function planLocation(plan: Pick<WorkPlan, "costRange">): string | null {
+  const r = plan.costRange?.region ? clean(plan.costRange.region) : "";
+  return r || null;
+}
+
+/** "3 problems, worst first" / "1 problem" / "No problems found". */
+export function problemSummary(count: number): string {
+  if (count === 0) return "No problems found";
+  return count === 1 ? "1 problem" : `${count} problems, worst first`;
+}
+
+/**
+ * One plain sentence about a problem: priority, then whether it was said and seen, then a missing-photo warning.
+ * e.g. "Low priority. Spotted on video, not mentioned on the walk."
+ */
+export function issueNote(issue: Issue, narrated: boolean, verdict?: PlanReviewItem): string {
+  const parts = [`${PRIORITY[issue.severity] ?? issue.severity}.`];
+  if (!narrated) parts.push("Seen on camera.");
+  else if (issue.unmentioned) parts.push("Spotted on video, not mentioned on the walk.");
+  else if (issue.status === "mentioned_not_seen") parts.push("Mentioned on the walk, not seen on video. Check in person.");
+  else parts.push("Mentioned on the walk and seen on video.");
+  if (verdict?.verified === false && issue.status !== "mentioned_not_seen") parts.push("No photo backs it yet. Check in person.");
+  return parts.join(" ");
+}
+
+/** The reviewer pass in plain words, e.g. "Each problem was checked against a photo: 1 of 1 confirmed." */
+export function plainReviewLine(plan: Pick<WorkPlan, "review" | "issues">): string | null {
+  const review = planReview(plan);
+  if (!review || plan.issues.length === 0) return null;
+  if (!review.ran) return "The photo check didn't run, so check each problem in person before acting on it.";
+  const t = reviewTally(review);
+  if (!t) return null;
+  return review.source === "precomputed"
+    ? `Each problem was matched to its photo ahead of time: ${t.verified} of ${t.total} have one.`
+    : `Each problem was checked against a photo: ${t.verified} of ${t.total} confirmed.`;
+}
+
+export interface PlanTextOptions {
+  maxChars?: number;
+  sample?: boolean;
+  /** Date shown in the header. Default: now. */
+  date?: Date;
+  /** The PDF goes with the text on the same share, so the last line points at it. */
+  pdfAttached?: boolean;
+}
 
 /**
  * The plan as plain text, for a group text or email to the people doing the work.
- * Same order as the plan screen: problems worst first, the work steps, materials, then cost.
- * Only sections with content appear, and the cost always carries its "not a quote" label.
+ * A short header (space, city and state, date, how many problems), then the same order as the plan screen:
+ * problems worst first, the work steps, materials, then cost. Only sections with content appear, the cost
+ * always carries its "not a quote" label, and nothing points at a link the teammate doesn't have.
  */
-export function planToText(plan: WorkPlan, opts: { maxChars?: number; sample?: boolean } = {}): string {
+export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const maxChars = opts.maxChars ?? MAX_SHARE_CHARS;
   const lines: string[] = [];
   const narrated = Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
   const sample = opts.sample ?? plan.meta?.isExample === true;
+  const location = planLocation(plan);
+  const issues = [...plan.issues].sort((a, b) => a.rank - b.rank);
 
   lines.push(`Work plan: ${clean(plan.spaceName) || "Walkthrough"}`);
-  if (sample) lines.push("(Example plan with sample data, not a real run.)");
+  lines.push([location, shareDate(opts.date ?? new Date())].filter(Boolean).join(" · "));
+  lines.push(`${problemSummary(issues.length)}.`);
+  if (sample) lines.push("Example plan with sample data, not a real run.");
   if (narrated && plan.transcriptSummary) lines.push(`Asked for: ${clean(plan.transcriptSummary)}`);
 
-  const issues = [...plan.issues].sort((a, b) => a.rank - b.rank);
   const review = planReview(plan);
   if (issues.length > 0) {
-    lines.push("", `Problems, worst first (${issues.length}):`);
+    lines.push("");
     for (const [n, i] of issues.entries()) {
-      const notSaid = narrated && i.unmentioned ? " [not mentioned]" : "";
-      const unverified = verdictFor(review, i)?.verified === false ? " [unverified: no photo backs it]" : "";
-      lines.push(`${n + 1}. ${clean(i.title)} (${SEVERITY[i.severity] ?? i.severity})${notSaid}${unverified}`);
+      lines.push(`${n + 1}. ${clean(i.title)}`, `   ${issueNote(i, narrated, verdictFor(review, i))}`);
     }
-    const line = reviewLine(review);
+    const line = plainReviewLine(plan);
     if (line) lines.push(line);
   } else {
-    lines.push("", "No problems found in the frames checked. Walk it in person before you sign off.");
+    lines.push("", "Nothing stood out in the frames checked. Walk it in person before you sign off.");
   }
 
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
@@ -56,15 +117,18 @@ export function planToText(plan: WorkPlan, opts: { maxChars?: number; sample?: b
 
   if (plan.costRange) {
     const c = plan.costRange;
-    lines.push("", `Rough cost: ${usd(c.low)}-${usd(c.high)} (${c.label ?? COST_LABEL}, ${clean(c.region)})`);
+    lines.push("", `Cost: ${usd(c.low)}-${usd(c.high)} for ${clean(c.region)}. ${c.label ?? COST_LABEL}.`);
   }
 
-  lines.push("", "Made with SightWork. Proof photos are in the full plan.");
+  const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
+  lines.push("", signoff);
 
   const text = lines.join("\n");
   if (text.length <= maxChars) return text;
-  const tail = "\n...\nSee the full plan for the rest.";
-  const cut = text.slice(0, Math.max(0, maxChars - tail.length));
+  // Keep the sign-off: cut the body at a line and say it was shortened.
+  const tail = `\n...\n${opts.pdfAttached ? "Shortened for a text. The PDF has everything." : "Shortened for a text."}\n\n${signoff}`;
+  const body = lines.slice(0, -2).join("\n");
+  const cut = body.slice(0, Math.max(0, maxChars - tail.length));
   const atLine = cut.lastIndexOf("\n");
   return (atLine > 0 ? cut.slice(0, atLine) : cut) + tail;
 }
@@ -73,24 +137,58 @@ export type ShareResult = "shared" | "copied" | "cancelled" | "failed";
 
 /** Minimal slices of `navigator` used here, so tests can pass stubs. */
 export interface ShareNavigator {
-  share?: (data: { title?: string; text?: string }) => Promise<void>;
-  canShare?: (data: { title?: string; text?: string }) => boolean;
+  share?: (data: ShareData) => Promise<void>;
+  canShare?: (data: ShareData) => boolean;
   clipboard?: { writeText: (text: string) => Promise<void> };
 }
 
+interface ShareData {
+  title?: string;
+  text?: string;
+  files?: File[];
+}
+
+/** A file to send along when the share sheet takes files, and the text to use with it (it points at the file). */
+export interface ShareAttachment {
+  files: File[];
+  text: string;
+}
+
+/** True when this browser's share sheet takes these files (iOS and Android Safari/Chrome do; most desktops don't). */
+export function canShareFiles(nav: ShareNavigator, files: File[]): boolean {
+  if (typeof nav.share !== "function" || typeof nav.canShare !== "function") return false;
+  try {
+    return nav.canShare({ files });
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Native share sheet when the device has one (phones), else the clipboard.
+ * Native share sheet when the device has one (phones), else the clipboard. With `attach`, the share carries the
+ * file too (and its text) when the sheet takes files; otherwise the plain text goes alone.
  * A dismissed share sheet is "cancelled", not an error, and never falls through to the clipboard.
  */
-export async function sharePlanText(title: string, text: string, nav: ShareNavigator, preferShare: boolean): Promise<ShareResult> {
-  const data = { title, text };
-  if (preferShare && typeof nav.share === "function" && (!nav.canShare || nav.canShare(data))) {
+export async function sharePlanText(
+  title: string,
+  text: string,
+  nav: ShareNavigator,
+  preferShare: boolean,
+  attach?: ShareAttachment | null,
+): Promise<ShareResult> {
+  const tries: ShareData[] = [];
+  if (preferShare && typeof nav.share === "function") {
+    if (attach && canShareFiles(nav, attach.files)) tries.push({ title, text: attach.text, files: attach.files });
+    const data = { title, text };
+    if (!nav.canShare || nav.canShare(data)) tries.push(data);
+  }
+  for (const data of tries) {
     try {
-      await nav.share(data);
+      await nav.share!(data);
       return "shared";
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return "cancelled";
-      // Some browsers refuse share outside a trusted gesture; the clipboard still works.
+      // Refused (no fresh tap, or the target can't take a file): try the next, then the clipboard.
     }
   }
   if (nav.clipboard?.writeText) {

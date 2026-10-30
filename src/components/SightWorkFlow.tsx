@@ -11,6 +11,7 @@ import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
 import { PlanView } from "./PlanView";
+import { SavePdfButton } from "./SavePdfButton";
 
 type Stage =
   // `resume`: back from a run the server refused for a missing or wrong tester code; the same video is
@@ -143,14 +144,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
             </Link>
             {stage.kind === "plan" && (
               <>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  aria-label="Save PDF or print this plan"
-                  className="min-h-11 shrink-0 rounded-full border border-ink/20 bg-white/60 px-4 text-sm font-medium hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  Save PDF
-                </button>
+                <SavePdfButton plan={stage.plan} example={stage.example} sample={stage.example?.kind === "sample" || (!stage.example && stage.plan.meta?.isExample === true)} />
                 <button
                   type="button"
                   onClick={startOver}

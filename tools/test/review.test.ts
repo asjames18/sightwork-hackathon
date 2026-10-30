@@ -103,13 +103,16 @@ test("every example carries an honest precomputed review", () => {
   }
 });
 
-test("share text marks unverified problems and carries the review line", () => {
+test("share text says in plain words when no photo backs a problem, and carries the review line", () => {
   const text = planToText(withPrecomputedReview(plan()));
-  assert.match(text, /2\. Thermostat set too high \(Low\) \[unverified: no photo backs it\]/);
-  assert.doesNotMatch(text, /1\. Cable across the steps.*unverified/);
-  assert.match(text, /Proof check for this example: 1 of 2 problems backed by a photo/);
-  assert.match(planToText(plan({ review: { ran: false, items: [] } })), /Review didn't run\./);
-  assert.doesNotMatch(planToText(plan()), /Review|unverified/);
+  assert.match(text, /2\. Thermostat set too high\n   Low priority\. Mentioned on the walk, not seen on video\. Check in person\./);
+  assert.doesNotMatch(text, /\[|\]/);
+  assert.match(text, /Each problem was matched to its photo ahead of time: 1 of 2 have one\./);
+  const seenNoPhoto = plan({ review: { ran: true, items: [{ problemId: "1", verified: false, reason: "not visible" }] } });
+  assert.match(planToText(seenNoPhoto), /1\. Cable across the steps\n   High priority\. Spotted on video, not mentioned on the walk\. No photo backs it yet\. Check in person\./);
+  assert.match(planToText(seenNoPhoto), /Each problem was checked against a photo: 0 of 1 confirmed\./);
+  assert.match(planToText(plan({ review: { ran: false, items: [] } })), /The photo check didn't run/);
+  assert.doesNotMatch(planToText(plan()), /photo check|checked against|No photo backs/);
 });
 
 test("stream parser: reviewing step, check notes, and the done plan's review", () => {
