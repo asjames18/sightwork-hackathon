@@ -127,3 +127,44 @@ test("?mock=nometa: SAM and the after picture show as skipped, the plan still co
   // The stand-in plan is hand-written, so its frames don't promise outlines.
   await expect(page.getByText(/coming soon/i)).toHaveCount(0);
 });
+
+test("processing: running clock and tab title follow the run, the screen is kept on, a stop freezes the total", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __wake: { requested: number; released: number } };
+    w.__wake = { requested: 0, released: 0 };
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: {
+        request: async () => {
+          w.__wake.requested++;
+          const s = {
+            released: false,
+            release: async () => {
+              if (!s.released) w.__wake.released++;
+              s.released = true;
+            },
+          };
+          return s;
+        },
+      },
+    });
+  });
+  const wake = () => page.evaluate(() => (window as unknown as { __wake: { requested: number; released: number } }).__wake);
+  await page.goto("/start?fail=planning");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Working on your plan" })).toBeVisible();
+  await expect(page.getByText(/^\d+:\d\d\s*\d+ seconds? elapsed$/)).toBeVisible();
+  await expect(page.getByText(/we'll keep your screen on/)).toBeVisible();
+  await expect(page).toHaveTitle(/^Step \d of \d · SightWork$/);
+  await expect.poll(async () => (await wake()).requested).toBeGreaterThan(0);
+  await expectNoSideScroll(page);
+
+  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveTitle("Stopped · SightWork");
+  await expect(page.getByText(/in total$/)).toBeVisible();
+  await expect.poll(async () => (await wake()).released).toBeGreaterThan(0);
+  // Mock steps finish in under a second, so no step shows a time (no "0 s" noise); real steps show "· 12 s".
+  await expect(page.getByText(/· 0 s/)).toHaveCount(0);
+  await expectNoAxeViolations(page, "failure card with times");
+});

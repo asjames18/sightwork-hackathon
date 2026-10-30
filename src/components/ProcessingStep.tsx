@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { PlanStep } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS } from "@/lib/client/engines";
+import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
+import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 
 const LABELS: Record<PlanStep, string> = {
   uploading: "Uploading",
@@ -80,6 +82,21 @@ export function ProcessingStep({
   // error twice (the alert card is its own live region).
   const nowStep = work[Math.min(current, work.length - 1)];
   const announce = failed || !nowStep ? "" : `Step ${position} of ${total}: ${LABELS[nowStep]}.`;
+  const { clock, elapsedMs } = useStepClock(current, failed);
+  // Keep the phone screen on while the plan runs: auto-lock can suspend the tab and drop the request.
+  useEffect(() => (failed ? undefined : keepScreenOn()), [failed]);
+  const [screenStaysOn, setScreenStaysOn] = useState(false);
+  useEffect(() => setScreenStaysOn(canKeepScreenOn()), []);
+  // The tab title follows the run, so a user who switched apps can see where it is at a glance.
+  useEffect(() => {
+    const before = document.title;
+    return () => {
+      document.title = before;
+    };
+  }, []);
+  useEffect(() => {
+    document.title = failed ? "Stopped · SightWork" : `Step ${position} of ${total} · SightWork`;
+  }, [failed, position, total]);
   return (
     <section>
       <p aria-live="polite" className="sr-only">
@@ -105,9 +122,15 @@ export function ProcessingStep({
       </div>
 
       <div className="mt-5">
-        <p className="text-sm font-semibold">
-          Step {position} of {total}
-        </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold">
+            Step {position} of {total}
+          </p>
+          <p className="text-sm tabular-nums text-ink/70">
+            <span aria-hidden="true">{formatClock(elapsedMs)}</span>
+            <span className="sr-only">{spokenClock(elapsedMs)}</span> {failed ? "in total" : "elapsed"}
+          </p>
+        </div>
         <div
           role="progressbar"
           aria-label="Plan progress"
@@ -122,7 +145,11 @@ export function ProcessingStep({
             style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
           />
         </div>
-        {!failed && <p className="mt-2 text-sm text-ink/65">Usually a few minutes. Keep this tab open.</p>}
+        {!failed && (
+          <p className="mt-2 text-sm text-ink/65">
+            Usually a few minutes. Keep this tab open{screenStaysOn ? "; we'll keep your screen on until it's done." : "."}
+          </p>
+        )}
       </div>
 
       <div className={`mt-5 ${failed ? "" : "lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6"}`}>
@@ -130,6 +157,7 @@ export function ProcessingStep({
         {work.map((s, i) => {
           const passed = i < current ? (skipped?.includes(s) ? "skipped" : "done") : null;
           const state: keyof typeof STATE_TEXT = passed ?? (i === current ? (failed ? "failed" : "now") : "next");
+          const took = state === "done" ? formatStepTime(stepDuration(clock, i) ?? 0) : null;
           return (
             <li key={s} aria-current={state === "now" ? "step" : undefined} className="flex min-h-[3.25rem] items-center gap-3 py-2.5">
               <span
@@ -173,7 +201,11 @@ export function ProcessingStep({
                     ) : (
                       ENGINE[s] && OPTIONAL_STEPS.has(s) && <span> · optional</span>
                     )}
+                    {took && <span className="tabular-nums"> · {took}</span>}
                   </span>
+                )}
+                {took && !(ENGINE[s] || state === "skipped") && (
+                  <span className="block text-sm tabular-nums text-ink/65">{took}</span>
                 )}
                 {state !== "skipped" && <span className="sr-only">{STATE_TEXT[state]}</span>}
               </span>
@@ -242,6 +274,31 @@ function WhileYouWait() {
       <p className="mt-4 text-sm text-ink/70">When it's ready, your plan opens here on its own.</p>
     </aside>
   );
+}
+
+/**
+ * Step times for this run plus a once-a-second running total. A retry (the step index going back, or
+ * the run leaving the failed state) starts a fresh clock. The total freezes when a run stops.
+ */
+function useStepClock(current: number, failed: boolean): { clock: StepClock; elapsedMs: number } {
+  const [clock, setClock] = useState<StepClock>(() => startClock(Date.now(), current));
+  const [now, setNow] = useState(() => Date.now());
+  const [stoppedAt, setStoppedAt] = useState<number | null>(null);
+  const wasFailed = useRef(failed);
+  useEffect(() => {
+    const restarted = wasFailed.current && !failed;
+    wasFailed.current = failed;
+    const t = Date.now();
+    setClock((c) => advanceClock(c, current, t, restarted));
+    setStoppedAt(failed ? t : null);
+    setNow(t);
+  }, [current, failed]);
+  useEffect(() => {
+    if (failed) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [failed]);
+  return { clock, elapsedMs: (stoppedAt ?? now) - clock.start };
 }
 
 /** A blob URL for the picked file, revoked when the file changes or the screen goes away. */
