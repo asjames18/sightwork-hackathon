@@ -115,6 +115,48 @@ test("Open my last plan: after a run it shows on the landing and on /start, and 
   await expectNoSideScroll(page);
 });
 
+test("Open my last plan: a plan too big for localStorage is kept in IndexedDB and still reopens", async ({ page }) => {
+  // A real run carries its frames and after image inline and can outgrow a phone's localStorage.
+  // Refuse the plan key here (as a full browser would) so the IndexedDB path runs in a real browser.
+  await page.addInitScript(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === "sightwork:lastPlan:v1") throw new DOMException("full", "QuotaExceededError");
+      return set.call(this, key, value);
+    };
+  });
+  await page.goto("/start");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
+  const spaceName = await page.getByRole("heading", { level: 1 }).first().innerText();
+  expect(await page.evaluate(() => localStorage.getItem("sightwork:lastPlan:v1"))).toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("sightwork:lastPlan:big:v1"))).not.toBeNull();
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Open my last plan" }).click();
+  await expect(page).toHaveURL(/\/start\?view=last$/);
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 }).first()).toHaveText(spaceName);
+
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Open my last plan" }).click();
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await expectNoSideScroll(page);
+
+  // Plan gone from IndexedDB (cleared site data): the link hides and ?view=last lands on upload.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase("sightwork");
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      }),
+  );
+  await page.goto("/start?view=last");
+  await expect(page.getByRole("heading", { level: 1, name: "Film a walkthrough. Get a work plan." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open my last plan" })).toHaveCount(0);
+});
+
 test.describe("not-found page", () => {
   // The browser logs the 404 response itself; that one line is expected here.
   test.use({ expectedConsoleErrors: [/status of 404/] });

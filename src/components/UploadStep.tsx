@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
-import { loadLastPlan } from "@/lib/client/lastPlan";
+import { hasLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
@@ -20,7 +20,7 @@ const subscribeStorage = (onChange: () => void) => {
   window.addEventListener("storage", onChange);
   return () => window.removeEventListener("storage", onChange);
 };
-const hasSavedPlan = () => loadLastPlan() !== null;
+const hasSavedPlan = hasLastPlan;
 const noPlanOnServer = () => false;
 
 export function UploadStep({

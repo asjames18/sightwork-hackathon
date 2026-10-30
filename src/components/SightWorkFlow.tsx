@@ -6,7 +6,7 @@ import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
-import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
+import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
 import { PlanView } from "./PlanView";
@@ -41,9 +41,11 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     setStage({ kind: "plan", plan: example.plan, videoName: null, example });
   };
   // Falls back to staying on upload if the saved plan was cleared since the link showed.
+  // A big real run is kept in IndexedDB, so this can take a moment.
   const showLastPlan = () => {
-    const saved = loadLastPlan();
-    if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+    void loadLastPlanAsync().then((saved) => {
+      if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+    });
   };
 
   // `?view=example` opens straight on the example plan: a direct link for screen checks at
@@ -55,9 +57,10 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     // Prerendered example pages already start on the plan.
     if (view === "example" && !initialExampleId) showExample(new URLSearchParams(window.location.search).get("ex") ?? undefined);
     if (view === "last") {
-      const saved = loadLastPlan();
-      if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
-      else document.documentElement.classList.remove("sw-opening");
+      void loadLastPlanAsync().then((saved) => {
+        if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+        else document.documentElement.classList.remove("sw-opening");
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

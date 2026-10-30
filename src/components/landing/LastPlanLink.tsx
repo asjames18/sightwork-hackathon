@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { loadLastPlan } from "@/lib/client/lastPlan";
+import { hasLastPlan } from "@/lib/client/lastPlan";
 
 // The landing is static; this small client piece only shows up when a finished plan is saved
 // on this device, so returning users can reopen it without another run. Server render and the
@@ -11,7 +11,7 @@ const subscribe = (onChange: () => void) => {
   window.addEventListener("storage", onChange);
   return () => window.removeEventListener("storage", onChange);
 };
-const hasSavedPlan = () => loadLastPlan() !== null;
+const hasSavedPlan = hasLastPlan;
 const noPlanOnServer = () => false;
 
 export function LastPlanLink() {
