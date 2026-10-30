@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
-import { selectedPlanJob } from "@/lib/client/selectRunner";
+import { planJobFor, type RunnerKind } from "@/lib/client/selectRunner";
+import { isTesterCodeFailure } from "@/lib/client/apiPlanJob";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { UploadStep } from "./UploadStep";
@@ -12,12 +13,14 @@ import { ProcessingStep } from "./ProcessingStep";
 import { PlanView } from "./PlanView";
 
 type Stage =
-  | { kind: "upload" }
-  | { kind: "processing"; file: File; run: number }
+  // `resume`: back from a run the server refused for a missing or wrong tester code; the same video is
+  // shown again with the code prompt open.
+  | { kind: "upload"; resume?: File }
+  | { kind: "processing"; file: File; run: number; runner: RunnerKind }
   | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example };
 
-/** Mock by default; NEXT_PUBLIC_SIGHTWORK_RUNNER=api or `?runner=api` switches to POST /api/plan. */
-const runPlanJob = selectedPlanJob;
+/** Nothing runs while there's no video; the runner is chosen per run (see UploadStep and ownVideoRunnerKind). */
+const idleJob = planJobFor("mock");
 
 /** `initialExampleId`: open on that example plan (prerendered example pages), instead of the upload screen. */
 export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string } = {}) {
@@ -26,7 +29,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     const example = findExample(initialExampleId);
     return { kind: "plan", plan: example.plan, videoName: null, example };
   });
-  const { status: job, checks } = usePlanJob(runPlanJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
+  const { status: job, checks } = usePlanJob(stage.kind === "processing" ? planJobFor(stage.runner) : idleJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
@@ -165,7 +168,8 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
       <main className={`mx-auto w-full px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pt-10 ${width}`}>
       {stage.kind === "upload" && (
         <UploadStep
-          onVideo={(file) => setStage({ kind: "processing", file, run: 1 })}
+          onVideo={(file, runner) => setStage({ kind: "processing", file, run: 1, runner })}
+          resumeFile={stage.resume}
           onExample={showExample}
           onLastPlan={showLastPlan}
         />
@@ -177,7 +181,12 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           videoName={stage.file.name}
           videoFile={stage.file}
           failure={job?.state === "failed" ? { message: job.message } : null}
-          onRetry={() => setStage({ kind: "processing", file: stage.file, run: stage.run + 1 })}
+          onRetry={() => setStage({ ...stage, run: stage.run + 1 })}
+          onEnterCode={
+            stage.runner === "api" && job?.state === "failed" && isTesterCodeFailure(job.message)
+              ? () => setStage({ kind: "upload", resume: stage.file })
+              : undefined
+          }
           onExample={() => showExample()}
           skipped={skipped}
           checks={checks}

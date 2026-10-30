@@ -49,6 +49,7 @@ export function ProcessingStep({
   failure,
   onRetry,
   onExample,
+  onEnterCode,
   engines,
   skipped,
   checks,
@@ -61,6 +62,8 @@ export function ProcessingStep({
   failure?: StepFailure | null;
   onRetry?: () => void;
   onExample?: () => void;
+  /** Set when the run stopped for a missing or wrong tester code: back to the video with the code prompt. */
+  onEnterCode?: () => void;
   /** Engine named under each step. Defaults to this page's plan provider (see src/lib/client/engines.ts). */
   engines?: Record<ScreenStep, string>;
   /** Optional steps the server skipped this run (e.g. Meta access off). Shown as skipped, not done. */
@@ -228,7 +231,16 @@ export function ProcessingStep({
           <p className="font-semibold text-red-700">Stopped at: {LABELS[steps[current]] ?? "a step"}</p>
           <p className="mt-1 text-sm text-ink/70">{failure.message}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            {onRetry && (
+            {onEnterCode ? (
+              <button
+                ref={retryRef}
+                type="button"
+                onClick={onEnterCode}
+                className="btn-primary flex-1 active:scale-[.99]"
+              >
+                Enter tester code
+              </button>
+            ) : onRetry && (
               <button
                 ref={retryRef}
                 type="button"

@@ -81,7 +81,7 @@ test("a clip under 5 seconds is blocked before anything runs", async ({ page }) 
   await expect(page.getByRole("button", { name: "Make my work plan" })).toBeDisabled();
 });
 
-test("real-run mode without a tester code stops at once and sends nothing", async ({ page }) => {
+test("real-run mode without a tester code asks for it on the video card and sends nothing", async ({ page }) => {
   await page.goto("/start?runner=api");
   const code = page.getByLabel("Tester code for real runs");
   await expect(code).toBeVisible();
@@ -92,9 +92,88 @@ test("real-run mode without a tester code stops at once and sends nothing", asyn
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await expect(page.getByText("Frames and narration are sent to make your plan.")).toBeVisible();
   await page.getByRole("button", { name: "Make my work plan" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible();
-  await expect(page.getByText(/Real runs need a tester code/)).toBeVisible();
+  // No run, no example plan: the code prompt opens on the same video card.
+  const card = page.getByRole("group", { name: "Your walkthrough" });
+  await expect(card.getByText("Enter the tester code to make a plan from this video.")).toBeVisible();
+  await expect(card.getByLabel("Tester code for real runs")).toBeFocused();
+  await expect(card).toContainText("walkthrough-6s.webm");
+  await expect(page.getByRole("heading", { level: 1, name: "Working on your plan" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toHaveCount(0);
+  await expectNoAxeViolations(page, "tester code prompt on the video card");
   // The apiCalls fixture then checks that no /api request left the browser.
+});
+
+/**
+ * Stubs /api/transcribe and /api/plan in the browser (no server call, no model call) and records what the
+ * page sent: the tester code header and how big the plan request was, which proves the user's own video
+ * was read and sent, not swapped for an example. The stub answers a failure, so no plan from anywhere shows.
+ */
+async function stubRealRun(page: import("@playwright/test").Page) {
+  const sent: { path: string; code: string | null; bytes: number }[] = [];
+  const record = (r: import("@playwright/test").Route) =>
+    sent.push({ path: new URL(r.request().url()).pathname, code: r.request().headers()["x-sightwork-test-code"] ?? null, bytes: r.request().postDataBuffer()?.length ?? 0 });
+  await page.route("**/api/transcribe", (r) => {
+    record(r);
+    return r.fulfill({ json: { transcript: "", transcriptTurns: [] } });
+  });
+  await page.route("**/api/plan", (r) => {
+    record(r);
+    return r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "failed", step: "planning", message: "Stub stop for the test." }) + "\n" });
+  });
+  return sent;
+}
+
+async function saveCodeAndRun(page: import("@playwright/test").Page, sent: { path: string; code: string | null; bytes: number }[]) {
+  const card = page.getByRole("group", { name: "Your walkthrough" });
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(card.getByText("Enter the tester code to make a plan from this video.")).toBeVisible();
+  await card.getByLabel("Tester code for real runs").fill("stub-code");
+  await card.getByRole("button", { name: "Save and make my plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Stub stop for the test.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toHaveCount(0);
+  const plan = sent.find((s) => s.path === "/api/plan");
+  expect(plan, "a real-run request was sent").toBeTruthy();
+  expect(plan!.code).toBe("stub-code");
+  expect(plan!.bytes, "frames from the user's own video").toBeGreaterThan(10_000);
+}
+
+test("own chosen video, no code saved: prompt, then a real run on that video (never the example plan)", async ({ page }) => {
+  const sent = await stubRealRun(page);
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await saveCodeAndRun(page, sent);
+});
+
+test("own recorded video, no code saved: prompt, then a real run on that take (never the example plan)", async ({ page }) => {
+  const sent = await stubRealRun(page);
+  await page.goto("/start?runner=api");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  const cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await page.waitForTimeout(6300);
+  await cam.getByRole("button", { name: "Stop recording" }).click();
+  await expect(page.getByRole("group", { name: "Your walkthrough" })).toContainText(/walkthrough-\d{4}-\d{2}-\d{2}-\d{4}\.(webm|mp4)/);
+  await saveCodeAndRun(page, sent);
+});
+
+test.describe("server refuses the code", () => {
+  test.use({ expectedConsoleErrors: [/status of 401/] });
+test("a code the server refuses goes back to the same video with the code prompt", async ({ page }) => {
+  await page.route("**/api/transcribe", (r) => r.fulfill({ status: 401, json: { error: "x" } }));
+  await page.route("**/api/plan", (r) => r.fulfill({ status: 401, json: { error: "x" } }));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "wrong-code"));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByText("That tester code wasn't accepted. Check it and enter it again, or open the example plan.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Something went wrong|couldn't read that video/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Enter tester code" }).click();
+  const card = page.getByRole("group", { name: "Your walkthrough" });
+  await expect(card).toContainText("walkthrough-6s.webm");
+  await expect(card.getByText("Enter the tester code to make a plan from this video.")).toBeVisible();
+});
 });
 
 test("real run of an all-black take stops on the device with a clear message and sends nothing", async ({ page }) => {

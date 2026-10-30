@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
+import { currentOwnVideoRunnerKind, needsTesterCode, pickRunnerKind, type RunnerKind } from "@/lib/client/selectRunner";
 import { hasLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
@@ -27,8 +27,12 @@ export function UploadStep({
   onVideo,
   onExample,
   onLastPlan,
+  resumeFile,
 }: {
-  onVideo: (file: File) => void;
+  /** Starts the run. `runner` is chosen here, once per video (see ownVideoRunnerKind). */
+  onVideo: (file: File, runner: RunnerKind) => void;
+  /** A video to show again with the tester-code prompt open (the server refused the code). */
+  resumeFile?: File;
   /** Opens an example plan by id (the featured real run when omitted). */
   onExample: (id?: string) => void;
   /** Reopens the last finished plan on this device; the link only shows when one is saved. */
@@ -49,9 +53,18 @@ export function UploadStep({
   const [check, setCheck] = useState<Check>({ kind: "reading" });
   // Read in an effect so the server render and the first client render match.
   const [runner, setRunner] = useState<RunnerKind>("mock");
+  // Where the user's own video goes: a real run, unless an example-plan preview was asked for on purpose.
+  const [videoRunner, setVideoRunner] = useState<RunnerKind>("api");
   useEffect(() => {
     setRunner(pickRunnerKind(window.location.search, process.env.NEXT_PUBLIC_SIGHTWORK_RUNNER));
+    setVideoRunner(currentOwnVideoRunnerKind());
   }, []);
+  // The tester-code prompt on the video card: shown when a real run is asked for without a saved code.
+  const [askCode, setAskCode] = useState(false);
+  const send = (file: File) => {
+    if (needsTesterCode(videoRunner, loadTestCode())) setAskCode(true);
+    else onVideo(file, videoRunner);
+  };
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
   const previewUrl = useRef<string | null>(null);
   useEffect(() => {
@@ -64,9 +77,16 @@ export function UploadStep({
     setRecording(false);
     setCameraNote(null);
     setRecorded(info);
+    setAskCode(false);
     setCheck({ kind: "reading" });
     setPreview({ url: URL.createObjectURL(file), file });
   }, []);
+  // Back from a run the server refused for the tester code: the same video, with the code prompt open.
+  useEffect(() => {
+    if (!resumeFile) return;
+    pick(resumeFile);
+    setAskCode(true);
+  }, [resumeFile, pick]);
   // Desktop: drop a video anywhere on the upload screen (dropping it outside a target used to make the
   // browser open the file in the tab and leave the app). The drop zone lights up while a file is dragged.
   const [dragging, setDragging] = useState(false);
@@ -290,16 +310,30 @@ export function UploadStep({
             <button
               type="button"
               disabled={!canSend}
-              onClick={() => onVideo(preview.file)}
+              onClick={() => send(preview.file)}
               className="btn-primary w-full text-lg motion-safe:active:scale-[.99]"
             >
               {check.kind === "reading" ? "Checking video…" : "Make my work plan"}
             </button>
             <p className="mt-2 text-center text-sm text-ink/70">
-              {runner === "api"
+              {videoRunner === "api"
                 ? "Frames and narration are sent to make your plan. The full video stays on this device."
                 : "Preview build: your video stays on this device and an example plan is shown."}
             </p>
+            {askCode && (
+              <div role="alert" className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-950">
+                <p className="text-sm font-semibold">Enter the tester code to make a plan from this video.</p>
+                <p className="mt-0.5 text-sm">Your video is kept here, and the plan runs on it as soon as the code is saved.</p>
+                <TesterCode
+                  autoFocus
+                  submitLabel="Save and make my plan"
+                  onSaved={() => {
+                    setAskCode(false);
+                    onVideo(preview.file, "api");
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -507,30 +541,42 @@ function ExampleCard({ example, onPick, wide = false }: { example: Example; onPi
   );
 }
 
-/** Real-run mode only (`?runner=api`): the tester code, typed once and kept on this device. */
-function TesterCode() {
+/**
+ * The tester code, typed once and kept on this device. Shown on the upload screen in real-run mode
+ * (`?runner=api`), and on the video card when a real run is asked for without one (`onSaved` then starts it).
+ */
+function TesterCode({
+  autoFocus = false,
+  submitLabel = "Save",
+  onSaved,
+}: { autoFocus?: boolean; submitLabel?: string; onSaved?: () => void } = {}) {
   const [code, setCode] = useState("");
   const [saved, setSaved] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const c = loadTestCode();
     setCode(c);
     setSaved(Boolean(c));
-  }, []);
+    if (autoFocus) field.current?.focus();
+  }, [autoFocus]);
   return (
     <form
-      className="mt-4 rounded-xl bg-white/70 p-3"
+      className={onSaved ? "mt-3" : "mt-4 rounded-xl bg-white/70 p-3"}
       onSubmit={(e) => {
         e.preventDefault();
         saveTestCode(code);
-        setSaved(Boolean(code.trim()));
+        const ok = Boolean(code.trim());
+        setSaved(ok);
+        if (ok) onSaved?.();
       }}
     >
-      <label htmlFor="tester-code" className="block text-sm font-semibold">
+      <label htmlFor={onSaved ? "tester-code-run" : "tester-code"} className="block text-sm font-semibold">
         Tester code for real runs
       </label>
       <div className="mt-2 flex gap-2">
         <input
-          id="tester-code"
+          ref={field}
+          id={onSaved ? "tester-code-run" : "tester-code"}
           type="password"
           autoComplete="off"
           value={code}
@@ -540,8 +586,8 @@ function TesterCode() {
           }}
           className="min-h-11 min-w-0 flex-1 rounded-lg border border-ink/20 bg-white px-3 text-base"
         />
-        <button type="submit" className="btn-secondary shrink-0 text-sm">
-          Save
+        <button type="submit" className={`${onSaved ? "btn-primary" : "btn-secondary"} shrink-0 text-sm`}>
+          {submitLabel}
         </button>
       </div>
       <p aria-live="polite" className="mt-1 text-xs text-ink/70">

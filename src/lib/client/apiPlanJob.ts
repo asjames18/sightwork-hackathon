@@ -60,8 +60,19 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
  * Screen text for a non-OK /api/plan response, keyed by status. The server's own
  * {error} text is written for developers, so it goes to the console, not the screen.
  */
+/** The 401 text. The flow matches it to offer the tester-code prompt again with the same video. */
+export const TESTER_CODE_MESSAGE = "Real runs need a tester code. Enter it to run this video, or open the example plan.";
+
+/** A code was sent and the server refused it (typo, or the code was changed). Also reopens the prompt. */
+export const WRONG_CODE_MESSAGE = "That tester code wasn't accepted. Check it and enter it again, or open the example plan.";
+
+/** True for either tester-code failure, so the flow can offer the code prompt with the same video. */
+export function isTesterCodeFailure(message: string): boolean {
+  return message === TESTER_CODE_MESSAGE || message === WRONG_CODE_MESSAGE;
+}
+
 export function messageForStatus(status: number): string {
-  if (status === 401) return "Real runs need a tester code. Enter it on the start screen, or open the example plan.";
+  if (status === 401) return TESTER_CODE_MESSAGE;
   if (status === 413) return "That video is too large to send. Try a shorter walkthrough.";
   if (status === 400) return "The video's frames didn't come through right. Try again, or open the example plan.";
   if (status === 429) return "Too many plans are running right now. Wait a minute and try again.";
@@ -185,7 +196,7 @@ export function createApiPlanJob(
       const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal);
       if (signal.aborted) return;
       if (split === "unauthorized") {
-        fail(messageForStatus(401));
+        fail(WRONG_CODE_MESSAGE);
         return;
       }
       body = split;
@@ -205,7 +216,8 @@ export function createApiPlanJob(
     }
     if (!res.ok || !res.body) {
       if (!res.ok) await logServerError(res);
-      fail(res.ok ? GENERIC_FAIL : messageForStatus(res.status));
+      // A code was sent (checked above), so a 401 here means the server refused it.
+      fail(res.ok ? GENERIC_FAIL : res.status === 401 ? WRONG_CODE_MESSAGE : messageForStatus(res.status));
       return;
     }
 
