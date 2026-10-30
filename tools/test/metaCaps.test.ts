@@ -1,4 +1,4 @@
-/** Spend bounds on the Meta callers (Mosheh 3cde733 image n cap, 7a9f99c Spark image cap): over-cap requests throw before any fetch. No network. */
+/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c): over-cap requests throw before any fetch. No network. */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createMetaClient } from "@/lib/meta/client";
