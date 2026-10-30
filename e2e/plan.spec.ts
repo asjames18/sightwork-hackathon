@@ -236,3 +236,37 @@ test("plan screen: tap a proof photo to see it full size with its outline; Esc c
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toBeHidden();
 });
+
+test("materials shopping list: tick items off, ticks survive a reload, and Send copies only what's left", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(REAL_RUN);
+    await page.evaluate(() => {
+      for (const k of Object.keys(localStorage)) if (k.startsWith("sightwork:materials:")) localStorage.removeItem(k);
+    });
+    await page.reload();
+    const section = page.locator("#materials");
+    await section.scrollIntoViewIfNeeded();
+    const boxes = section.getByRole("checkbox", { name: /^Got it: / });
+    const count = await boxes.count();
+    expect(count).toBeGreaterThan(1);
+    const first = boxes.first();
+    const firstName = ((await first.getAttribute("aria-label")) ?? "").replace(/^Got it: /, "");
+    await first.check();
+    await expect(section.getByText(`1 of ${count} items in hand.`)).toBeVisible();
+    await page.reload();
+    await expect(page.locator("#materials").getByRole("checkbox", { name: /^Got it: / }).first()).toBeChecked();
+    await page.locator("#materials").getByRole("button", { name: "Send what's left" }).click();
+    await expect(page.locator("#materials").getByText("Shopping list copied.")).toBeVisible();
+    const text = await page.evaluate(() => navigator.clipboard.readText());
+    expect(text).toContain(`${count - 1} still needed, 1 already in hand.`);
+    expect(text).not.toContain(`[ ] ${firstName}:`);
+    await expectNoSideScroll(page);
+    // Axe at the top of the page: mid-scroll, the sticky section chips sit over whatever row is under them.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectNoAxeViolations(page, `materials list ${width}`);
+    await page.locator("#materials").getByRole("button", { name: "Clear ticks" }).click();
+    await expect(page.locator("#materials").getByRole("button", { name: "Send shopping list" })).toBeVisible();
+  }
+});

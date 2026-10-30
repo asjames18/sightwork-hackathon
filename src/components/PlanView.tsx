@@ -3,6 +3,7 @@ import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { WorkSteps } from "./WorkSteps";
+import { MaterialsList } from "./MaterialsList";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictFor } from "@/lib/review";
 
@@ -407,22 +408,7 @@ export function PlanView({
       <div className={plan.costRange || plan.materials.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-8" : undefined}>
         <Section title="Materials" id="materials">
           {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
-          <ul className={plan.materials.length ? "divide-y divide-ink/10 rounded-2xl bg-white" : "hidden"}>
-            {plan.materials.map((m) => (
-              <li key={m.item} className="flex items-start justify-between gap-3 p-3 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium break-words">{m.item}</p>
-                  <p className="text-sm text-ink/70">
-                    {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-semibold">{m.qty}</p>
-                  {m.unitCost && <p className="text-sm text-ink/70">{usd(m.unitCost[0])}–{usd(m.unitCost[1])} each</p>}
-                </div>
-              </li>
-            ))}
-          </ul>
+          {plan.materials.length > 0 && <MaterialsList plan={plan} sample={sample} />}
         </Section>
 
         {!plan.costRange && plan.materials.length > 0 && (

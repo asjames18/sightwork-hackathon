@@ -1,0 +1,110 @@
+import type { WorkPlan } from "@/lib/types";
+
+/**
+ * Materials shopping list: which materials are already in hand, kept on this device per plan so whoever
+ * does the buying can tick items off in the store and come back later. Browser only; storage can be full
+ * or off, so every call fails quietly.
+ */
+const PREFIX = "sightwork:materials:v1:";
+/** Oldest entries are dropped past this many plans, so storage never grows without bound. */
+const MAX_PLANS = 20;
+
+type PlanMaterials = Pick<WorkPlan, "spaceName" | "materials">;
+type Stored = { got: number[]; at: number };
+
+/** Stable key for a plan: its name plus its material lines in order (FNV-1a hash), so a new run gets a fresh list. */
+export function planMaterialsKey(plan: PlanMaterials): string {
+  const src = [plan.spaceName, ...plan.materials.map((m, i) => `${i}:${m.item}:${m.qty}`)].join("\u0001");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < src.length; i++) {
+    h ^= src.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return PREFIX + h.toString(36);
+}
+
+/** Indexes (into plan.materials) already ticked as got, limited to items that still exist. */
+export function loadGotMaterials(plan: PlanMaterials): number[] {
+  try {
+    const raw = window.localStorage.getItem(planMaterialsKey(plan));
+    if (!raw) return [];
+    const saved = JSON.parse(raw) as Stored;
+    if (!saved || !Array.isArray(saved.got)) return [];
+    const n = plan.materials.length;
+    return [...new Set(saved.got.filter((i) => Number.isInteger(i) && i >= 0 && i < n))].sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+/** Saves the ticked items; an empty list removes the entry. Returns false when storage refused it. */
+export function saveGotMaterials(plan: PlanMaterials, got: number[]): boolean {
+  const key = planMaterialsKey(plan);
+  try {
+    const ls = window.localStorage;
+    if (got.length === 0) {
+      ls.removeItem(key);
+      return true;
+    }
+    const value: Stored = { got: [...new Set(got)].sort((a, b) => a - b), at: Date.now() };
+    ls.setItem(key, JSON.stringify(value));
+    prune(ls);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function prune(ls: Storage) {
+  if (typeof ls.length !== "number" || typeof ls.key !== "function") return;
+  const entries: { key: string; at: number }[] = [];
+  for (let i = 0; i < ls.length; i++) {
+    const k = ls.key(i);
+    if (!k || !k.startsWith(PREFIX)) continue;
+    let at = 0;
+    try {
+      at = Number((JSON.parse(ls.getItem(k) ?? "{}") as Stored).at) || 0;
+    } catch {}
+    entries.push({ key: k, at });
+  }
+  if (entries.length <= MAX_PLANS) return;
+  entries.sort((a, b) => a.at - b.at);
+  for (const e of entries.slice(0, entries.length - MAX_PLANS)) ls.removeItem(e.key);
+}
+
+/** "3 of 7 items in hand", "Everything is in hand", or "" when nothing is ticked. */
+export function gotLine(got: number, total: number): string {
+  if (total === 0 || got === 0) return "";
+  if (got >= total) return total === 1 ? "The item is in hand." : `All ${total} items in hand.`;
+  return `${got} of ${total} item${total === 1 ? "" : "s"} in hand.`;
+}
+
+const clean = (s: string) => s.replace(/\s+/g, " ").trim();
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+/**
+ * The still-needed materials as plain text, for whoever is doing the buying.
+ * Each line carries its quantity, the problems it fixes and a per-unit price estimate when the plan has one.
+ * Returns "" when everything is already in hand.
+ */
+export function shoppingListText(plan: PlanMaterials, got: number[] = [], opts: { sample?: boolean } = {}): string {
+  const have = new Set(got);
+  const need = plan.materials.filter((_, i) => !have.has(i));
+  if (need.length === 0) return "";
+  const lines = [`Shopping list: ${clean(plan.spaceName) || "Walkthrough"}`];
+  if (opts.sample) lines.push("(Example plan with sample data, not a real run.)");
+  if (have.size > 0) lines.push(`${need.length} still needed, ${plan.materials.length - need.length} already in hand.`);
+  lines.push("");
+  for (const m of need) {
+    const extra = [
+      m.forIssues?.length ? `for #${m.forIssues.join(", #")}` : null,
+      m.unitCost ? `about ${m.unitCost[0] === m.unitCost[1] ? usd(m.unitCost[0]) : `${usd(m.unitCost[0])}-${usd(m.unitCost[1])}`} each` : null,
+      m.note ? clean(m.note) : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    lines.push(`[ ] ${clean(m.item)}: ${clean(m.qty)}${extra ? ` (${extra})` : ""}`);
+  }
+  lines.push("", need.some((m) => m.unitCost) ? "Prices are rough estimates, not quotes. Made with SightWork." : "Made with SightWork.");
+  return lines.join("\n");
+}

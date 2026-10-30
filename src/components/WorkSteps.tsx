@@ -108,7 +108,7 @@ export function WorkSteps({ plan }: { plan: WorkPlan }) {
                   type="checkbox"
                   checked={isDone}
                   onChange={(e) => toggle(step.order, e.target.checked)}
-                  className="h-5 w-5 cursor-pointer accent-[var(--color-safe-dark)]"
+                  className="h-6 w-6 cursor-pointer accent-[var(--color-safe-dark)]"
                   aria-label={`Step ${step.order} done: ${step.title}`}
                 />
                 <span aria-hidden="true" className="hidden sm:inline">Done</span>
