@@ -52,7 +52,7 @@ export interface ReviewFrame {
 export interface ReviewInput {
   /** The plan's issues, in rank order. At least the rank, title, and detail ride into the prompt. */
   issues: Pick<Issue, "rank" | "title" | "detail" | "proofFrames">[];
-  /** Proof photos to attach. Deduped and capped by the caller; this step only checks the cap. */
+  /** Proof photos to attach. Capped by the caller; this step checks the cap and rejects a repeated frame, so one photo never rides twice. */
   frames: ReviewFrame[];
 }
 
@@ -185,6 +185,27 @@ function inputProblems(input: ReviewInput): string[] {
   });
   if (input.frames.length > MAX_REVIEW_IMAGES) {
     errs.push(`review: at most ${MAX_REVIEW_IMAGES} frames per request, got ${input.frames.length}`);
+  }
+  // A repeated frame would ride to the model twice, spending an image
+  // slot on a photo already attached and giving two prompt letters to
+  // one photo. The wiring dedupes via pickReviewFrames, but a direct
+  // caller gets the same fail-fast here, before any call is spent.
+  // Only valid indices are compared, so a bad index keeps its own
+  // message instead of also drawing a duplicate one.
+  {
+    const seenFrameIndices = new Set<number>();
+    input.frames.forEach((frame, i) => {
+      if (
+        isRecord(frame) &&
+        Number.isInteger(frame.frameIndex) &&
+        (frame.frameIndex as number) >= 0
+      ) {
+        if (seenFrameIndices.has(frame.frameIndex as number)) {
+          errs.push(`review: frames[${i}].frameIndex duplicates an earlier frame`);
+        }
+        seenFrameIndices.add(frame.frameIndex as number);
+      }
+    });
   }
   input.frames.forEach((frame, i) => {
     if (!isRecord(frame)) {
