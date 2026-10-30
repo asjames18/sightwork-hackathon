@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDuration, HARD_MAX_SEC, SOFT_MAX_SEC } from "@/lib/client/duration";
+import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel } from "@/lib/client/micLevel";
+import { keepScreenOn } from "@/lib/client/wakeLock";
 import {
   averageBitrate,
   baseMime,
@@ -67,6 +69,10 @@ export function CameraRecorder({
   const [phase, setPhase] = useState<Phase>("starting");
   const [settings, setSettings] = useState<MediaTrackSettings | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  // Live mic level (0..1), whether the stream has a mic at all, and the "can't hear you" hint.
+  const [level, setLevel] = useState(0);
+  const [hasMic, setHasMic] = useState<boolean | null>(null);
+  const [tooQuiet, setTooQuiet] = useState(false);
   // Keep the latest callbacks without restarting the camera when the parent re-renders.
   const cb = useRef({ onRecorded, onCancel, onUnavailable });
   useEffect(() => {
@@ -119,6 +125,7 @@ export function CameraRecorder({
         v.srcObject = stream;
         v.play().catch(() => {});
       }
+      setHasMic(stream.getAudioTracks().length > 0);
       setPhase("ready");
     })();
     return () => {
@@ -204,6 +211,36 @@ export function CameraRecorder({
     }, 250);
   }, [settings, stop, stopTracks]);
 
+  // Keep the screen on while the camera is open, so auto-lock can't end a take mid-walk.
+  const cameraOpen = phase === "ready" || phase === "recording";
+  useEffect(() => {
+    if (!cameraOpen) return;
+    return keepScreenOn();
+  }, [cameraOpen]);
+
+  // Mic meter while the camera is open. The quiet hint only counts time while recording.
+  useEffect(() => {
+    if (!cameraOpen || !streamRef.current) return;
+    const meter = openMicMeter(streamRef.current);
+    if (!meter) return;
+    let smoothed = 0;
+    let quietSince: number | null = null;
+    const id = setInterval(() => {
+      smoothed = smoothLevel(smoothed, meter.read());
+      setLevel(smoothed);
+      if (phase === "recording") {
+        const now = performance.now() / 1000;
+        quietSince = nextQuietSince(quietSince, smoothed, now);
+        setTooQuiet(isTooQuiet(quietSince, now));
+      }
+    }, 100);
+    return () => {
+      clearInterval(id);
+      meter.close();
+      setTooQuiet(false);
+    };
+  }, [cameraOpen, phase]);
+
   const cancel = useCallback(() => {
     discardRef.current = true;
     stopTick();
@@ -246,6 +283,23 @@ export function CameraRecorder({
             {formatDuration(elapsed)}
           </span>
         )}
+        {cameraOpen && hasMic && (
+          <span
+            className="absolute right-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white"
+            data-testid="mic-level"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current">
+              <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z" />
+            </svg>
+            <span className="sr-only">Microphone level</span>
+            <span aria-hidden className="relative h-1.5 w-12 overflow-hidden rounded-full bg-white/30">
+              <span
+                className="absolute inset-y-0 left-0 rounded-full bg-emerald-400 transition-[width] duration-100"
+                style={{ width: `${Math.round(Math.max(level, 0.04) * 100)}%` }}
+              />
+            </span>
+          </span>
+        )}
       </div>
       <div className="p-4">
         <p className="text-sm text-ink/70" data-testid="recording-resolution">
@@ -267,6 +321,16 @@ export function CameraRecorder({
         {recording && state === "long" && (
           <p role="status" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Past {formatDuration(SOFT_MAX_SEC)}: wrap up soon. Recording stops by itself in {secondsLeft(elapsed)} s.
+          </p>
+        )}
+        {recording && tooQuiet && (
+          <p role="status" className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900" data-testid="mic-quiet">
+            We can&apos;t hear you. Say what you see as you walk, like &ldquo;this chair is broken.&rdquo;
+          </p>
+        )}
+        {cameraOpen && hasMic === false && (
+          <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="mic-missing">
+            No microphone, so the plan will use the video only. Allow the microphone to add your narration.
           </p>
         )}
         {recording && state === "short" && (

@@ -169,3 +169,57 @@ test("WebM recording (browsers without MP4 recording): the take's length still r
   await expect(card).toContainText("0:06");
   await expect(card).not.toContainText("couldn't read this video's length");
 });
+
+/** Counts screen wake lock requests and releases (Chromium headless may not grant a real one). */
+const stubWakeLock = () => {
+  const w = window as unknown as { __wake: { requested: number; released: number } };
+  w.__wake = { requested: 0, released: 0 };
+  Object.defineProperty(navigator, "wakeLock", {
+    configurable: true,
+    value: {
+      request: async () => {
+        w.__wake.requested++;
+        const s = {
+          released: false,
+          release: async () => {
+            if (!s.released) w.__wake.released++;
+            s.released = true;
+          },
+        };
+        return s;
+      },
+    },
+  });
+};
+
+test("Record: the screen is kept on while the camera is open, and the mic level moves with sound", async ({ page }) => {
+  await page.addInitScript(stubWakeLock);
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  const cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __wake: { requested: number } }).__wake.requested)).toBeGreaterThan(0);
+
+  // The fake mic plays a beep, so the bar rises above its 4% floor.
+  const meter = cam.getByTestId("mic-level");
+  await expect(meter).toBeVisible();
+  await expect(meter.getByText("Microphone level")).toBeAttached();
+  await expect
+    .poll(async () => meter.locator("span[style]").evaluate((el) => parseFloat((el as HTMLElement).style.width)))
+    .toBeGreaterThan(4);
+
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await expect(cam).toHaveAttribute("data-phase", "recording");
+  await expect(meter).toBeVisible();
+  await expect(cam.getByTestId("mic-missing")).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  await expect(cam.getByTestId("mic-quiet")).toHaveCount(0);
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "recorder with mic level");
+
+  await cam.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("group", { name: "Camera" })).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __wake: { released: number } }).__wake.released))
+    .toBeGreaterThan(0);
+});
