@@ -210,9 +210,16 @@ export function validateTranscribeInput(input: TranscribeInput): void {
       off += 8 + size + (size % 2);
     }
   }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts)
+  // and validateRunPlanRequest: an empty string means "not given"
+  // (the cleanup fill below already defaults an empty spaceType to
+  // "room"), so only a non-string or a spaces-only string fails here.
+  // A plan request with narration and spaceType "" used to pass both
+  // route validators and then fail at "listening" inside runTranscribe.
   if (
     input.spaceType !== undefined &&
-    (typeof input.spaceType !== "string" || !input.spaceType.trim())
+    (typeof input.spaceType !== "string" ||
+      (input.spaceType.length > 0 && input.spaceType.trim().length === 0))
   ) {
     throw new Error("transcribe: spaceType is not a non-empty string");
   }
