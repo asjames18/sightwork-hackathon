@@ -13,9 +13,10 @@
  * is injected, like the reason step's, so the step is testable on
  * mock data and the spike can swap callers without touching this
  * logic. Prompt and schema are injected too: the prompt wording
- * lives in the planning repo (prompt 06, still to come), and the
- * schema below mirrors PlanReviewItem, so the caller sends the
- * finished prompt the wiring code built from the plan.
+ * is prompt 06, built by the wiring code from the finished plan
+ * (src/lib/reviewPrompt.ts), and the schema below mirrors
+ * PlanReviewItem, so the caller sends the finished prompt the
+ * wiring code built from the plan.
  *
  * Never fails a run. A call failure, a validation failure after one
  * retry, or a bad step input returns `{ ran: false, items: [] }`
