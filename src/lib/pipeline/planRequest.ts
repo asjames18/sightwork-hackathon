@@ -22,6 +22,15 @@ export const MAX_PLAN_BODY_BYTES = 10 * 1024 * 1024;
  */
 export const MAX_PLAN_FRAMES = 48;
 
+/**
+ * Max decoded bytes per plan frame, same bound as the reason,
+ * segment, runPlan, and renderAfter step caps and the Spark, SAM,
+ * Baseten, and Image caller caps. Frames are 1024 px JPEGs from the
+ * browser builder, so 5 MB is wide headroom; a larger frame is not
+ * something the UI produces.
+ */
+export const MAX_PLAN_FRAME_IMAGE_BYTES = 5 * 1024 * 1024;
+
 /** True when the raw request text is over the route body cap. */
 export function planBodyTooLarge(bodyText: string): boolean {
   return new TextEncoder().encode(bodyText).length > MAX_PLAN_BODY_BYTES;
@@ -223,6 +232,19 @@ export function validatePlanRequest(body: unknown): string[] {
           problems.push(`frames[${i}].dataUrl must carry valid base64 image data`);
         } else if (!isImageBase64(payload)) {
           problems.push(`frames[${i}].dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`);
+        } else {
+          // Same shape as the step and caller caps: the route body
+          // cap is 10 MB, so a single frame over 5 MB would pass
+          // this gate and only surface later, in runPlan, instead
+          // of failing fast here on "uploading" before any model
+          // call is spent. 5 MB decoded is wide headroom over a
+          // 1024 px JPEG frame, so no valid request changes.
+          const stripped = payload.replace(/\s/g, "");
+          const padding = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+          const decodedBytes = (stripped.length * 3) / 4 - padding;
+          if (decodedBytes > MAX_PLAN_FRAME_IMAGE_BYTES) {
+            problems.push(`frames[${i}].dataUrl must be at most 5 MB, got ${decodedBytes} bytes`);
+          }
         }
       }
       // zoneId is optional (types.ts: PlanRequest frames), but when
