@@ -245,6 +245,11 @@ export interface WorkPlan {
     /** Which engine wrote the plan (reason + work order). Omitted = Meta Muse Spark. */
     planProvider?: PlanProvider;
     /**
+     * City and state the run was for ("Sebring, FL"), as sent in PlanRequest.region. Kept even when the
+     * cost step failed (costRange null), so the plan still says where it is. Omitted on older plans.
+     */
+    region?: string;
+    /**
      * Optional steps that did not run this time (e.g. Meta model access off). The plan is still complete.
      * cost: a region was given but the cost step failed, so costRange is null for that reason (not a missing region).
      */

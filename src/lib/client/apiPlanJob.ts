@@ -5,6 +5,7 @@ import type { PlanJobRunner } from "./planJob";
 import { BuildRequestError } from "./buildPlanRequest";
 import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
 import { loadRegion } from "./location";
+import { withRunRegion } from "./planText";
 
 /**
  * Turns the picked video into the request body (frames + narration).
@@ -250,7 +251,8 @@ export function createApiPlanJob(
       const s = parseStatusLine(line);
       if (!s || finished) return;
       if (s.state !== "running") finished = true;
-      report(s);
+      // The plan keeps the City, ST it was run for, even when the cost step failed and costRange is null.
+      report(s.state === "done" ? { ...s, plan: withRunRegion(s.plan, body.region) } : s);
     };
 
     try {

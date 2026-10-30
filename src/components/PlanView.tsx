@@ -11,6 +11,7 @@ import { ProblemList } from "./ProblemList";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { issueCostShares, stepCostShares } from "@/lib/costShares";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
+import { planLocation } from "@/lib/client/planText";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -109,6 +110,7 @@ export function PlanView({
   const issueCosts = issueCostShares(plan);
   const stepCosts = stepCostShares(plan);
   const metaParts = planMetaParts(plan);
+  const location = planLocation(plan);
   const unmentioned = narrated ? rankedIssues(plan).filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
@@ -177,6 +179,12 @@ export function PlanView({
       )}
 
       <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
+      {location && (
+        <p className="mt-1 text-sm font-semibold text-ink/80 break-words" data-testid="plan-location">
+          <span className="sr-only">Location: </span>
+          {location}
+        </p>
+      )}
       {metaParts ? (
         <p className="mt-1 text-sm text-ink/70">
           <span className="sr-only">Walkthrough video: </span>
@@ -337,8 +345,8 @@ export function PlanView({
         {!plan.costRange && plan.materials.length > 0 && (
           <Section title="What it might cost">
             <Empty>
-              {plan.meta?.skipped?.cost
-                ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
+              {plan.meta?.skipped?.cost || (location && !sample)
+                ? `The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for ${location ?? "your area"}.`
                 : sample
                   ? "This sample has no cost range. On a real run with a city or region, SightWork prices the materials and labor for that area."
                   : "This run didn\u2019t include a city and state, so there\u2019s no cost range. New runs ask for them before the plan is made."}

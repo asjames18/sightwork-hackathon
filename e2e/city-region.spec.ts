@@ -137,3 +137,28 @@ test("example plans and the example preview are unaffected", async ({ page }) =>
   await card.getByRole("button", { name: "Make my work plan" }).click();
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
 });
+
+test("cost step failed: the plan still says where it is and offers to price it for that city", async ({ page }) => {
+  const plan = {
+    ...sanctuary,
+    meta: { ...sanctuary.meta, isExample: undefined, skipped: { cost: true } },
+    costRange: null,
+  };
+  await page.route("**/api/transcribe", (r) => r.fulfill({ json: { transcript: "", transcriptTurns: [] } }));
+  await page.route("**/api/plan", (r) =>
+    r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "done", plan }) + "\n" }),
+  );
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  const card = page.getByRole("group", { name: "Your walkthrough" });
+  await card.getByLabel("City").fill("Sebring");
+  await card.getByLabel("State").selectOption("FL");
+  await card.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByTestId("plan-location")).toHaveText(/Sebring, FL/, { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /Cost range for/ })).toHaveCount(0);
+  await expect(page.getByText("try again to price them for Sebring, FL.")).toBeVisible();
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "plan with a city but no cost range");
+  await shoot(page, "city-region-no-cost-390.png");
+});

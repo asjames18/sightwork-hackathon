@@ -22,10 +22,25 @@ export function shareDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** City and state the plan was priced for ("Sebring, FL"), when it has one. */
-export function planLocation(plan: Pick<WorkPlan, "costRange">): string | null {
-  const r = plan.costRange?.region ? clean(plan.costRange.region) : "";
+/**
+ * City and state the plan is for ("Sebring, FL"), when it has one: the run's own region first (kept even when
+ * the cost step failed), else the region the cost range was priced for.
+ */
+export function planLocation(plan: Pick<WorkPlan, "costRange" | "meta">): string | null {
+  const fromMeta = typeof plan.meta?.region === "string" ? clean(plan.meta.region) : "";
+  if (fromMeta) return fromMeta;
+  const r = typeof plan.costRange?.region === "string" ? clean(plan.costRange.region) : "";
   return r || null;
+}
+
+/**
+ * The finished plan with the region the browser sent stamped on as meta.region, when the server left it off.
+ * A region the server already set wins; a blank region changes nothing. Never mutates the input.
+ */
+export function withRunRegion(plan: WorkPlan, region: string | null | undefined): WorkPlan {
+  const r = typeof region === "string" ? clean(region) : "";
+  if (!r || (typeof plan.meta?.region === "string" && plan.meta.region.trim())) return plan;
+  return { ...plan, meta: { ...(plan.meta ?? {}), region: r } };
 }
 
 /** "3 problems, worst first" / "1 problem" / "No problems found". */
