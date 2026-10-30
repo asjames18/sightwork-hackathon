@@ -50,6 +50,7 @@ export function ProcessingStep({
   onRetry,
   onExample,
   onEnterCode,
+  enterCodeLabel = "Enter tester code",
   engines,
   skipped,
   checks,
@@ -64,6 +65,8 @@ export function ProcessingStep({
   onExample?: () => void;
   /** Set when the run stopped for a missing or wrong tester code: back to the video with the code prompt. */
   onEnterCode?: () => void;
+  /** Label for the onEnterCode button ("Add city and state" when the run was stopped for the location). */
+  enterCodeLabel?: string;
   /** Engine named under each step. Defaults to this page's plan provider (see src/lib/client/engines.ts). */
   engines?: Record<ScreenStep, string>;
   /** Optional steps the server skipped this run (e.g. Meta access off). Shown as skipped, not done. */
@@ -238,7 +241,7 @@ export function ProcessingStep({
                 onClick={onEnterCode}
                 className="btn-primary flex-1 active:scale-[.99]"
               >
-                Enter tester code
+                {enterCodeLabel}
               </button>
             ) : onRetry && (
               <button

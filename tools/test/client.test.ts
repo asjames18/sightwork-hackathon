@@ -7,6 +7,7 @@ import { requestBudgetBytes, MIN_REQUEST_BYTES, MAX_REQUEST_BYTES, BuildRequestE
 import { BLANK_TAKE_MESSAGE } from "@/lib/client/blankTake";
 import { parseStatusLine, messageForStatus, createApiPlanJob } from "@/lib/client/apiPlanJob";
 import { loadTestCode, saveTestCode, TEST_CODE_HEADER } from "@/lib/client/testCode";
+import { saveLocation } from "@/lib/client/location";
 import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
 import { pickMockKind } from "@/lib/mock/pickMockPlan";
 import { FEATURED_EXAMPLE } from "@/lib/examples";
@@ -101,6 +102,8 @@ describe("tester code and last plan storage", () => {
 async function runApi(opts: { chunks?: string[]; status?: number; throws?: boolean; code?: string }) {
   const w = fakeWindow();
   if (opts.code) saveTestCode(opts.code);
+  // Real runs need a city and state (Antonio, 2026-10-30); every runner test here has one saved.
+  saveLocation({ city: "Sebring", state: "FL" });
   const sent: { headers?: Record<string, string>; body?: string } = {};
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (_url: string, init: RequestInit) => {
@@ -177,6 +180,7 @@ describe("transcribe split (fake fetch, nothing leaves the machine)", () => {
   async function runSplit(transcribe: { status?: number; json?: unknown; throws?: boolean }, request?: Partial<PlanRequest>) {
     fakeWindow();
     saveTestCode("tester-2");
+    saveLocation({ city: "Sebring", state: "FL" });
     const calls: Call[] = [];
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string, init: RequestInit) => {
@@ -266,6 +270,7 @@ describe("API runner: a video problem found on the device", () => {
   async function runBuildFail(err: unknown) {
     fakeWindow();
     saveTestCode("tester-3");
+    saveLocation({ city: "Sebring", state: "FL" });
     const realFetch = globalThis.fetch;
     let fetches = 0;
     globalThis.fetch = (async () => {

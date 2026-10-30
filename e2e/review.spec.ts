@@ -54,6 +54,7 @@ test("real-run shape (stubbed API): Unverified badge with its reason, review lin
   await page.route("**/api/transcribe", (r) => r.fulfill({ json: { transcript: "[0.0] Stage check.", transcriptTurns: [{ startSec: 0, text: "Stage check." }] } }));
   await page.route("**/api/plan", (r) => r.fulfill({ contentType: "application/x-ndjson", body: lines.map((l) => JSON.stringify(l)).join("\n") + "\n" }));
   await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await page.getByRole("button", { name: "Make my work plan" }).click();

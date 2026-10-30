@@ -5,6 +5,7 @@ import { currentOwnVideoRunnerKind, needsTesterCode, pickRunnerKind, type Runner
 import { hasLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
+import { checkLocation, CITY_MAX, isUsStateCode, isValidCity, loadLocation, saveLocation, US_STATES, type RunLocation } from "@/lib/client/location";
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
@@ -61,7 +62,30 @@ export function UploadStep({
   }, []);
   // The tester-code prompt on the video card: shown when a real run is asked for without a saved code.
   const [askCode, setAskCode] = useState(false);
+  // City and state, required before a real run (the cost step prices for them), kept on this device.
+  const [loc, setLoc] = useState<RunLocation>({ city: "", state: "" });
+  const [locError, setLocError] = useState<string | null>(null);
+  const cityField = useRef<HTMLInputElement>(null);
+  const stateField = useRef<HTMLSelectElement>(null);
+  useEffect(() => setLoc(loadLocation()), []);
+  const changeLoc = (next: RunLocation) => {
+    setLoc(next);
+    saveLocation(next);
+    if (locError && checkLocation(next).ok) setLocError(null);
+  };
+  /** Shows the inline message and moves focus to the first missing field. True when both are filled. */
+  const locationReady = (): boolean => {
+    const c = checkLocation(loc);
+    if (c.ok) {
+      setLocError(null);
+      return true;
+    }
+    setLocError(c.message);
+    (c.missing === "state" ? stateField : cityField).current?.focus();
+    return false;
+  };
   const send = (file: File) => {
+    if (videoRunner === "api" && !locationReady()) return;
     if (needsTesterCode(videoRunner, loadTestCode())) setAskCode(true);
     else onVideo(file, videoRunner);
   };
@@ -85,7 +109,13 @@ export function UploadStep({
   useEffect(() => {
     if (!resumeFile) return;
     pick(resumeFile);
-    setAskCode(true);
+    // Stopped for the city and state: show that message (and the code prompt only if no code is saved).
+    const where = checkLocation(loadLocation());
+    if (where.ok) setAskCode(true);
+    else {
+      setLocError(where.message);
+      setAskCode(!loadTestCode());
+    }
   }, [resumeFile, pick]);
   // Desktop: drop a video anywhere on the upload screen (dropping it outside a target used to make the
   // browser open the file in the tab and leave the app). The drop zone lights up while a file is dragged.
@@ -307,6 +337,15 @@ export function UploadStep({
             </p>
           )}
           <div className="px-4 pb-4">
+            {videoRunner === "api" && (
+              <LocationFields
+                value={loc}
+                onChange={changeLoc}
+                error={locError}
+                cityRef={cityField}
+                stateRef={stateField}
+              />
+            )}
             <button
               type="button"
               disabled={!canSend}
@@ -328,6 +367,7 @@ export function UploadStep({
                   autoFocus
                   submitLabel="Save and make my plan"
                   onSaved={() => {
+                    if (!locationReady()) return;
                     setAskCode(false);
                     onVideo(preview.file, "api");
                   }}
@@ -594,5 +634,84 @@ function TesterCode({
         {saved ? "Saved on this device." : "Real runs use paid model credits, so they need a code."}
       </p>
     </form>
+  );
+}
+
+/**
+ * City and state for a real run, on the video card above "Make my work plan". Both are required: the
+ * cost step prices materials and labor for that area, and the plan says which area it priced for.
+ * Saved on this device as they're typed (src/lib/client/location.ts), so testers don't retype them.
+ */
+function LocationFields({
+  value,
+  onChange,
+  error,
+  cityRef,
+  stateRef,
+}: {
+  value: RunLocation;
+  onChange: (next: RunLocation) => void;
+  error: string | null;
+  cityRef: React.RefObject<HTMLInputElement | null>;
+  stateRef: React.RefObject<HTMLSelectElement | null>;
+}) {
+  const cityBad = Boolean(error) && !isValidCity(value.city);
+  const stateBad = Boolean(error) && !isUsStateCode(value.state);
+  return (
+    <fieldset className="mb-3" data-testid="location-fields">
+      <legend className="text-sm font-semibold">Where is this space?</legend>
+      <p id="location-hint" className="mt-0.5 text-xs text-ink/70">
+        Required for a real run. Used to price materials and labor for your area. Saved on this device.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <div className="min-w-0 flex-1">
+          <label htmlFor="run-city" className="block text-xs font-medium text-ink/80">
+            City
+          </label>
+          <input
+            ref={cityRef}
+            id="run-city"
+            type="text"
+            autoComplete="address-level2"
+            maxLength={CITY_MAX}
+            required
+            aria-invalid={cityBad || undefined}
+            aria-describedby={error ? "location-error location-hint" : "location-hint"}
+            placeholder="e.g. Sebring"
+            value={value.city}
+            onChange={(e) => onChange({ ...value, city: e.target.value })}
+            className={`mt-1 min-h-11 w-full rounded-lg border bg-white px-3 text-base ${cityBad ? "border-red-600" : "border-ink/20"}`}
+          />
+        </div>
+        <div className="w-[9.5rem] shrink-0">
+          <label htmlFor="run-state" className="block text-xs font-medium text-ink/80">
+            State
+          </label>
+          <select
+            ref={stateRef}
+            id="run-state"
+            autoComplete="address-level1"
+            required
+            aria-invalid={stateBad || undefined}
+            aria-describedby={error ? "location-error location-hint" : "location-hint"}
+            value={value.state}
+            onChange={(e) => onChange({ ...value, state: e.target.value })}
+            className={`mt-1 min-h-11 w-full rounded-lg border bg-white px-2 text-base ${stateBad ? "border-red-600" : "border-ink/20"}`}
+          >
+            <option value="">Choose…</option>
+            {US_STATES.map((st) => (
+              <option key={st.code} value={st.code}>
+                {st.code} · {st.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {error && (
+        <p id="location-error" role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </p>
+      )}
+    </fieldset>
   );
 }

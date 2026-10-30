@@ -4,6 +4,7 @@ import { parseStepCheck } from "@/lib/stepChecks";
 import type { PlanJobRunner } from "./planJob";
 import { BuildRequestError } from "./buildPlanRequest";
 import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
+import { loadRegion } from "./location";
 
 /**
  * Turns the picked video into the request body (frames + narration).
@@ -69,6 +70,17 @@ export const WRONG_CODE_MESSAGE = "That tester code wasn't accepted. Check it an
 /** True for either tester-code failure, so the flow can offer the code prompt with the same video. */
 export function isTesterCodeFailure(message: string): boolean {
   return message === TESTER_CODE_MESSAGE || message === WRONG_CODE_MESSAGE;
+}
+
+/**
+ * A real run needs the city and state (Antonio, 2026-10-30): the upload screen asks for them on the video
+ * card, so this only shows if storage was cleared mid-run. The flow reopens the card with the same video.
+ */
+export const LOCATION_REQUIRED_MESSAGE = "Add the city and state where this space is to make a plan from this video.";
+
+/** True when the flow should go back to the video card with the same video (tester code or city/state). */
+export function isResumeFailure(message: string): boolean {
+  return isTesterCodeFailure(message) || message === LOCATION_REQUIRED_MESSAGE;
 }
 
 export function messageForStatus(status: number): string {
@@ -182,9 +194,18 @@ export function createApiPlanJob(
       return;
     }
 
+    // City and state are required for a real run (the cost step prices for them); checked before any work.
+    const region = loadRegion();
+    if (!region) {
+      fail(LOCATION_REQUIRED_MESSAGE);
+      return;
+    }
+
     let body: PlanRequest;
     try {
       body = await buildRequest(file, signal);
+      // The saved "City, ST" rides on every real run as PlanRequest.region, unless the builder set one.
+      if (!body.region?.trim()) body = { ...body, region };
     } catch (err) {
       // A BuildRequestError says what's wrong with this video (too long, no picture, blank); show it.
       if (!signal.aborted) fail(err instanceof BuildRequestError ? err.message : READ_FAIL);
