@@ -94,7 +94,7 @@ export function ProofFrame({
         )}
         <span
           aria-hidden
-          className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white/90 backdrop-blur-sm transition group-hover:bg-black/80"
+          className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white/90 backdrop-blur-sm transition group-hover:bg-black/80 print:hidden"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M12 3h5v5M8 17H3v-5M17 3l-6 6M3 17l6-6" />

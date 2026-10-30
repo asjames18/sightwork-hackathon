@@ -80,7 +80,12 @@ test.describe("plan screen", () => {
     await expect(page.getByRole("navigation", { name: "Plan sections" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Make your own" })).toBeHidden();
     await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+    // The proof photos print, but their tap-to-enlarge badge is screen only.
+    const photo = page.getByRole("button", { name: /^See full size: / }).first();
+    await expect(photo.locator("img")).toBeVisible();
+    await expect(photo.locator("span:has(svg)")).toBeHidden();
     await page.emulateMedia({ media: "screen" });
+    await expect(photo.locator("span:has(svg)")).toBeVisible();
   });
 });
 
