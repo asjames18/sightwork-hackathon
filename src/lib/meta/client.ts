@@ -78,6 +78,19 @@ const DEFAULT_INPUT_PRICE_PER_MILLION = 1.25;
 const DEFAULT_OUTPUT_PRICE_PER_MILLION = 4.25;
 const DEFAULT_WEB_SEARCH_COST_USD = 0.0025;
 
+/**
+ * Most images one Spark call may carry. The reason step attaches the
+ * request's frames, and the route validator caps a plan request at 48
+ * frames (src/lib/pipeline/planRequest.ts MAX_PLAN_FRAMES), so every
+ * call the pipeline makes today carries at most 48; the judge carries
+ * exactly 3 and the cost step carries none. The tracker only sees a
+ * call's cost after it returns, so without a bound here one bad direct
+ * caller (say 1000 frames) would pay for all of them in a single huge
+ * token bill before any cap could stop it. Forty-eight matches the
+ * route cap, not a new limit on the pipeline.
+ */
+const MAX_SPARK_IMAGES = 48;
+
 /** Total attempts for a transient 404 model_not_found. */
 const MAX_SPARK_ATTEMPTS = 3;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
@@ -196,6 +209,11 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
           req.images.some((image) => typeof image !== "string" || image.trim().length === 0))
       ) {
         throw new Error("meta: images must be an array of non-empty strings");
+      }
+      if (req.images !== undefined && req.images.length > MAX_SPARK_IMAGES) {
+        throw new Error(
+          `meta: at most ${MAX_SPARK_IMAGES} images per request, got ${req.images.length}`,
+        );
       }
       // Parity with the reason step's validateReasonRequest and the
       // other Meta callers (SAM, Image, Baseten): an image must be a
