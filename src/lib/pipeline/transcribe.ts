@@ -126,7 +126,10 @@ export interface TranscribeDeps {
 /**
  * Fail fast on a bad transcribe request before any paid call. An
  * empty audio string still means "no narration" (the skip path below),
- * so only a non-string value is rejected here.
+ * so the audio checks run only on a non-empty string: valid base64,
+ * WAV header, the 32 MB step cap, and the mono s16le 16/24 kHz
+ * format Meta transcribe accepts (a WAV with no fmt chunk in the
+ * decoded head passes, left to runTranscribe and the provider).
  */
 export function validateTranscribeInput(input: TranscribeInput): void {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
@@ -151,6 +154,61 @@ export function validateTranscribeInput(input: TranscribeInput): void {
     input.audioWavBase64.trim().length === 0
   ) {
     throw new Error("transcribe: audioWavBase64 must not be blank when given");
+  }
+  // Parity with runTranscribe below and validateRunPlanRequest:
+  // a non-empty audio string that is not valid base64, not a WAV,
+  // over the 32 MB step cap, or in a format Meta transcribe refuses
+  // used to pass this validator and only fail inside runTranscribe,
+  // after validation — so the transcribe route answered 500 ("We
+  // couldn't transcribe that narration") instead of 400 for
+  // malformed audio, and a direct caller validating first got a
+  // mid-run failure instead of a fail-fast one. The messages match
+  // runTranscribe's, so a caller that validates first and a caller
+  // that runs both see the same error. A WAV with no fmt chunk in
+  // the decoded head passes, like the route validator, and is left
+  // to runTranscribe and the provider.
+  if (
+    typeof input.audioWavBase64 === "string" &&
+    input.audioWavBase64.length > 0
+  ) {
+    const bytes = audioByteLength(input.audioWavBase64);
+    if (bytes > MAX_AUDIO_BYTES) {
+      throw new Error(
+        `transcribe: audio is ${bytes} bytes, over the ${MAX_AUDIO_BYTES} byte limit`,
+      );
+    }
+    if (bytes < 12) {
+      throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
+    }
+    const head = Buffer.from(input.audioWavBase64, "base64").subarray(0, 12).toString("latin1");
+    if (head.slice(0, 4) !== "RIFF" || head.slice(8, 12) !== "WAVE") {
+      throw new Error("transcribe: audio is not a WAV file (missing RIFF/WAVE header)");
+    }
+    const fmtHead = Buffer.from(input.audioWavBase64.replace(/\s/g, "").slice(0, 268), "base64");
+    let off = 12;
+    while (off + 8 <= fmtHead.length) {
+      const id = fmtHead.subarray(off, off + 4).toString("latin1");
+      const size = fmtHead.readUInt32LE(off + 4);
+      if (id === "fmt " && size >= 16 && off + 8 + 16 <= fmtHead.length) {
+        const format = fmtHead.readUInt16LE(off + 8);
+        const channels = fmtHead.readUInt16LE(off + 10);
+        const sampleRate = fmtHead.readUInt32LE(off + 12);
+        const bits = fmtHead.readUInt16LE(off + 22);
+        if (
+          format !== 1 ||
+          channels !== 1 ||
+          (sampleRate !== 16000 && sampleRate !== 24000) ||
+          bits !== 16
+        ) {
+          throw new Error(
+            `transcribe: audio must be mono s16le WAV at 16000 or 24000 Hz ` +
+              `(got format ${format}, ${channels} channel(s), ${sampleRate} Hz, ${bits}-bit)`,
+          );
+        }
+        break;
+      }
+      off += 8 + size + (size % 2);
+    }
   }
   if (
     input.spaceType !== undefined &&
