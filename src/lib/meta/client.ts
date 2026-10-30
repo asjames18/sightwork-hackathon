@@ -91,6 +91,9 @@ const DEFAULT_WEB_SEARCH_COST_USD = 0.0025;
  */
 const MAX_SPARK_IMAGES = 48;
 
+/** Max decoded bytes per image, same shape as the SAM and Baseten callers' 5 MB image caps. */
+const MAX_SPARK_IMAGE_BYTES = 5 * 1024 * 1024;
+
 /** Total attempts for a transient 404 model_not_found. */
 const MAX_SPARK_ATTEMPTS = 3;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
@@ -235,6 +238,19 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
           }
           if (!isImageBase64(payload)) {
             throw new Error("meta: images must carry image data (JPEG, PNG, WebP, or GIF)");
+          }
+          // Same shape as the SAM and Baseten callers' image caps: the
+          // reason step's frames are small, but a direct caller bypassing
+          // the step had no per-image byte bound, so an unbounded image
+          // would ride onto a paid Spark call before any cap could stop
+          // it. 5 MB decoded is wide headroom over a 1024 px JPEG frame;
+          // reject it here, before any fetch.
+          const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+          const decodedBytes = (payload.length * 3) / 4 - padding;
+          if (decodedBytes > MAX_SPARK_IMAGE_BYTES) {
+            throw new Error(
+              `meta: image must be at most 5 MB, got ${decodedBytes} bytes`,
+            );
           }
         }
       }
