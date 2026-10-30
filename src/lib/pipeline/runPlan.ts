@@ -4,7 +4,9 @@
  * Stage order, matched to the UI steps in types.ts:
  *   listening (transcribe) -> looking + counting (segment) ->
  *   comparing (reason) -> planning (cost + assembly) ->
- *   picturing (renderAfter).
+ *   picturing (renderAfter) -> reviewing (review, optional).
+ * Reviewing is review-only and never fails a run: it checks the
+ * finished plan against its proof photos and lands on plan.review.
  * The route emits the first "uploading" status itself, right after it
  * parses the body; this runner starts at "listening".
  *
@@ -26,13 +28,17 @@
  * static dep prompt for that run (including the reason retry, which
  * reuses the step prompt). When absent, the static prompt is used
  * unchanged. The seam lives here, not in the step deps, because this
- * runner already assembles both step inputs.
+ * runner already assembles both step inputs. The review prompt works
+ * the same way: reviewPrompt builds prompt 06 from the finished plan
+ * (its issues and selected proof photos), and the route supplies the
+ * review caller alongside it.
  */
 
 import {
   AFTER_IMAGE_LABEL,
   checkWorkPlan,
   type PlanFrame,
+  type Issue,
   type PlanJobStatus,
   type PlanProvider,
   type PlanRequest,
@@ -51,6 +57,12 @@ import {
   type ReasonOutput,
 } from "./reason";
 import { runRenderAfter, type RenderAfterDeps } from "./renderAfter";
+import {
+  MAX_REVIEW_IMAGES,
+  REVIEW_SCHEMA,
+  runReview,
+  type ReviewSparkCaller,
+} from "./review";
 import { runSegment, type SegmentDeps } from "./segment";
 import {
   MAX_AUDIO_BYTES,
@@ -98,6 +110,30 @@ export interface RunPlanDeps {
    */
   reasonPrompt?: (input: ReasonInput) => string;
   costPrompt?: (input: CostInput, spaceType?: string) => string;
+  /**
+   * Reviewer step (prompt 06), optional: when both review and
+   * reviewPrompt are given, runPlan runs the reviewing step after
+   * picturing and attaches its result to plan.review; when both are
+   * absent, the run ends at picturing with no review, as before.
+   * Giving exactly one is a wiring bug and fails fast in
+   * validateRunPlanDeps. The caller is the plan step's provider
+   * caller (Baseten Muse Spark Open in baseten mode); the schema
+   * defaults to REVIEW_SCHEMA and the tracker is the shared one, so
+   * the review call counts against the spike cap like every step.
+   * runReview never throws for a runtime failure, so reviewing
+   * never fails a run: a failed review lands as ran:false.
+   */
+  review?: {
+    callSpark: ReviewSparkCaller;
+  };
+  /**
+   * Builds prompt 06 from the finished plan. Receives the plan's
+   * issues in rank order and the selected proof photos in attach
+   * order (Photo A, B, ...); the builder fills the prompt's photo
+   * and problem lists from them, including each problem's own
+   * photo letters and captions, and the schema placeholder.
+   */
+  reviewPrompt?: (input: ReviewPromptInput) => string;
   /** Shared with every step dep above; its totals land in plan.meta. */
   tracker: UsageTracker;
   /**
@@ -377,10 +413,24 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
   ) {
     throw new Error("runPlan: segmentConcurrency must be a whole number >= 1 when given");
   }
-  for (const field of ["reasonPrompt", "costPrompt", "onStatus"] as const) {
+  for (const field of ["reasonPrompt", "costPrompt", "reviewPrompt", "onStatus"] as const) {
     if (deps[field] !== undefined && typeof deps[field] !== "function") {
       throw new Error(`runPlan: ${field} must be a function when given`);
     }
+  }
+  if (deps.review !== undefined) {
+    if (
+      deps.review === null ||
+      typeof deps.review !== "object" ||
+      typeof deps.review.callSpark !== "function"
+    ) {
+      throw new Error("runPlan: review.callSpark must be a function when given");
+    }
+  }
+  if (
+    (deps.review === undefined) !== (deps.reviewPrompt === undefined)
+  ) {
+    throw new Error("runPlan: review and reviewPrompt must be given together");
   }
   if (deps.signal !== undefined && (deps.signal === null || typeof deps.signal !== "object")) {
     throw new Error("runPlan: signal must be an object when given");
@@ -783,6 +833,94 @@ export function validateRunPlanRequest(request: PlanRequest): void {
  * the reason step continues with no segmentation counts, so a blocked
  * SAM step never kills a real plan run (Grok Bot, 2026-10-27 11:20 AM).
  */
+
+/** One proof photo as the review prompt names it, in attach order (Photo A, B, ...). */
+export interface ReviewPhoto {
+  letter: string;
+  /** Index into the plan's frames. */
+  frameIndex: number;
+  /** Seconds into the video, for the prompt's m:ss times. */
+  tSec: number;
+}
+
+/** What reviewPrompt receives: the finished plan's issues plus the selected photos. */
+export interface ReviewPromptInput {
+  spaceType?: string;
+  /** The plan's issues, in rank order. */
+  issues: Issue[];
+  /** Selected proof photos, in attach order. The builder derives each
+   * problem's own photo letters (and captions, from that issue's
+   * proofFrames) from these frame indices. */
+  photos: ReviewPhoto[];
+}
+
+/**
+ * Pick the proof photos the reviewer sees, by prompt 06's photo list
+ * rule: per issue in rank order, its primary frame first, then its
+ * proofFrames in order; dedupe keeping first appearance. When more
+ * than MAX_REVIEW_IMAGES candidates exist, every issue's first photo
+ * wins a slot before any issue's second photo, then the remaining
+ * slots fill by ascending frame index. Returns the selected frame
+ * indices ascending: that is the attach order (Photo A is the
+ * earliest frame), so the letters stay stable whatever the issue
+ * order was. Frames outside the plan are dropped, never guessed.
+ */
+export function pickReviewFrames(
+  issues: Pick<Issue, "rank" | "frameIndex" | "proofFrames">[],
+  frameCount?: number,
+): number[] {
+  const inRange = (i: number): boolean =>
+    Number.isInteger(i) && i >= 0 && (frameCount === undefined || i < frameCount);
+  const ranked = [...issues].sort((a, b) => a.rank - b.rank);
+  const perIssue: number[][] = ranked.map((issue) => {
+    const seen = new Set<number>();
+    const out: number[] = [];
+    const candidates = [issue.frameIndex, ...(issue.proofFrames ?? []).map((pf) => pf.frameIndex)];
+    for (const fi of candidates) {
+      if (inRange(fi) && !seen.has(fi)) {
+        seen.add(fi);
+        out.push(fi);
+      }
+    }
+    return out;
+  });
+  const selected: number[] = [];
+  const chosen = new Set<number>();
+  for (const list of perIssue) {
+    if (selected.length >= MAX_REVIEW_IMAGES) break;
+    const first = list[0];
+    if (first !== undefined && !chosen.has(first)) {
+      chosen.add(first);
+      selected.push(first);
+    }
+  }
+  const rest: number[] = [];
+  for (const list of perIssue) {
+    for (const fi of list) {
+      if (!chosen.has(fi) && !rest.includes(fi)) rest.push(fi);
+    }
+  }
+  rest.sort((a, b) => a - b);
+  for (const fi of rest) {
+    if (selected.length >= MAX_REVIEW_IMAGES) break;
+    chosen.add(fi);
+    selected.push(fi);
+  }
+  return selected.sort((a, b) => a - b);
+}
+
+/** The selected proof photos as prompt letters, from the plan's frames. */
+export function buildReviewPhotos(
+  issues: Pick<Issue, "rank" | "frameIndex" | "proofFrames">[],
+  frames: Pick<PlanFrame, "tSec">[],
+): ReviewPhoto[] {
+  return pickReviewFrames(issues, frames.length).map((fi, i) => ({
+    letter: String.fromCharCode(65 + i),
+    frameIndex: fi,
+    tSec: frames[fi].tSec,
+  }));
+}
+
 export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<WorkPlan> {
   // Optional steps skipped so far this run, in stage order. Attached
   // to every later running status (Grok Bot, 2026-10-27 5:45 PM), so
@@ -1132,6 +1270,55 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   {
     const picturingCheck = stepChecksForPlan(plan).picturing;
     if (picturingCheck) emit("picturing", picturingCheck);
+  }
+
+  // reviewing: the review-only reviewer pass (prompt 06), only when
+  // the route wired it (review + reviewPrompt together). It runs
+  // after picturing, or after planning when picturing was skipped,
+  // because the plan is final by then either way. It never fails a
+  // run: runReview returns ran:false on any call, validation, or cap
+  // failure, and the plan still ships with "Review didn't run".
+  // When the review dep is absent, the run ends here with no review
+  // field, as before, and the processing screen's Reviewing row
+  // simply completes when the done plan arrives.
+  if (deps.review && deps.reviewPrompt) {
+    assertNotAborted(deps.signal);
+    emit("reviewing");
+    const photos = buildReviewPhotos(plan.issues, plan.frames ?? []);
+    let review: Awaited<ReturnType<typeof runReview>>;
+    try {
+      review = await runReview(
+        {
+          issues: plan.issues,
+          frames: photos.map((photo) => ({
+            frameIndex: photo.frameIndex,
+            dataUrl: (plan.frames ?? [])[photo.frameIndex].url,
+          })),
+        },
+        {
+          prompt: deps.reviewPrompt({
+            spaceType: request.spaceType,
+            issues: plan.issues,
+            photos,
+          }),
+          schema: REVIEW_SCHEMA,
+          callSpark: deps.review.callSpark,
+          tracker: deps.tracker,
+        },
+      );
+    } catch (err) {
+      if (isAbort(err)) throw err;
+      // runReview throws only for bad deps (already validated above),
+      // so anything here is a late wiring bug: log it and ship the
+      // finished plan with "Review didn't run" rather than failing
+      // the run at its last step.
+      console.warn(`runPlan: review failed unexpectedly, continuing without review: ${detailOf(err)}`);
+      review = { ran: false, items: [] };
+    }
+    return {
+      ...plan,
+      review: review.ran ? { ...review, source: "model" as const } : review,
+    };
   }
   return plan;
 }
