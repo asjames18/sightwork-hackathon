@@ -398,7 +398,9 @@ export function PlanView({
             <Empty>
               {plan.meta?.skipped?.cost
                 ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
-                : "No cost range yet. Add your city or region and we\u2019ll price the materials and labor for your area."}
+                : sample
+                  ? "This sample has no cost range. On a real run with a city or region, SightWork prices the materials and labor for that area."
+                  : "This run didn\u2019t include a city or region, so there\u2019s no cost range. The materials and work steps above are complete."}
             </Empty>
           </Section>
         )}
