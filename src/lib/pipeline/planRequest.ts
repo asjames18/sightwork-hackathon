@@ -272,6 +272,55 @@ export function validatePlanRequest(body: unknown): string[] {
       );
     }
   }
+  // Parity with runPlan's own validator (validateRunPlanRequest in
+  // runPlan.ts): a request may carry narration already transcribed by
+  // POST /api/transcribe instead of the WAV, so the route must check
+  // the pair here on "uploading" instead of letting a bad pair ride
+  // into the pipeline and fail at "listening". Null means no
+  // narration (the transcribe route's empty result); a blank string
+  // is neither, so it fails. Turns without a transcript would be
+  // silently ignored by the listening stage, so they fail too — the
+  // pair arrives together from /api/transcribe. No separate length
+  // cap: the 10 MB body cap above already bounds the transcript, and
+  // runPlan sets no cap either, so parity means none here.
+  if (
+    req.transcript !== undefined &&
+    req.transcript !== null &&
+    typeof req.transcript !== "string"
+  ) {
+    problems.push("transcript must be a string or null when given");
+  } else if (
+    typeof req.transcript === "string" &&
+    req.transcript.trim().length === 0
+  ) {
+    problems.push("transcript must not be blank when given");
+  }
+  if (req.transcriptTurns !== undefined) {
+    if (!Array.isArray(req.transcriptTurns)) {
+      problems.push("transcriptTurns must be an array when given");
+    } else {
+      if (req.transcript === undefined) {
+        problems.push("transcriptTurns given without transcript");
+      }
+      req.transcriptTurns.forEach((turn, i) => {
+        const t = turn as Record<string, unknown> | null;
+        if (
+          t === null ||
+          typeof t !== "object" ||
+          typeof t.startSec !== "number" ||
+          !Number.isFinite(t.startSec) ||
+          t.startSec < 0 ||
+          typeof t.text !== "string" ||
+          (t.endSec !== undefined &&
+            (typeof t.endSec !== "number" ||
+              !Number.isFinite(t.endSec) ||
+              t.endSec < 0))
+        ) {
+          problems.push(`transcriptTurns[${i}] is not a valid turn`);
+        }
+      });
+    }
+  }
   if (
     req.laborBasis !== undefined &&
     req.laborBasis !== "volunteer" &&
