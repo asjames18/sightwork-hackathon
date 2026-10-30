@@ -13,6 +13,9 @@
  * Wiring: runPlan's step deps get the real callers plus the
  * per-request prompt builders from planPrompts.ts, so prompts 03
  * and 05 are filled with this request's frames, transcript, and region.
+ * Reviewing (prompt 06): wired here with the reason step's provider
+ * caller plus buildReviewPrompt, so a real run emits "reviewing" and
+ * lands plan.review; a failed review ships ran:false, never a failed run.
  * Provider switch (PLAN_PROVIDER, default "baseten"): the reason step
  * — the main plan engine per Antonio's Oct 27 decision — runs on
  * Baseten Muse Spark Open, or on Meta Muse Spark when
@@ -44,6 +47,7 @@ import {
 import { IMAGE_MODEL, createImageCaller } from "../../../lib/meta/image";
 import { createSamSegmentCaller } from "../../../lib/meta/sam";
 import { createAsrTranscribeCaller } from "../../../lib/meta/transcribe";
+import { buildReviewPrompt } from "../../../lib/reviewPrompt";
 import {
   COST_PROMPT_TEMPLATE,
   COST_SCHEMA,
@@ -214,6 +218,19 @@ export async function POST(req: Request): Promise<Response> {
           renderAfter: { imageModel: IMAGE_MODEL, callImage: createImageCaller(), tracker },
           reasonPrompt: buildReasonPrompt,
           costPrompt: buildCostPrompt,
+          // Reviewing (prompt 06, 2026-10-30): the reviewer runs on the
+          // same provider caller as the reason step (Baseten Muse Spark
+          // Open in baseten mode, Meta Muse Spark in meta mode) with
+          // Grok Bot's buildReviewPrompt builder, so a finished plan
+          // carries plan.review. Reviewing never fails a run: runPlan
+          // ships ran:false on any review failure. No timeout is
+          // plumbed here: prompt 06 suggests 60 s (measured max 29 s),
+          // but the caller interfaces carry no timeout/signal, and
+          // racing the call would drop its usage record, so the route
+          // relies on maxDuration above; see mosheh-log for the open
+          // question on plumbing a real timeout.
+          review: { callSpark: reasonCaller },
+          reviewPrompt: buildReviewPrompt,
         };
         wired = true;
         const plan = await runPlan(request, {
