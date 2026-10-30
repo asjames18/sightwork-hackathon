@@ -560,6 +560,53 @@ export function validateRunPlanRequest(request: PlanRequest): void {
   ) {
     throw new Error("runPlan: audioWavBase64 must not be blank when given");
   }
+  // Plan-side half of option (b) (2026-10-29):
+  // a request may carry narration already transcribed by POST
+  // /api/transcribe instead of the WAV. A supplied transcript is
+  // validated here, like the other request fields, so a direct
+  // caller fails fast instead of handing the reason step a bad
+  // transcript mid-run. Null means no narration, matching
+  // TranscribeOutput; a blank string is neither a transcript nor
+  // null, so it fails. Turns without a transcript would be
+  // silently ignored by the listening stage below, so they fail
+  // too — the pair arrives together from /api/transcribe.
+  if (
+    request.transcript !== undefined &&
+    request.transcript !== null &&
+    typeof request.transcript !== "string"
+  ) {
+    throw new Error("runPlan: transcript must be a string or null when given");
+  }
+  if (
+    typeof request.transcript === "string" &&
+    request.transcript.trim().length === 0
+  ) {
+    throw new Error("runPlan: transcript must not be blank when given");
+  }
+  if (request.transcriptTurns !== undefined) {
+    if (!Array.isArray(request.transcriptTurns)) {
+      throw new Error("runPlan: transcriptTurns must be an array when given");
+    }
+    if (request.transcript === undefined) {
+      throw new Error("runPlan: transcriptTurns given without transcript");
+    }
+    request.transcriptTurns.forEach((turn, i) => {
+      if (
+        turn === null ||
+        typeof turn !== "object" ||
+        typeof turn.startSec !== "number" ||
+        !Number.isFinite(turn.startSec) ||
+        turn.startSec < 0 ||
+        typeof turn.text !== "string" ||
+        (turn.endSec !== undefined &&
+          (typeof turn.endSec !== "number" ||
+            !Number.isFinite(turn.endSec) ||
+            turn.endSec < 0))
+      ) {
+        throw new Error(`runPlan: transcriptTurns[${i}] is not a valid turn`);
+      }
+    });
+  }
   if (
     request.laborBasis !== undefined &&
     request.laborBasis !== "volunteer" &&
@@ -621,22 +668,36 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   };
 
   // listening: transcribe the narration, or null when there is none.
+  // Plan-side half of option (b) (2026-10-29):
+  // when the request already carries a transcript (pre-transcribed
+  // by POST /api/transcribe), it is authoritative and the transcribe
+  // step is skipped entirely — no call, no cost — even when
+  // audioWavBase64 is also present, so the browser never pays for
+  // the same narration twice and a transcript-carrying request is
+  // never silently re-transcribed. Answer to the 10:05 PM log question: transcript present + audio present prefers the
+  // transcript. Omit both transcript fields and the pipeline
+  // transcribes audioWavBase64 as before.
   assertNotAborted(deps.signal);
   validateRunPlanDeps(deps);
   validateRunPlanRequest(request);
   emit("listening");
   let transcript: string | null;
   let transcriptTurns: NonNullable<WorkPlan["transcriptTurns"]>;
-  try {
-    const transcribed = await runTranscribe(
-      { audioWavBase64: request.audioWavBase64, spaceType: request.spaceType },
-      deps.transcribe,
-    );
-    transcript = transcribed.transcript;
-    transcriptTurns = transcribed.transcriptTurns;
-  } catch (err) {
-    if (isAbort(err)) throw err;
-    throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
+  if (request.transcript !== undefined) {
+    transcript = request.transcript;
+    transcriptTurns = request.transcriptTurns ?? [];
+  } else {
+    try {
+      const transcribed = await runTranscribe(
+        { audioWavBase64: request.audioWavBase64, spaceType: request.spaceType },
+        deps.transcribe,
+      );
+      transcript = transcribed.transcript;
+      transcriptTurns = transcribed.transcriptTurns;
+    } catch (err) {
+      if (isAbort(err)) throw err;
+      throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
+    }
   }
 
   // looking + counting: SAM hazards and counts on the request frames.
