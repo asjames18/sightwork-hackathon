@@ -1,5 +1,7 @@
-import { PLAN_STEPS, type PlanJobStatus, type PlanStep } from "@/lib/types";
+import { PLAN_STEPS, RUN_STEPS, type PlanJobStatus, type PlanStep } from "@/lib/types";
 import { pickMockPlan } from "@/lib/mock/pickMockPlan";
+import { withPrecomputedReview } from "@/lib/review";
+import { stepChecksForPlan } from "@/lib/stepChecks";
 
 /** What the UI hands a runner: the picked video, plus where to report progress. */
 export interface PlanJobInput {
@@ -42,9 +44,13 @@ export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
   // comparing line; picturing's skip only shows on the finished plan (meta.skipped.afterImage).
   const noMeta = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "nometa";
   const skipped: Exclude<PlanStep, "done">[] = [];
-  for (const step of PLAN_STEPS) {
+  // The plan the preview ends on, with its precomputed proof check, so the check notes describe that plan.
+  const plan = withPrecomputedReview(pickMockPlan());
+  const checks = stepChecksForPlan(plan);
+  for (const step of RUN_STEPS) {
     if (signal.aborted) return;
-    onStatus(skipped.length ? { state: "running", step, skipped: [...skipped] } : { state: "running", step });
+    const base = skipped.length ? { state: "running" as const, step, skipped: [...skipped] } : { state: "running" as const, step };
+    onStatus(base);
     if (!(await wait(STEP_MS, signal))) return;
     if (step === failAt) {
       onStatus({
@@ -55,6 +61,8 @@ export const mockPlanJob: PlanJobRunner = async ({ onStatus, signal }) => {
       return;
     }
     if (noMeta && step === "counting") skipped.push("looking", "counting");
+    const check = checks[step];
+    if (check && !skipped.includes(step as Exclude<PlanStep, "done">)) onStatus({ ...base, check });
   }
-  if (!signal.aborted) onStatus({ state: "done", plan: pickMockPlan() });
+  if (!signal.aborted) onStatus({ state: "done", plan });
 };

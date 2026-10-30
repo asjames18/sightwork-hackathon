@@ -250,7 +250,48 @@ export interface WorkPlan {
      */
     skipped?: { masks?: boolean; afterImage?: boolean; cost?: boolean };
   };
+  /** Review-only check of the finished plan against its proof photos (the "reviewing" step). Never edits the plan. Omitted on plans made before the step existed. */
+  review?: PlanReview;
 }
+
+// ---------------------------------------------------------------------------
+// Verification: per-step checks and the reviewer pass
+// ---------------------------------------------------------------------------
+
+/** One reviewer verdict. `problemId` is `String(issue.rank)`. */
+export interface PlanReviewItem {
+  problemId: string;
+  /** True when the reviewer could see the problem in at least one proof photo. */
+  verified: boolean;
+  /** One plain sentence, at most 140 characters. */
+  reason: string;
+}
+
+/**
+ * Output of the reviewer pass. `ran: false` means the review call failed or was skipped; the plan still stands.
+ * `source`: "model" (or omitted) when a model reviewed it; "precomputed" for example plans, where the verdicts
+ * only record whether each problem has a proof photo and no model ran.
+ */
+export interface PlanReview {
+  ran: boolean;
+  items: PlanReviewItem[];
+  summary?: string;
+  source?: "model" | "precomputed";
+}
+
+/** A cheap, deterministic check of one step's output before the next step uses it. ok false = something was marked (not a failure). */
+export interface StepCheck {
+  ok: boolean;
+  /** Plain text, at most 120 characters, no provider text. */
+  note: string;
+}
+
+/** The reviewer step. Kept out of PlanStep so step-keyed records elsewhere don't change; it can never fail a run. */
+export type ReviewStep = "reviewing";
+
+/** Every step a running status line can name. */
+export type RunStep = Exclude<PlanStep, "done"> | ReviewStep;
+
 
 /** Where the plan step runs: Meta Model API (Muse Spark) or Muse Spark Open on Baseten. */
 export type PlanProvider = "meta" | "baseten";
@@ -270,6 +311,9 @@ export type PlanStep = "uploading" | "listening" | "looking" | "counting" | "com
 /** Steps the processing screen shows, in order ("done" is not shown). */
 export const PLAN_STEPS: Exclude<PlanStep, "done">[] = ["uploading", "listening", "looking", "counting", "comparing", "planning", "picturing"];
 
+/** Steps the processing screen shows, in order, including the reviewer pass. */
+export const RUN_STEPS: RunStep[] = [...PLAN_STEPS, "reviewing"];
+
 /**
  * Progress of one plan job as the UI sees it. A failed step carries a plain message
  * (no provider error text); the processing screen shows it as-is.
@@ -277,12 +321,18 @@ export const PLAN_STEPS: Exclude<PlanStep, "done">[] = ["uploading", "listening"
 export type PlanJobStatus =
   | {
       state: "running";
-      step: Exclude<PlanStep, "done">;
+      step: RunStep;
       /** Optional steps already skipped this run (cumulative, e.g. ["looking", "counting"] when SAM is unavailable). Omit when none. */
       skipped?: Exclude<PlanStep, "done">[];
+      /**
+       * The check for the step this line names, sent as one more line for the same step once its output
+       * is checked and before the next step starts. Omit until then.
+       */
+      check?: StepCheck;
     }
   | { state: "done"; plan: WorkPlan }
-  | { state: "failed"; step: Exclude<PlanStep, "done">; message: string };
+  /** The pipeline never fails a run at "reviewing"; the browser can still report it there when the connection drops. */
+  | { state: "failed"; step: RunStep; message: string };
 
 // ---------------------------------------------------------------------------
 // Contract checks (no dependencies). Returns a list of problems; [] = valid.

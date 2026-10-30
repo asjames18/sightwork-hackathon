@@ -1,4 +1,6 @@
-import { PLAN_STEPS, type PlanJobStatus, type PlanRequest, type PlanStep } from "@/lib/types";
+import { RUN_STEPS, type PlanJobStatus, type PlanRequest, type RunStep, type WorkPlan } from "@/lib/types";
+import { parseReview } from "@/lib/review";
+import { parseStepCheck } from "@/lib/stepChecks";
 import type { PlanJobRunner } from "./planJob";
 import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
 
@@ -8,13 +10,11 @@ import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
  */
 export type BuildPlanRequest = (file: File, signal: AbortSignal) => Promise<PlanRequest>;
 
-type RunStep = Exclude<PlanStep, "done">;
-
 const GENERIC_FAIL = "Something went wrong while making the plan. Try again, or open the example plan.";
 const CONNECTION_FAIL = "The connection dropped before the plan finished. Try again.";
 
 function isRunStep(v: unknown): v is RunStep {
-  return typeof v === "string" && (PLAN_STEPS as string[]).includes(v);
+  return typeof v === "string" && (RUN_STEPS as string[]).includes(v);
 }
 
 /**
@@ -33,13 +33,24 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   if (o.state === "running" && isRunStep(o.step)) {
-    const skipped = Array.isArray(o.skipped) ? o.skipped.filter(isRunStep) : [];
-    return skipped.length ? { state: "running", step: o.step, skipped } : { state: "running", step: o.step };
+    // "reviewing" is a run step but never an optional skip.
+    const skipped = Array.isArray(o.skipped) ? o.skipped.filter((s): s is Exclude<RunStep, "reviewing"> => isRunStep(s) && s !== "reviewing") : [];
+    const check = parseStepCheck(o.check);
+    return { state: "running", step: o.step, ...(skipped.length ? { skipped } : {}), ...(check ? { check } : {}) };
   }
   if (o.state === "failed" && isRunStep(o.step))
     return { state: "failed", step: o.step, message: typeof o.message === "string" && o.message ? o.message : GENERIC_FAIL };
-  if (o.state === "done" && o.plan && typeof o.plan === "object")
-    return { state: "done", plan: o.plan as Extract<PlanJobStatus, { state: "done" }>["plan"] };
+  if (o.state === "done" && o.plan && typeof o.plan === "object") {
+    const plan = o.plan as WorkPlan;
+    // The review is advisory: a malformed one is dropped (the plan shows without it), never trusted as-is.
+    if ("review" in plan) {
+      const review = Array.isArray(plan.issues) ? parseReview(plan.review, plan.issues) : undefined;
+      const { review: _r, ...rest } = plan;
+      void _r;
+      return { state: "done", plan: review ? { ...rest, review } : rest };
+    }
+    return { state: "done", plan };
+  }
   return null;
 }
 

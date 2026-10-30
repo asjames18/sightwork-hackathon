@@ -8,6 +8,7 @@ import sanctuaryRun from "./sanctuary-run.json";
 import { classroomSample, officeSample, warehouseSample } from "./samples";
 import { kitchenSample } from "./kitchen";
 import { withFrameSizes } from "./frameSizes";
+import { withPrecomputedReview } from "../review";
 
 export type ExampleKind = "real" | "sample";
 
@@ -82,6 +83,10 @@ export const EXAMPLES: Example[] = [
     credit: { author: "Charly Birdsinger (Unsplash)", license: "CC0", url: "https://commons.wikimedia.org/wiki/File:Industrial_storage_area_(Unsplash).jpg" },
   },
 ];
+
+// Every example gets a precomputed proof check (src/lib/review.ts): it records only whether each problem points at a
+// real proof photo, says it was worked out ahead of time, and never claims a model reviewed it.
+for (const e of EXAMPLES) e.plan = withPrecomputedReview(e.plan);
 
 export const FEATURED_EXAMPLE = EXAMPLES[0];
 
