@@ -429,7 +429,8 @@ export const COST_SCHEMA: Record<string, unknown> = {
           "materialIndex",
           "unit",
           "unitCost",
-          "grounded"
+          "grounded",
+          "sourceIndex"
         ],
         "properties": {
           "materialIndex": {
@@ -453,9 +454,9 @@ export const COST_SCHEMA: Record<string, unknown> = {
             "type": "boolean"
           },
           "sourceIndex": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "minimum": 0,
-            "description": "Index into sources, when grounded"
+            "description": "Index into sources when grounded, else null"
           }
         }
       }
