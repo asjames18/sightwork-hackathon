@@ -32,7 +32,8 @@
  *   the caller makes one request per candidate and sums the cost;
  *   a short candidate list is returned, never padded with failures,
  *   and the renderAfter step picks the first good candidate when the
- *   judge path cannot run.
+ *   judge path cannot run. n is capped at 4 per call, so one bad
+ *   request cannot loop paid generations past the spike cap's reach.
  * - Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing, per the step's rule.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
@@ -79,6 +80,15 @@ const DEFAULT_IMAGE_COST_USD = 0.01;
 const DEFAULT_SIZE = "1536x1024";
 const DEFAULT_OUTPUT_FORMAT = "jpeg";
 
+/**
+ * Most candidates one call may generate. The step asks for 1 or 2
+ * (generate-2-keep-1); the tracker only sees the caller's summed cost
+ * after the loop, so without a bound here one bad n (say 1000) would
+ * fire that many paid requests before any cap could stop it. Four
+ * covers today's 1-or-2 plus headroom for a larger candidate set, and
+ * bounds one call's loop spend to 4 x $0.01.
+ */
+const MAX_IMAGES_PER_CALL = 4;
 /** Total attempts for a transient 404 model_not_found. */
 const MAX_IMAGE_ATTEMPTS = 3;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
@@ -236,6 +246,17 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
     const wanted = req.n ?? 1;
     if (!Number.isInteger(wanted) || wanted < 1) {
       throw new Error(`image: n must be a positive integer, got ${String(req.n)}`);
+    }
+    // A bad n would otherwise loop that many paid requests before
+    // the usage tracker ever sees a cost: the step records the
+    // caller's summed cost only after this loop returns, so the $10
+    // spike cap cannot stop a runaway loop mid-call. Reject it here,
+    // before any fetch, like the other request fields above. Today's
+    // step asks for 1 or 2, so the bound changes no current call.
+    if (wanted > MAX_IMAGES_PER_CALL) {
+      throw new Error(
+        `image: n must be at most ${MAX_IMAGES_PER_CALL}, got ${String(req.n)}`,
+      );
     }
     const images: string[] = [];
     let latencyMs = 0;
