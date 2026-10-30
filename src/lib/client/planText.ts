@@ -1,4 +1,5 @@
 import { COST_LABEL, type WorkPlan } from "@/lib/types";
+import { planReview, reviewLine, verdictFor } from "@/lib/review";
 
 /** Longest share text we hand to the share sheet or clipboard; long plans are cut at a line with a pointer to the PDF. */
 export const MAX_SHARE_CHARS = 6000;
@@ -25,12 +26,16 @@ export function planToText(plan: WorkPlan, opts: { maxChars?: number; sample?: b
   if (narrated && plan.transcriptSummary) lines.push(`Asked for: ${clean(plan.transcriptSummary)}`);
 
   const issues = [...plan.issues].sort((a, b) => a.rank - b.rank);
+  const review = planReview(plan);
   if (issues.length > 0) {
     lines.push("", `Problems, worst first (${issues.length}):`);
     for (const [n, i] of issues.entries()) {
       const notSaid = narrated && i.unmentioned ? " [not mentioned]" : "";
-      lines.push(`${n + 1}. ${clean(i.title)} (${SEVERITY[i.severity] ?? i.severity})${notSaid}`);
+      const unverified = verdictFor(review, i)?.verified === false ? " [unverified: no photo backs it]" : "";
+      lines.push(`${n + 1}. ${clean(i.title)} (${SEVERITY[i.severity] ?? i.severity})${notSaid}${unverified}`);
     }
+    const line = reviewLine(review);
+    if (line) lines.push(line);
   } else {
     lines.push("", "No problems found in the frames checked. Walk it in person before you sign off.");
   }

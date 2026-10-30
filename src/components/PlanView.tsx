@@ -4,6 +4,7 @@ import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { WorkSteps } from "./WorkSteps";
 import type { Example } from "@/lib/examples";
+import { planReview, reviewLine, verdictFor } from "@/lib/review";
 
 /** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
 const SEVERITY_BORDER: Record<Issue["severity"], string> = {
@@ -90,13 +91,30 @@ function AfterSlot({ frame, sample = false }: { frame: PlanFrame | undefined; sa
   );
 }
 
+/** The reviewer pass, in one line above the problems. Prints too, so the PDF carries it. */
+function ReviewLine({ text, ok }: { text: string; ok: boolean }) {
+  return (
+    <p className="mb-4 flex items-start gap-2 rounded-xl border border-ink/10 bg-white px-4 py-3 text-sm text-ink/80 break-inside-avoid">
+      <svg aria-hidden="true" viewBox="0 0 20 20" className={`mt-0.5 h-4 w-4 shrink-0 ${ok ? "text-safe-dark" : "text-amber-800"}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 2.5 4 5v4.5c0 3.6 2.6 6.6 6 8 3.4-1.4 6-4.4 6-8V5l-6-2.5Z" />
+        {ok ? <path d="m7.2 10 2 2 3.6-3.8" /> : <path d="M10 6.5v4M10 13.3v.2" />}
+      </svg>
+      <span className="min-w-0">{text}</span>
+    </p>
+  );
+}
+
 /** Small "how this plan was made" line, so the agent trace is visible on the result too. */
 function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
   const planEngine = plan.meta?.planProvider === "baseten" ? "Muse Spark Open (Meta open weights, on Baseten)" : "Muse Spark";
+  const review = planReview(plan);
   const rows: [string, string][] = [
     ["Plan", planEngine],
     ["Outlines", masks ? "SAM 3.1" : "Off this run"],
     ["After picture", plan.afterImageUrl ? "Muse Image" : "Off this run"],
+    ...(review
+      ? [["Review", !review.ran ? "Didn't run this time" : review.source === "precomputed" ? "Worked out ahead of time for this example" : `${planEngine}, review only`] as [string, string]]
+      : []),
   ];
   return (
     <footer className="mt-12 border-t border-ink/10 pt-4 text-sm text-ink/70">
@@ -137,6 +155,8 @@ export function PlanView({
   const sample = example?.kind === "sample" || (!example && plan.meta?.isExample === true);
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
+  const review = planReview(plan);
+  const reviewText = plan.issues.length > 0 ? reviewLine(review) : null;
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
   // Hero proof frame for the top of the plan when there's no after picture: the plan's hero frame, else the worst
   // problem's proof frame. It borrows that problem's box and caption only when it is the same frame.
@@ -295,9 +315,12 @@ export function PlanView({
                 : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
+        {reviewText && <ReviewLine text={reviewText} ok={review?.ran === true && review.items.every((i) => i.verified)} />}
         <ol className="flex flex-col gap-3">
           {plan.issues.map((issue) => {
             const proof = issue.proofFrames?.[0];
+            const verdict = verdictFor(review, issue);
+            const unverified = verdict?.verified === false;
             return (
               <li
                 key={issue.rank}
@@ -310,9 +333,18 @@ export function PlanView({
                   <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
                   <span className="text-xs font-semibold uppercase tracking-wide text-ink/70">{SEVERITY_LABEL[issue.severity]} priority</span>
                   <SaidBadge issue={issue} narrated={narrated} />
+                  {unverified && (
+                    <span className="rounded-full border border-amber-800 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">Unverified</span>
+                  )}
                 </div>
                 <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
                 <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
+                {unverified && verdict.reason && (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    <span className="font-semibold">Not backed by a photo: </span>
+                    {verdict.reason}
+                  </p>
+                )}
                 </div>
                 {issue.status !== "mentioned_not_seen" && (
                   <div className="mt-3 min-w-0 md:mt-0">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { PLAN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
+import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { selectedPlanJob } from "@/lib/client/selectRunner";
 import { usePlanJob } from "@/lib/client/usePlanJob";
@@ -26,7 +26,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     const example = findExample(initialExampleId);
     return { kind: "plan", plan: example.plan, videoName: null, example };
   });
-  const job = usePlanJob(runPlanJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
+  const { status: job, checks } = usePlanJob(runPlanJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
@@ -67,7 +67,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   }, [stage.kind]);
   // When the job finishes, show every step passed (not step 1) for the frame before the plan opens,
   // so the bar never snaps back to the start.
-  const current = !job ? 0 : job.state === "done" ? PLAN_STEPS.length : PLAN_STEPS.indexOf(job.step);
+  const current = !job ? 0 : job.state === "done" ? RUN_STEPS.length : RUN_STEPS.indexOf(job.step);
 
   // Steps the server reported as skipped this run. The list is cumulative, so keep the latest one
   // through a failure (failed lines don't carry it); a new run starts empty.
@@ -169,7 +169,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
       )}
       {stage.kind === "processing" && (
         <ProcessingStep
-          steps={PLAN_STEPS}
+          steps={RUN_STEPS}
           current={current}
           videoName={stage.file.name}
           videoFile={stage.file}
@@ -177,6 +177,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           onRetry={() => setStage({ kind: "processing", file: stage.file, run: stage.run + 1 })}
           onExample={() => showExample()}
           skipped={skipped}
+          checks={checks}
         />
       )}
       {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} onMakeYourOwn={startOver} />}

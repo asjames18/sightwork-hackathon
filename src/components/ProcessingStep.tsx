@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { PlanStep } from "@/lib/types";
-import { currentStepEngines, OPTIONAL_STEPS } from "@/lib/client/engines";
+import type { RunStep, StepCheck } from "@/lib/types";
+import { currentStepEngines, OPTIONAL_STEPS, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 
-const LABELS: Record<PlanStep, string> = {
+const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
   listening: "Listening to what you said",
   looking: "Looking at every frame",
@@ -12,11 +12,12 @@ const LABELS: Record<PlanStep, string> = {
   comparing: "Comparing what you said with what we saw",
   planning: "Planning the work",
   picturing: "Picturing the finished space",
+  reviewing: "Reviewing",
   done: "Done",
 };
 
 /** One plain sentence for the step in progress (fixed per step; the status stream carries no live details). */
-const NOW_LINE: Record<PlanStep, string> = {
+const NOW_LINE: Record<ScreenStep, string> = {
   uploading: "Sending your video. Bigger files take a little longer.",
   listening: "Turning what you said into a list of requests.",
   looking: "Picking frames from your walkthrough to study.",
@@ -24,6 +25,7 @@ const NOW_LINE: Record<PlanStep, string> = {
   comparing: "Checking what you asked for against what's in the room.",
   planning: "Ranking the problems and putting the work steps in order.",
   picturing: "Drawing a picture of the finished space.",
+  reviewing: "A separate check is looking for a photo behind every problem. It can't change the plan.",
   done: "Wrapping up your plan.",
 };
 
@@ -49,8 +51,9 @@ export function ProcessingStep({
   onExample,
   engines,
   skipped,
+  checks,
 }: {
-  steps: PlanStep[];
+  steps: ScreenStep[];
   current: number;
   videoName: string;
   /** The picked video, used only to show its first frame as a small thumbnail next to the name. */
@@ -59,9 +62,11 @@ export function ProcessingStep({
   onRetry?: () => void;
   onExample?: () => void;
   /** Engine named under each step. Defaults to this page's plan provider (see src/lib/client/engines.ts). */
-  engines?: Record<PlanStep, string>;
+  engines?: Record<ScreenStep, string>;
   /** Optional steps the server skipped this run (e.g. Meta access off). Shown as skipped, not done. */
-  skipped?: readonly PlanStep[];
+  skipped?: readonly ScreenStep[];
+  /** Latest check per step (see StepCheck), shown under the step once it has finished. */
+  checks?: Partial<Record<RunStep, StepCheck>>;
 }) {
   const ENGINE = engines ?? currentStepEngines();
   const thumb = useObjectUrl(videoFile);
@@ -199,7 +204,8 @@ export function ProcessingStep({
                     {state === "skipped" ? (
                       <span>{ENGINE[s] ? " · " : ""}skipped this run</span>
                     ) : (
-                      ENGINE[s] && OPTIONAL_STEPS.has(s) && <span> · optional</span>
+                      ENGINE[s] &&
+                      (REVIEW_ONLY_STEPS.has(s) ? <span> · review only</span> : OPTIONAL_STEPS.has(s) && <span> · optional</span>)
                     )}
                     {took && <span className="tabular-nums"> · {took}</span>}
                   </span>
@@ -207,6 +213,7 @@ export function ProcessingStep({
                 {took && !(ENGINE[s] || state === "skipped") && (
                   <span className="block text-sm tabular-nums text-ink/65">{took}</span>
                 )}
+                {state === "done" && checks?.[s] && <CheckNote check={checks[s]!} />}
                 {state !== "skipped" && <span className="sr-only">{STATE_TEXT[state]}</span>}
               </span>
             </li>
@@ -244,6 +251,20 @@ export function ProcessingStep({
         </div>
       )}
     </section>
+  );
+}
+
+/** The step's check, under a finished step: a green tick when it passed, an amber flag when it marked something. */
+function CheckNote({ check }: { check: StepCheck }) {
+  return (
+    <span className={`mt-0.5 flex items-start gap-1.5 text-sm ${check.ok ? "text-safe-dark" : "text-amber-800"}`}>
+      <span aria-hidden="true" className="mt-px shrink-0 font-bold">
+        {check.ok ? "✓" : "!"}
+      </span>
+      <span className="min-w-0 break-words">
+        <span className="font-semibold">{check.ok ? "Checked" : "Flagged"}:</span> {check.note}
+      </span>
+    </span>
   );
 }
 
