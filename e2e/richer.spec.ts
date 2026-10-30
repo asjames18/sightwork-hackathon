@@ -68,7 +68,10 @@ async function stubPlan(page: import("@playwright/test").Page, plan: unknown) {
     sent.push({ spaceType: body.spaceType, spaceName: body.spaceName, frames: body.frames?.length ?? 0 });
     return r.fulfill({ contentType: "application/x-ndjson", body: [{ state: "running", step: "planning" }, { state: "done", plan }].map((l) => JSON.stringify(l)).join("\n") + "\n" });
   });
-  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.addInitScript(() => {
+    window.localStorage.setItem("sightwork:test-code", "stub-code");
+    window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" }));
+  });
   return sent;
 }
 
@@ -91,8 +94,8 @@ test("space picker on the video card: the pick and name go with the run, and den
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   const card = page.getByRole("group", { name: "Your walkthrough" });
-  await card.getByLabel("What kind of space?").selectOption("sanctuary");
-  await card.getByLabel(/^Name/).fill("Main sanctuary");
+  await card.getByLabel("Type", { exact: true }).selectOption("sanctuary");
+  await card.getByLabel("Name", { exact: true }).fill("Main sanctuary");
   await expectNoAxeViolations(page, "video card with the space picker");
   await expectNoSideScroll(page);
   await shot(page, "video-card-space-picker", card);
@@ -107,7 +110,7 @@ test("space picker on the video card: the pick and name go with the run, and den
   // Remembered on this device for the next video.
   await page.reload();
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
-  await expect(page.getByLabel("What kind of space?")).toHaveValue("sanctuary");
+  await expect(page.getByLabel("Type", { exact: true })).toHaveValue("sanctuary");
 });
 
 test("richer plan: tiers, where and what, partly backed, SAM outline, cost shares that add up, closer-look list, checklist", async ({ page }) => {
@@ -183,8 +186,15 @@ test("thin plan: one problem, no tier headings, a coverage note that says why, c
   const problems = page.locator("#problems");
   await expect(problems.getByTestId("coverage-note")).toContainText("Why only one problem: Only the stage was filmed", { timeout: 30_000 });
   await expect(problems.getByRole("heading", { level: 3, name: /^Fix now/ })).toHaveCount(0);
-  await expect(problems.getByTestId("watch-list")).toBeVisible();
+  const watch = problems.getByTestId("watch-list");
+  await expect(watch).toBeVisible();
   await expect(page.getByTestId("issue-cost")).toHaveCount(0);
+  // Save PDF: the collapsed list opens for printing and closes again after.
+  await expect(watch).not.toHaveAttribute("open", "");
+  await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+  await expect(watch).toHaveAttribute("open", "");
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await expect(watch).not.toHaveAttribute("open", "");
   await expectNoAxeViolations(page, "thin plan with coverage note");
   await shot(page, "problems-thin", problems);
 });

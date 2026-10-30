@@ -337,7 +337,6 @@ export function UploadStep({
               {check.message}
             </p>
           )}
-          <SpacePicker />
           <div className="px-4 pb-4">
             {videoRunner === "api" && (
               <LocationFields
@@ -348,6 +347,7 @@ export function UploadStep({
                 stateRef={stateField}
               />
             )}
+            <SpacePicker />
             <button
               type="button"
               disabled={!canSend}

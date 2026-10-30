@@ -4,6 +4,7 @@ import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
 import { boxSource, coverageNote, groupByTier, issueExtras, issueTier, TIER_HINT, TIER_LABEL, type Tier, type WatchItem } from "@/lib/planExtras";
 import { checklistRows } from "@/lib/checklist";
 import { shareLabel, type CostShare } from "@/lib/costShares";
+import { PrintOpenDetails } from "./PrintOpenDetails";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -20,7 +21,8 @@ const SEVERITY_BORDER: Record<Issue["severity"], string> = {
 };
 const SEVERITY_LABEL: Record<Issue["severity"], string> = { high: "High", medium: "Medium", low: "Low" };
 
-const TIER_DOT: Record<Tier, string> = { urgent: "bg-red-600", soon: "bg-amber-500", later: "bg-ink/35" };
+/** Same hues as the severity border on each card. */
+const TIER_DOT: Record<Tier, string> = { urgent: "bg-red-600", soon: "bg-amber-500", later: "bg-ink/25" };
 
 function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
   if (!narrated) return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
@@ -112,6 +114,12 @@ function IssueCard({
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
+          {cost && (
+            <span className="order-last ml-auto hidden text-sm font-semibold text-ink tabular-nums sm:inline" data-testid="issue-cost">
+              <span className="font-medium text-ink/65">Share of cost </span>
+              {shareLabel(cost)}
+            </span>
+          )}
           <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
           <span className="text-xs font-semibold uppercase tracking-wide text-ink/70">{SEVERITY_LABEL[issue.severity]} priority</span>
           <SaidBadge issue={issue} narrated={narrated} />
@@ -119,13 +127,19 @@ function IssueCard({
             <span className="rounded-full border border-amber-800 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">Unverified</span>
           )}
           {kind === "partly" && (
-            <span className="rounded-full border border-sky-800 bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-900">Partly backed</span>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Partly backed</span>
           )}
         </div>
         {titleLevel === 3 ? (
           <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
         ) : (
           <h4 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h4>
+        )}
+        {cost && (
+          <p className="mt-1 text-sm font-semibold text-ink tabular-nums sm:hidden" aria-hidden>
+            <span className="font-medium text-ink/65">Share of cost </span>
+            {shareLabel(cost)}
+          </p>
         )}
         <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
         <WhereAndWhat area={area} evidence={evidence} />
@@ -136,17 +150,13 @@ function IssueCard({
           </p>
         )}
         {kind === "partly" && (scope || verdict?.reason) && (
-          <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-950">
+          <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
             <span className="font-semibold">Partly backed: </span>
             {scope ? `the photos show ${scope.replace(/^(the )?photos? shows? /i, "")}` : verdict?.reason}
-            {scope && verdict?.reason ? <span className="block text-sky-900/80">{verdict.reason}</span> : null}
+            {scope && verdict?.reason ? <span className="mt-0.5 block text-amber-900/80">{verdict.reason}</span> : null}
           </p>
         )}
-        {cost && (
-          <p className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-ink/15 bg-ink/[0.03] px-3 text-sm font-semibold tabular-nums" data-testid="issue-cost">
-            <span className="font-medium text-ink/70">Share of cost</span> {shareLabel(cost)}
-          </p>
-        )}
+
       </div>
       {seen && (
         <div className="mt-3 min-w-0 md:mt-0">
@@ -223,7 +233,7 @@ export function ProblemList({
       )}
 
       {note && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl border border-ink/10 bg-white/70 px-4 py-3 text-sm text-ink/75" data-testid="coverage-note">
+        <p className="mt-4 flex items-start gap-2 rounded-2xl bg-white p-4 text-sm text-ink/70" data-testid="coverage-note">
           <svg aria-hidden viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-ink/60" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="10" cy="10" r="7.5" />
             <path d="M10 9v4.5M10 6.3v.2" />
@@ -244,23 +254,24 @@ export function ProblemList({
 /** "Worth a closer look": lower-confidence finds, collapsed by default, each with its photo. */
 function WatchList({ items, frames, masks, sample }: { items: WatchItem[]; frames: PlanFrame[]; masks: boolean; sample: boolean }) {
   return (
-    <details className="group mt-6 rounded-2xl border border-dashed border-ink/25 bg-white/60 print:border-solid" data-testid="watch-list">
-      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+    <PrintOpenDetails className="group mt-6 rounded-2xl border border-ink/10 bg-white" data-testid="watch-list">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
         <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
           <path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className="min-w-0 flex-1">
-          <span className="block font-bold">
-            Worth a closer look <span className="font-semibold text-ink/60 tabular-nums">· {items.length}</span>
+          <span className="flex items-center gap-2 font-semibold">
+            Worth a closer look
+            <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-bold tabular-nums">{items.length}</span>
           </span>
-          <span className="block text-sm text-ink/65">Lower confidence. Not in the ranked list or the work order; check these in person.</span>
+          <span className="mt-0.5 block text-sm text-ink/65">Lower confidence. Not in the ranked list or the work order; check these in person.</span>
         </span>
       </summary>
-      <ul className="flex flex-col gap-3 px-4 pb-4">
+      <ul className="flex flex-col gap-3 px-5 pb-5">
         {items.map((w, i) => {
           const proof = w.proofFrames?.[0];
           return (
-            <li key={`${w.title}-${i}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3 rounded-xl bg-white p-3 ring-1 ring-ink/10 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <li key={`${w.title}-${i}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3 rounded-xl bg-ink/[0.03] p-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
               <div className="min-w-0">
                 <p className="font-bold leading-snug">{w.title}</p>
                 {w.detail && <p className="mt-0.5 text-sm text-ink/75">{w.detail}</p>}
@@ -286,7 +297,7 @@ function WatchList({ items, frames, masks, sample }: { items: WatchItem[]; frame
           );
         })}
       </ul>
-    </details>
+    </PrintOpenDetails>
   );
 }
 
@@ -300,7 +311,7 @@ function Checklist({ issues, watch }: { issues: Issue[]; watch: WatchItem[] }) {
   const hits = rows.filter((r) => r.found + r.watch > 0);
   const clear = rows.filter((r) => r.found + r.watch === 0);
   return (
-    <section aria-labelledby="checklist-heading" className="mt-6 rounded-2xl bg-white p-4 sm:p-5 break-inside-avoid" data-testid="checklist">
+    <section aria-labelledby="checklist-heading" className="mt-6 rounded-2xl border border-ink/10 bg-white p-5 break-inside-avoid" data-testid="checklist">
       <h3 id="checklist-heading" className="font-extrabold">
         What SightWork checked
       </h3>

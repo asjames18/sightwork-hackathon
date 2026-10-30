@@ -18,20 +18,26 @@ export function SpacePicker() {
     saveSpaceChoice(next);
   };
   return (
-    <fieldset className="mx-4 mb-3 rounded-xl bg-ink/[0.03] p-3 ring-1 ring-ink/10" data-testid="space-picker">
-      <legend className="sr-only">About this space</legend>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <fieldset className="mb-3" data-testid="space-picker">
+      <legend className="text-sm font-semibold">
+        What kind of space? <span className="font-normal text-ink/65">(optional)</span>
+      </legend>
+      <p id={`${id}-hint`} className="mt-0.5 text-xs text-ink/70">
+        Helps SightWork check what matters in this kind of space. Saved on this device.
+      </p>
+      <div className="mt-2 grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
         <div className="min-w-0">
-          <label htmlFor={`${id}-type`} className="block text-sm font-semibold">
-            What kind of space?
+          <label htmlFor={`${id}-type`} className="block text-xs font-medium text-ink/80">
+            Type
           </label>
           <select
             id={`${id}-type`}
+            aria-describedby={`${id}-hint`}
             value={choice.typeId}
             onChange={(e) => update({ ...choice, typeId: e.target.value })}
-            className="mt-1 min-h-11 w-full rounded-lg border border-ink/20 bg-white px-3 text-base"
+            className="mt-1 min-h-11 w-full rounded-lg border border-ink/20 bg-white px-2 text-base"
           >
-            <option value="">Pick one (optional)</option>
+            <option value="">Choose…</option>
             {SPACE_TYPES.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
@@ -40,8 +46,8 @@ export function SpacePicker() {
           </select>
         </div>
         <div className="min-w-0">
-          <label htmlFor={`${id}-name`} className="block text-sm font-semibold">
-            Name <span className="font-normal text-ink/65">(optional)</span>
+          <label htmlFor={`${id}-name`} className="block text-xs font-medium text-ink/80">
+            Name
           </label>
           <input
             id={`${id}-name`}
@@ -55,7 +61,6 @@ export function SpacePicker() {
           />
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink/65">Helps SightWork check what matters in this kind of space. Saved on this device.</p>
     </fieldset>
   );
 }
