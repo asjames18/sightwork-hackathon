@@ -108,7 +108,9 @@ export function metaCredits(plan: WorkPlan, opts: { sample?: boolean } = {}): Me
       host: api,
       ...(sample
         ? { status: "sample" as const }
-        : hasSpeech(plan)
+        : skipped.transcribe
+          ? { status: "off" as const, note: "Didn't finish this run, so the plan comes from the video alone" }
+          : hasSpeech(plan)
           ? { status: "ran" as const }
           : { status: "not_needed" as const, note: "No speech in this video" }),
     },

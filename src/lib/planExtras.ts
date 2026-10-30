@@ -1,15 +1,15 @@
 /**
  * Optional plan fields for richer findings (items 2, 6 and 7 of the Oct 30 plan), read defensively.
  *
- * The server side (schema, filter, reviewer, cost math) is Mosheh's lane and lands separately, so these
- * fields are not in types.ts yet. Everything here reads them from an untrusted plan and falls back to what
- * today's plans already carry, so the plan screen renders the same whether or not the server sends them.
- * Field names are the ones proposed in handoffs/grokbot-log.md (2026-10-30 4:30 PM ET). Pure, no DOM.
+ * The fields are declared (optional) in types.ts: Issue.tier/area/evidence/checklistKey/watch, WorkPlan.watch
+ * and WorkPlan.coverageNote. Everything here still reads them defensively from an untrusted plan and falls
+ * back to what older plans carry, so the plan screen renders the same whether or not the server sends them.
+ * Pure, no DOM.
  */
-import type { Box, FrameRef, Issue, Severity, WorkPlan } from "./types";
+import type { Box, FrameRef, Issue, IssueTier, Severity, WatchIssue, WorkPlan } from "./types";
 
 /** How soon to act. Maps from severity when the server doesn't send one. */
-export type Tier = "urgent" | "soon" | "later";
+export type Tier = IssueTier;
 
 export const TIERS: readonly Tier[] = ["urgent", "soon", "later"];
 
@@ -46,18 +46,8 @@ export function groupByTier(issues: Issue[]): { tier: Tier; issues: Issue[] }[] 
   return TIERS.map((tier) => ({ tier, issues: issues.filter((i) => issueTier(i) === tier) })).filter((g) => g.issues.length > 0);
 }
 
-/** One lower-confidence finding for "Worth a closer look". */
-export interface WatchItem {
-  title: string;
-  detail: string;
-  confidence?: number;
-  frameIndex: number;
-  frameTimeSec: number;
-  area?: string;
-  evidence?: string;
-  checklistKey?: string;
-  proofFrames?: FrameRef[];
-}
+/** One lower-confidence finding for "Worth a closer look" (the declared WorkPlan.watch shape). */
+export type WatchItem = WatchIssue;
 
 function parseBox(v: unknown): Box | undefined {
   if (!Array.isArray(v) || v.length !== 4 || !v.every((n) => typeof n === "number" && Number.isFinite(n))) return undefined;

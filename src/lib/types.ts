@@ -154,6 +154,62 @@ export interface Issue {
   confidence?: number;
   category?: IssueCategory;
   hazard?: HazardKey;
+  /**
+   * How soon to act: urgent (life safety now), soon (damage that grows, or broken function), later (cosmetic).
+   * Optional; when omitted the UI maps it from severity (high, medium, low).
+   */
+  tier?: IssueTier;
+  /** Where in the room, in a few plain words ("front left of the stage"). At most 80 characters. */
+  area?: string;
+  /**
+   * What the primary proof frame literally shows ("black cable on stage floor near front edge"). Title and
+   * detail may not claim more than this plus what was said. At most 160 characters.
+   */
+  evidence?: string;
+  /**
+   * Checklist area key the model filed it under. Free string so new keys never fail validation; known keys
+   * are CHECKLIST_KEYS (a superset of HazardKey). Set `hazard` too only when it is one of the HazardKey values.
+   */
+  checklistKey?: string;
+  /**
+   * Lower-confidence find (about 0.35 to the keep threshold). The UI shows these under "Worth a closer look",
+   * not in the ranked list. Servers should prefer WorkPlan.watch; this in-place flag is also read.
+   */
+  watch?: boolean;
+}
+
+/** How soon a problem should be dealt with. */
+export type IssueTier = "urgent" | "soon" | "later";
+
+/**
+ * Known checklist keys for Issue.checklistKey (prompt 03's sweep). The original HazardKey values are
+ * included, so a key that is also a hazard can go in both fields. Unknown keys are allowed and show as "Other".
+ */
+export const CHECKLIST_KEYS = [
+  "egress", "exit_sign", "fire_extinguisher", "fire_alarm", "blocked_aisle", "stage_edge", "steps",
+  "exposed_wiring", "power_strip", "cord_under_rug",
+  "trip_cable", "av_unsecured", "mic_stand",
+  "lighting", "damaged_seating", "flooring",
+  "walls", "water_stain", "ceiling", "doors_windows",
+  "clutter", "signage", "cleanliness", "ada_path", "hvac",
+] as const;
+export type ChecklistKey = (typeof CHECKLIST_KEYS)[number];
+
+/**
+ * One lower-confidence finding in WorkPlan.watch. Not ranked, never counted as a problem, never priced or
+ * reviewed. Same frame rules as Issue: frameIndex must point at a real frame.
+ */
+export interface WatchIssue {
+  title: string;
+  detail: string;
+  /** 0-1, below the ranked list's keep threshold. */
+  confidence?: number;
+  frameIndex: number;
+  frameTimeSec: number;
+  area?: string;
+  evidence?: string;
+  checklistKey?: string;
+  proofFrames?: FrameRef[];
 }
 
 export interface MaterialItem {
@@ -218,6 +274,10 @@ export interface WorkPlan {
   inventory: InventoryItem[];
   /** Sorted by rank ascending. */
   issues: Issue[];
+  /** Lower-confidence finds for "Worth a closer look", kept apart so the ranked list stays clean. Omit when none. */
+  watch?: WatchIssue[];
+  /** Why the plan has few problems, when the model found fewer than 3 ("only the stage was filmed"). At most 240 characters. */
+  coverageNote?: string;
   materials: MaterialItem[];
   /** Sorted by order ascending. */
   workOrder: WorkStep[];
@@ -252,8 +312,10 @@ export interface WorkPlan {
     /**
      * Optional steps that did not run this time (e.g. Meta model access off). The plan is still complete.
      * cost: a region was given but the cost step failed, so costRange is null for that reason (not a missing region).
+     * transcribe: the video had audio but transcription failed, and the run went on without the narration
+     * (transcript empty for that reason, not because nobody spoke).
      */
-    skipped?: { masks?: boolean; afterImage?: boolean; cost?: boolean };
+    skipped?: { masks?: boolean; afterImage?: boolean; cost?: boolean; transcribe?: boolean };
   };
   /** Review-only check of the finished plan against its proof photos (the "reviewing" step). Never edits the plan. Omitted on plans made before the step existed. */
   review?: PlanReview;
