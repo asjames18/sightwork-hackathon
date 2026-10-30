@@ -76,6 +76,8 @@ const DEFAULT_PRICE_PER_HOUR_USD = 0.18;
 
 /** Total attempts for a transient 404 model_not_found. */
 const MAX_ASR_ATTEMPTS = 3;
+/** Max audio per ASR call, matching the transcribe step's MAX_AUDIO_BYTES (src/lib/pipeline/transcribe.ts: 32 MB). */
+const MAX_ASR_AUDIO_BYTES = 32 * 1024 * 1024;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
 const ASR_RETRY_DELAYS_MS = [250, 500];
 
@@ -180,6 +182,17 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
       wavHead.toString("ascii", 8, 12) !== "WAVE"
     ) {
       throw new Error("asr: audioWavBase64 must decode to WAV audio (RIFF/WAVE header)");
+    }
+    // The transcribe step already caps audio at 32 MB before calling,
+    // but a direct caller bypassing the step had no bound: a huge WAV
+    // would ride along on a paid ASR call (billed by audio length)
+    // before any cap could stop it, the same shape as the Spark
+    // 48-image and Image n caps. Reject it here, before any fetch;
+    // 32 MB matches the step's cap, so no current pipeline call changes.
+    if (wavHead.length > MAX_ASR_AUDIO_BYTES) {
+      throw new Error(
+        `asr: audioWavBase64 must be at most 32 MB, got ${wavHead.length} bytes`,
+      );
     }
     // A whitespace-only keyword would otherwise ride along on a paid
     // ASR call and only fail (or silently do nothing) at the provider:
