@@ -45,6 +45,17 @@
  * - Sources keep only http(s) URLs; the field is omitted when none are
  *   left. (The caller passes only web_search results; code cannot
  *   verify provenance beyond the URL shape.)
+ * - Per-problem and per-step shares (costRange.byIssue / byStep, read
+ *   by src/lib/costShares.ts): every material line and every paid
+ *   labor line is split equally among the issue ranks it fixes
+ *   (material forIssues / step fixes), with lines that name no valid
+ *   rank split equally across all issues, and contingency applied to
+ *   every line at the same rates as the total; material lines are
+ *   likewise split across the steps whose fixes intersect the
+ *   material's forIssues (all steps when nothing intersects). Shares
+ *   are then rescaled so each list sums to the rounded total, so the
+ *   screen's shares add up exactly. A list is omitted when it would
+ *   be empty (no issues, no steps, or a zero total).
  * - The result is validated with checkWorkPlan from ../types.
  * - The usage tracker records cost/latency per call; it has no
  *   per-call search-count field, so web_search cost is folded into the
@@ -101,6 +112,32 @@ export interface CostResult {
   costRange: CostRange;
   materials: MaterialItem[];
 }
+
+/** One per-problem share, keyed by issue rank (client: costShares.ts). */
+export interface IssueCostShare {
+  rank: number;
+  low: number;
+  high: number;
+}
+
+/** One per-step share, keyed by work-step order (client: costShares.ts). */
+export interface StepCostShare {
+  order: number;
+  low: number;
+  high: number;
+}
+
+/**
+ * A CostRange carrying the per-problem and per-step shares. The shared
+ * CostRange type (Grok Bot's lane) does not declare these fields, so
+ * they ride as extra properties here and the client reads them with
+ * the same cast; checkWorkPlan ignores unknown fields, so the
+ * contract check in estimateCost still passes.
+ */
+export type CostRangeWithShares = CostRange & {
+  byIssue?: IssueCostShare[];
+  byStep?: StepCostShare[];
+};
 
 /** One model-supplied unit price, keyed by material index. */
 export interface ModelUnitCost {
@@ -202,9 +239,62 @@ function round10(n: number): number {
   return Math.round(n / 10) * 10;
 }
 
+/** Split an amount equally among unique keys, adding into the accumulator. */
+function splitInto(
+  acc: Map<number, number>,
+  amount: number,
+  keys: number[],
+  fallback: number[],
+): void {
+  const targets = keys.length > 0 ? keys : fallback;
+  if (targets.length === 0 || amount === 0) return;
+  const each = amount / targets.length;
+  for (const k of targets) acc.set(k, (acc.get(k) ?? 0) + each);
+}
+
+/** Unique ranks from a forIssues/fixes list that exist in the plan's issues. */
+function validRanks(list: number[] | undefined, known: Set<number>): number[] {
+  if (!list) return [];
+  return [...new Set(list)].filter((r) => known.has(r));
+}
+
+/**
+ * Apply contingency and rescale a per-key subtotal map so it sums to
+ * the rounded total, dropping zero entries. Rounding the total to tens
+ * (round10) would otherwise leave the shares a few dollars off the
+ * displayed total on small plans, past the client's 5% trust gate.
+ */
+function finalizeShares(
+  subLo: Map<number, number>,
+  subHi: Map<number, number>,
+  contLo: number,
+  contHi: number,
+  totalLo: number,
+  totalHi: number,
+): { key: number; low: number; high: number }[] {
+  const rawLo = new Map<number, number>();
+  const rawHi = new Map<number, number>();
+  for (const [k, v] of subLo) rawLo.set(k, v * (1 + contLo / 100));
+  for (const [k, v] of subHi) rawHi.set(k, v * (1 + contHi / 100));
+  const sumLo = [...rawLo.values()].reduce((a, b) => a + b, 0);
+  const sumHi = [...rawHi.values()].reduce((a, b) => a + b, 0);
+  const out: { key: number; low: number; high: number }[] = [];
+  const keys = [...new Set([...rawLo.keys(), ...rawHi.keys()])].sort((a, b) => a - b);
+  for (const k of keys) {
+    const low = sumLo > 0 ? Math.round(((rawLo.get(k) ?? 0) * totalLo) / sumLo * 100) / 100 : 0;
+    const high = sumHi > 0 ? Math.round(((rawHi.get(k) ?? 0) * totalHi) / sumHi * 100) / 100 : 0;
+    if (low === 0 && high === 0) continue;
+    out.push({ key: k, low, high });
+  }
+  return out;
+}
+
 /**
  * Pure math from prompt 05: unit prices + labor + contingency -> CostRange,
  * with each material's unitCost filled in. No model call, no tracker.
+ * The optional issues list (6th arg, default none) turns on the
+ * byIssue/byStep shares; older callers that omit it get exactly the
+ * previous result, with no share fields attached.
  */
 export function computeCostRange(
   materials: MaterialItem[],
@@ -212,6 +302,7 @@ export function computeCostRange(
   region: string,
   laborBasis: LaborBasis,
   model: CostModelOutput,
+  issues: Issue[] = [],
 ): CostResult {
   const byIndex = new Map<number, ModelUnitCost>();
   const ignored = new Set<number>();
@@ -270,11 +361,18 @@ export function computeCostRange(
 
   let laborLow = 0;
   let laborHigh = 0;
+  // Paid labor per step order, for the byStep shares (unpaid steps
+  // stay at zero here; they can still carry a material share below).
+  const laborByStep = new Map<number, [number, number]>();
   for (const step of workOrder) {
     if (!step.hours || !laborPaid(step.trade, laborBasis)) continue;
     const [hLo, hHi] = step.hours[0] <= step.hours[1] ? step.hours : [step.hours[1], step.hours[0]];
-    laborLow += hLo * model.laborRate[0];
-    laborHigh += hHi * model.laborRate[1];
+    const lo = hLo * model.laborRate[0];
+    const hi = hHi * model.laborRate[1];
+    laborLow += lo;
+    laborHigh += hi;
+    const prev = laborByStep.get(step.order) ?? [0, 0];
+    laborByStep.set(step.order, [prev[0] + lo, prev[1] + hi]);
   }
 
   const [cLo, cHi] = model.contingencyPct;
@@ -285,7 +383,64 @@ export function computeCostRange(
   const low = round10(subtotalLow * (1 + contLo / 100));
   const high = round10(subtotalHigh * (1 + contHi / 100));
 
-  const costRange: CostRange = {
+  // Per-problem and per-step shares (only when the caller supplied
+  // issues; without them the result is exactly the previous one, with
+  // no share fields). Material
+  // lines use the filled (state-scaled) unit costs, so the shares and
+  // the total are built from the same numbers.
+  const knownRanks = new Set(issues.map((i) => i.rank));
+  const allRanks = [...knownRanks].sort((a, b) => a - b);
+  const issueSubLo = new Map<number, number>();
+  const issueSubHi = new Map<number, number>();
+  if (issues.length > 0) {
+    for (const m of filled) {
+      const q = parseQty(m.qty);
+      const [lo, hi] = m.unitCost ?? [0, 0];
+      const keys = validRanks(m.forIssues, knownRanks);
+      splitInto(issueSubLo, q * lo, keys, allRanks);
+      splitInto(issueSubHi, q * hi, keys, allRanks);
+    }
+    for (const step of workOrder) {
+      const labor = laborByStep.get(step.order);
+      if (!labor) continue;
+      const keys = validRanks(step.fixes, knownRanks);
+      splitInto(issueSubLo, labor[0], keys, allRanks);
+      splitInto(issueSubHi, labor[1], keys, allRanks);
+    }
+  }
+  const stepSubLo = new Map<number, number>();
+  const stepSubHi = new Map<number, number>();
+  if (issues.length > 0 && workOrder.length > 0) {
+    for (const step of workOrder) {
+      const labor = laborByStep.get(step.order);
+      if (labor) {
+        stepSubLo.set(step.order, (stepSubLo.get(step.order) ?? 0) + labor[0]);
+        stepSubHi.set(step.order, (stepSubHi.get(step.order) ?? 0) + labor[1]);
+      }
+    }
+    for (const m of filled) {
+      const q = parseQty(m.qty);
+      const [lo, hi] = m.unitCost ?? [0, 0];
+      if (lo === 0 && hi === 0) continue;
+      // Steps that fix an issue this material fixes; all steps when
+      // the material names no issue or no step touches those issues.
+      const materialRanks = new Set(validRanks(m.forIssues, knownRanks));
+      const targets = workOrder
+        .filter((s) => (s.fixes ?? []).some((r) => materialRanks.has(r)))
+        .map((s) => s.order);
+      const keys = materialRanks.size > 0 && targets.length > 0
+        ? [...new Set(targets)]
+        : workOrder.map((s) => s.order);
+      splitInto(stepSubLo, q * lo, keys, workOrder.map((s) => s.order));
+      splitInto(stepSubHi, q * hi, keys, workOrder.map((s) => s.order));
+    }
+  }
+  const byIssue = finalizeShares(issueSubLo, issueSubHi, contLo, contHi, low, high)
+    .map(({ key, low: l, high: h }) => ({ rank: key, low: l, high: h }));
+  const byStep = finalizeShares(stepSubLo, stepSubHi, contLo, contHi, low, high)
+    .map(({ key, low: l, high: h }) => ({ order: key, low: l, high: h }));
+
+  const costRange: CostRangeWithShares = {
     low,
     high,
     currency: "USD",
@@ -304,6 +459,8 @@ export function computeCostRange(
       ...[...duplicates].sort((a, b) => a - b).map((n) => `Duplicate price for material index ${n} (kept the last price)`),
     ],
     ...(model.sources.length > 0 ? { sources: model.sources } : {}),
+    ...(byIssue.length > 0 ? { byIssue } : {}),
+    ...(byStep.length > 0 ? { byStep } : {}),
   };
   return { costRange, materials: filled };
 }
@@ -390,7 +547,7 @@ export async function estimateCost(input: CostInput, deps: CostDeps): Promise<Co
   });
 
   const model = parseCostModel(res.json);
-  const result = computeCostRange(input.materials, input.workOrder, region, laborBasis, model);
+  const result = computeCostRange(input.materials, input.workOrder, region, laborBasis, model, input.issues);
 
   const shell: WorkPlan = {
     spaceName: input.spaceName,
