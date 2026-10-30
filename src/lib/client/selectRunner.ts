@@ -1,6 +1,6 @@
 import { mockPlanJob, type PlanJobRunner } from "./planJob";
 import { createApiPlanJob } from "./apiPlanJob";
-import { createBuildPlanRequest } from "./buildPlanRequest";
+import { createBuildPlanRequest, requestBudgetBytes } from "./buildPlanRequest";
 
 export type RunnerKind = "mock" | "api";
 
@@ -15,9 +15,15 @@ export function pickRunnerKind(search: string | null, envValue: string | undefin
   return envValue === "api" ? "api" : "mock";
 }
 
-/** Demo defaults sent with each request. Region is left out until Antonio picks one, so no cost range is asked for. */
+/**
+ * Demo defaults sent with each request. Region is left out until Antonio picks one, so no cost range is asked for.
+ * The request budget comes from NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES (unset keeps 9 MB).
+ */
 const apiPlanJob = createApiPlanJob(
-  createBuildPlanRequest({ spaceType: "room" }),
+  createBuildPlanRequest({
+    spaceType: "room",
+    maxRequestBytes: requestBudgetBytes(process.env.NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES),
+  }),
 );
 
 /**

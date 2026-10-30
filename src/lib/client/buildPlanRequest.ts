@@ -26,7 +26,10 @@ export interface BuildOptions {
    * 16000 or 24000 Hz (8000 gets a 400, checked 2026-10-28), so any other value falls back to 16000.
    */
   audioSampleRate?: number;
-  /** Total request budget in bytes (the route caps at 10 MB). Default 9 MB, leaving room for JSON. */
+  /**
+   * Total request budget in bytes (the route caps at 10 MB). Default 9 MB, leaving room for JSON.
+   * Hosts with a smaller platform cap pass less; see requestBudgetBytes.
+   */
   maxRequestBytes?: number;
   /**
    * Group the take into zones and send each frame's zoneId (proposal B). Default true. Off, or when
@@ -43,6 +46,23 @@ const DEFAULTS = {
   maxRequestBytes: 9 * 1024 * 1024,
   zones: true,
 };
+
+/** Smallest and largest request budgets requestBudgetBytes accepts (1 MB to the 9 MB default). */
+export const MIN_REQUEST_BYTES = 1024 * 1024;
+export const MAX_REQUEST_BYTES = DEFAULTS.maxRequestBytes;
+
+/**
+ * Request budget from a build-time setting (NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES). Hosts with a
+ * smaller body cap than the route's 10 MB (Vercel Functions take 4.5 MB) set it so long takes get
+ * softer frames that fit, or the friendly "too long" message, instead of a platform 413. Blank,
+ * non-numeric, fractional or out-of-range values keep the 9 MB default.
+ */
+export function requestBudgetBytes(raw: string | undefined): number {
+  const text = raw?.trim() ?? "";
+  if (!/^\d+$/.test(text)) return DEFAULTS.maxRequestBytes;
+  const n = Number(text);
+  return n >= MIN_REQUEST_BYTES && n <= MAX_REQUEST_BYTES ? n : DEFAULTS.maxRequestBytes;
+}
 
 /** Sample rates the transcribe step accepts. */
 export const TRANSCRIBE_SAMPLE_RATES = [16000, 24000] as const;

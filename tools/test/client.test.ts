@@ -3,6 +3,7 @@ import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { checkDuration, formatDuration } from "@/lib/client/duration";
 import { pickRunnerKind } from "@/lib/client/selectRunner";
+import { requestBudgetBytes, MIN_REQUEST_BYTES, MAX_REQUEST_BYTES } from "@/lib/client/buildPlanRequest";
 import { parseStatusLine, messageForStatus, createApiPlanJob } from "@/lib/client/apiPlanJob";
 import { loadTestCode, saveTestCode, TEST_CODE_HEADER } from "@/lib/client/testCode";
 import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
@@ -167,5 +168,23 @@ describe("API runner (fake fetch, nothing leaves the machine)", () => {
   test("nothing after the final line is shown", async () => {
     const { statuses } = await runApi({ code: "c", chunks: ['{"state":"failed","step":"looking","message":"x"}\n{"state":"running","step":"planning"}\n'] });
     assert.deepEqual(statuses.map((s) => s.state), ["running", "failed"]);
+  });
+});
+
+describe("request budget setting", () => {
+  const DEFAULT = 9 * 1024 * 1024;
+  test("blank, junk and out-of-range values keep the 9 MB default", () => {
+    for (const raw of [undefined, "", "  ", "abc", "4.5e6", "4300000.5", "-4300000", "0", "1048575", "9437185", "99999999999"])
+      assert.equal(requestBudgetBytes(raw), DEFAULT, String(raw));
+  });
+  test("whole numbers from 1 MB to 9 MB are used as given", () => {
+    assert.equal(requestBudgetBytes("4300000"), 4_300_000);
+    assert.equal(requestBudgetBytes(" 4300000 "), 4_300_000);
+    assert.equal(requestBudgetBytes(String(MIN_REQUEST_BYTES)), MIN_REQUEST_BYTES);
+    assert.equal(requestBudgetBytes(String(MAX_REQUEST_BYTES)), MAX_REQUEST_BYTES);
+    assert.equal(MAX_REQUEST_BYTES, DEFAULT);
+  });
+  test("a Vercel-sized budget stays under the 4.5 MB platform cap with room for JSON", () => {
+    assert.ok(requestBudgetBytes("4300000") + 64 * 1024 < 4.5 * 1024 * 1024);
   });
 });
