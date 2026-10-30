@@ -2,6 +2,7 @@ import { RUN_STEPS, type PlanJobStatus, type PlanRequest, type RunStep, type Wor
 import { parseReview } from "@/lib/review";
 import { parseStepCheck } from "@/lib/stepChecks";
 import type { PlanJobRunner } from "./planJob";
+import { BuildRequestError } from "./buildPlanRequest";
 import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
 
 /**
@@ -11,6 +12,7 @@ import { loadTestCode, TEST_CODE_HEADER } from "./testCode";
 export type BuildPlanRequest = (file: File, signal: AbortSignal) => Promise<PlanRequest>;
 
 const GENERIC_FAIL = "Something went wrong while making the plan. Try again, or open the example plan.";
+const READ_FAIL = "We couldn't read that video. Try a different file, or open the example plan.";
 const CONNECTION_FAIL = "The connection dropped before the plan finished. Try again.";
 
 function isRunStep(v: unknown): v is RunStep {
@@ -172,8 +174,9 @@ export function createApiPlanJob(
     let body: PlanRequest;
     try {
       body = await buildRequest(file, signal);
-    } catch {
-      if (!signal.aborted) fail("We couldn't read that video. Try a different file, or open the example plan.");
+    } catch (err) {
+      // A BuildRequestError says what's wrong with this video (too long, no picture, blank); show it.
+      if (!signal.aborted) fail(err instanceof BuildRequestError ? err.message : READ_FAIL);
       return;
     }
     if (signal.aborted) return;

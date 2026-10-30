@@ -1,4 +1,4 @@
-import { test, expect, WALKTHROUGH, SHORT_CLIP, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
+import { test, expect, WALKTHROUGH, SHORT_CLIP, BLANK_CLIP, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
 
 // Every test uses both fixtures, so /api stays blocked and console errors fail the test.
 test.beforeEach(async ({ apiCalls, pageErrors }) => {
@@ -94,6 +94,19 @@ test("real-run mode without a tester code stops at once and sends nothing", asyn
   await page.getByRole("button", { name: "Make my work plan" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible();
   await expect(page.getByText(/Real runs need a tester code/)).toBeVisible();
+  // The apiCalls fixture then checks that no /api request left the browser.
+});
+
+test("real run of an all-black take stops on the device with a clear message and sends nothing", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(BLANK_CLIP);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Every frame of this video came out blank or black/)).toBeVisible();
+  await expect(page.getByText(/We couldn't read that video/)).toHaveCount(0);
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "blank take message");
   // The apiCalls fixture then checks that no /api request left the browser.
 });
 

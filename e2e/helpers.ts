@@ -7,6 +7,8 @@ export const FIXTURES = path.join(__dirname, "fixtures");
 export const WALKTHROUGH = path.join(FIXTURES, "walkthrough-6s.webm");
 /** 3 s clip, under the 5 s minimum. */
 export const SHORT_CLIP = path.join(FIXTURES, "clip-3s.webm");
+/** 6 s of plain black: a take with nothing to see (lens covered). */
+export const BLANK_CLIP = path.join(FIXTURES, "blank-6s.webm");
 
 /**
  * `page` with /api/** aborted in the browser and every attempt recorded, plus console errors and

@@ -3,6 +3,7 @@ import type { BuildPlanRequest } from "./apiPlanJob";
 import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
 import { trimFramesCoveringZones } from "./zoneCoverage";
 import { resolveVideoDuration } from "./videoDuration";
+import { BLANK_SIDE, BLANK_TAKE_MESSAGE, isBlankTake, lumaStats, type LumaStats } from "./blankTake";
 import { chooseSharpTick, frameSharpness, isSoftTick, scoreSize, tickCandidates } from "./sharpTick";
 
 /**
@@ -84,7 +85,10 @@ export function narrationSampleRate(requested: number | undefined): number {
 /** JPEG qualities tried in order until a frame fits its share of the budget. */
 const QUALITIES = [0.72, 0.55, 0.4];
 
-export class BuildRequestError extends Error {}
+/** A video problem the person can act on; its message is shown to them as is. */
+export class BuildRequestError extends Error {
+  override name = "BuildRequestError";
+}
 
 /**
  * Frame times: one every intervalSec, spread evenly over the video when that would pass
@@ -250,6 +254,17 @@ function signCanvas(source: HTMLCanvasElement, thumb: CanvasRenderingContext2D |
   }
 }
 
+/** Brightness stats of the canvas on a tiny copy; null if pixels can't be read. */
+function measureLuma(source: HTMLCanvasElement, g: CanvasRenderingContext2D | null): LumaStats | null {
+  if (!g) return null;
+  try {
+    g.drawImage(source, 0, 0, BLANK_SIDE, BLANK_SIDE);
+    return lumaStats(g.getImageData(0, 0, BLANK_SIDE, BLANK_SIDE).data, BLANK_SIDE, BLANK_SIDE);
+  } catch {
+    return null;
+  }
+}
+
 /** Sharpness of the current canvas measured on a small copy; null if pixels can't be read. */
 function scoreCanvas(source: HTMLCanvasElement, small: CanvasRenderingContext2D | null, w: number, h: number): number | null {
   if (!small) return null;
@@ -336,6 +351,13 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
         bestG = best.getContext("2d");
       }
 
+      // Blank take check on a tiny copy of each sent frame (see blankTake.ts).
+      const lc = document.createElement("canvas");
+      lc.width = BLANK_SIDE;
+      lc.height = BLANK_SIDE;
+      const lumaG = lc.getContext("2d", { willReadFrequently: true });
+      const lumas: (LumaStats | null)[] = [];
+
       let frames: PlanRequest["frames"] = [];
       const signatures: (FrameSignature | null)[] = [];
       const tickScores: number[] = [];
@@ -366,9 +388,11 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
           }
           tickScores.push(own);
         }
+        lumas.push(measureLuma(out, lumaG));
         frames.push({ tSec, dataUrl: encodeFrame(out, perFrame) });
         if (o.zones) signatures.push(signCanvas(out, thumb));
       }
+      if (isBlankTake(lumas)) throw new BuildRequestError(BLANK_TAKE_MESSAGE);
       if (o.zones) frames = withZoneIds(frames, signatures);
       // Guard: never send more than maxFrames, and if anything ever has to go, every zone keeps a frame.
       frames = trimFramesCoveringZones(frames, Math.max(1, o.maxFrames));

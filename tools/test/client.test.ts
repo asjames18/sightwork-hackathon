@@ -3,7 +3,8 @@ import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { checkDuration, formatDuration } from "@/lib/client/duration";
 import { pickRunnerKind } from "@/lib/client/selectRunner";
-import { requestBudgetBytes, MIN_REQUEST_BYTES, MAX_REQUEST_BYTES } from "@/lib/client/buildPlanRequest";
+import { requestBudgetBytes, MIN_REQUEST_BYTES, MAX_REQUEST_BYTES, BuildRequestError } from "@/lib/client/buildPlanRequest";
+import { BLANK_TAKE_MESSAGE } from "@/lib/client/blankTake";
 import { parseStatusLine, messageForStatus, createApiPlanJob } from "@/lib/client/apiPlanJob";
 import { loadTestCode, saveTestCode, TEST_CODE_HEADER } from "@/lib/client/testCode";
 import { loadLastPlan, saveLastPlan } from "@/lib/client/lastPlan";
@@ -258,5 +259,44 @@ describe("request budget setting", () => {
   });
   test("a Vercel-sized budget stays under the 4.5 MB platform cap with room for JSON", () => {
     assert.ok(requestBudgetBytes("4300000") + 64 * 1024 < 4.5 * 1024 * 1024);
+  });
+});
+
+describe("API runner: a video problem found on the device", () => {
+  async function runBuildFail(err: unknown) {
+    fakeWindow();
+    saveTestCode("tester-3");
+    const realFetch = globalThis.fetch;
+    let fetches = 0;
+    globalThis.fetch = (async () => {
+      fetches++;
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch;
+    const statuses: PlanJobStatus[] = [];
+    try {
+      await createApiPlanJob(async () => {
+        throw err;
+      })({ file: {} as File, onStatus: (s) => statuses.push(s), signal: new AbortController().signal });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    const last = statuses[statuses.length - 1];
+    return { fetches, message: last?.state === "failed" ? last.message : undefined };
+  }
+
+  test("shows the specific message (too long, blank take) and makes no upload", async () => {
+    const tooLong = "That video is too long to send. Try a walkthrough of 90 seconds or less.";
+    for (const msg of [tooLong, BLANK_TAKE_MESSAGE]) {
+      const { fetches, message } = await runBuildFail(new BuildRequestError(msg));
+      assert.equal(message, msg);
+      assert.equal(fetches, 0);
+    }
+  });
+
+  test("any other failure keeps the generic read message", async () => {
+    const { fetches, message } = await runBuildFail(new Error("decoder exploded: internal detail"));
+    assert.match(message ?? "", /^We couldn't read that video/);
+    assert.doesNotMatch(message ?? "", /internal detail/);
+    assert.equal(fetches, 0);
   });
 });
