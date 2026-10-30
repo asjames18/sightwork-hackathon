@@ -2,7 +2,8 @@
  * Proposal C prep (longer takes), client side: time-based sampling that keeps the sharpest frame
  * in each window instead of whatever frame sits exactly on the tick.
  *
- * NOT WIRED YET. buildPlanRequest still samples with pickFrameTimes, and duration.ts keeps its
+ * The window sampling (planSampleWindows) is NOT WIRED YET; only sharpness and pickSharpest are
+ * used, through sharpTick.ts, to nudge soft ticks. buildPlanRequest still samples with pickFrameTimes, and duration.ts keeps its
  * 95 s warning / 150 s block. Per Mosheh (mosheh-log, Oct 29 5:45 PM ET) the client sampling and
  * threshold changes only switch on after C's server steps 1-4 ship (48 frames to Spark on Meta,
  * Blob upload, staged pipeline under the 300 s limit). Pure logic, no DOM, no network.

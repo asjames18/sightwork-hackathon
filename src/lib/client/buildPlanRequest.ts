@@ -3,6 +3,7 @@ import type { BuildPlanRequest } from "./apiPlanJob";
 import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
 import { trimFramesCoveringZones } from "./zoneCoverage";
 import { resolveVideoDuration } from "./videoDuration";
+import { chooseSharpTick, frameSharpness, isSoftTick, scoreSize, tickCandidates } from "./sharpTick";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -36,6 +37,13 @@ export interface BuildOptions {
    * the browser can't read pixels back, frames go without zoneId and the pipeline sees one zone.
    */
   zones?: boolean;
+  /**
+   * When a frame tick looks soft next to the rest of the take, try a couple of seek times near it
+   * (about 0.3 s either side) and send the sharpest, so a tick that lands mid-turn doesn't send a
+   * smeared frame. Default true. Frame
+   * count, spacing and size don't change. Off, or when pixels can't be read, each tick is sent as is.
+   */
+  sharpFrames?: boolean;
 }
 
 const DEFAULTS = {
@@ -45,6 +53,7 @@ const DEFAULTS = {
   audioSampleRate: 16000,
   maxRequestBytes: 9 * 1024 * 1024,
   zones: true,
+  sharpFrames: true,
 };
 
 /** Smallest and largest request budgets requestBudgetBytes accepts (1 MB to the 9 MB default). */
@@ -241,6 +250,18 @@ function signCanvas(source: HTMLCanvasElement, thumb: CanvasRenderingContext2D |
   }
 }
 
+/** Sharpness of the current canvas measured on a small copy; null if pixels can't be read. */
+function scoreCanvas(source: HTMLCanvasElement, small: CanvasRenderingContext2D | null, w: number, h: number): number | null {
+  if (!small) return null;
+  try {
+    small.drawImage(source, 0, 0, w, h);
+    const { data } = small.getImageData(0, 0, w, h);
+    return frameSharpness(data, w, h);
+  } catch {
+    return null;
+  }
+}
+
 /** Encodes the canvas at the highest quality that fits maxChars. */
 function encodeFrame(canvas: HTMLCanvasElement, maxChars: number): string {
   let url = "";
@@ -299,13 +320,54 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
         thumb = tc.getContext("2d", { willReadFrequently: true });
       }
 
+      // Sharper frames: score each candidate on a small copy, keep the best full-size draw in `best`.
+      let small: CanvasRenderingContext2D | null = null;
+      let best: HTMLCanvasElement | null = null;
+      let bestG: CanvasRenderingContext2D | null = null;
+      const ss = scoreSize(w, h);
+      if (o.sharpFrames) {
+        const sc = document.createElement("canvas");
+        sc.width = ss.w;
+        sc.height = ss.h;
+        small = sc.getContext("2d", { willReadFrequently: true });
+        best = document.createElement("canvas");
+        best.width = w;
+        best.height = h;
+        bestG = best.getContext("2d");
+      }
+
       let frames: PlanRequest["frames"] = [];
       const signatures: (FrameSignature | null)[] = [];
+      const tickScores: number[] = [];
       for (const t of times) {
         await seek(video, t, signal);
         g.drawImage(video, 0, 0, w, h);
-        frames.push({ tSec: t, dataUrl: encodeFrame(canvas, perFrame) });
-        if (o.zones) signatures.push(signCanvas(canvas, thumb));
+        let out = canvas;
+        let tSec = t;
+        if (small && best && bestG) {
+          const own = scoreCanvas(canvas, small, ss.w, ss.h) ?? NaN;
+          const candidates = tickCandidates(t, durationSec);
+          if (candidates.length > 1 && isSoftTick(own, tickScores)) {
+            // Soft tick: keep its draw, try the neighbours, and send whichever is clearly sharper.
+            bestG.drawImage(canvas, 0, 0);
+            const scores = [own];
+            let kept = chooseSharpTick(scores);
+            for (const c of candidates.slice(1)) {
+              await seek(video, c, signal);
+              g.drawImage(video, 0, 0, w, h);
+              scores.push(scoreCanvas(canvas, small, ss.w, ss.h) ?? NaN);
+              const pick = chooseSharpTick(scores);
+              // The pick only ever moves to the newest candidate; copy it before the next seek.
+              if (pick !== kept && pick === scores.length - 1) bestG.drawImage(canvas, 0, 0);
+              kept = pick;
+            }
+            out = best;
+            tSec = candidates[kept < 0 ? 0 : kept];
+          }
+          tickScores.push(own);
+        }
+        frames.push({ tSec, dataUrl: encodeFrame(out, perFrame) });
+        if (o.zones) signatures.push(signCanvas(out, thumb));
       }
       if (o.zones) frames = withZoneIds(frames, signatures);
       // Guard: never send more than maxFrames, and if anything ever has to go, every zone keeps a frame.
