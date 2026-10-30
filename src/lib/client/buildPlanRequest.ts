@@ -6,6 +6,7 @@ import { resolveVideoDuration } from "./videoDuration";
 import { BLANK_SIDE, BLANK_TAKE_MESSAGE, isBlankTake, lumaStats, type LumaStats } from "./blankTake";
 import { chooseSharpTick, frameSharpness, isSoftTick, scoreSize, tickCandidates } from "./sharpTick";
 import { normalizeNarration } from "./narrationLevel";
+import { audioOnlyMp4, blobReader } from "./movAudio";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -212,14 +213,20 @@ async function extractNarration(file: File, sampleRate: number, signal: AbortSig
     typeof window !== "undefined" ? window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext : undefined;
   if (!Ctx || typeof OfflineAudioContext === "undefined") return null;
   const ctx = new Ctx();
-  let decoded: AudioBuffer;
+  let decoded: AudioBuffer | null = null;
   try {
-    decoded = await ctx.decodeAudioData(await file.arrayBuffer());
-  } catch {
-    return null; // no audio track, or a codec the browser can't decode
+    // Phone videos (.mov/.mp4): decode just the AAC track, rewrapped as a plain audio MP4. iOS
+    // Safari refuses the iPhone camera's QuickTime sound entry, and Chromium trips on an iPhone
+    // Spatial Audio track listed first, so the whole-file decode below loses the narration there.
+    const audioOnly = await audioOnlyMp4(blobReader(file), file.size).catch(() => null);
+    checkAbort(signal);
+    if (audioOnly) decoded = await ctx.decodeAudioData(audioOnly.buffer as ArrayBuffer).catch(() => null);
+    // In-page recordings (WebM), other containers, or a rewrap that didn't decode: the file as it is.
+    if (!decoded) decoded = await ctx.decodeAudioData(await file.arrayBuffer()).catch(() => null);
   } finally {
     void ctx.close();
   }
+  if (!decoded) return null; // no audio track, or a codec the browser can't decode
   checkAbort(signal);
   const length = Math.max(1, Math.ceil(decoded.duration * sampleRate));
   const offline = new OfflineAudioContext(1, length, sampleRate);

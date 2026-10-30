@@ -28,3 +28,7 @@ tools/frames/test/
 # Playwright e2e output
 e2e/.results/
 playwright-report/
+
+# Synthetic e2e fixtures (test pattern + TTS voice, no real footage)
+!e2e/fixtures/speech-6s*.mov
+!e2e/fixtures/speech-6s*.mp4
