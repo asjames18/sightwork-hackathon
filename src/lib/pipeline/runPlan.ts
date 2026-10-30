@@ -430,6 +430,66 @@ function isImageBase64(value: string): boolean {
   return false;
 }
 
+
+/**
+ * True when the base64 string decodes to a WAV header, by the same
+ * rule the route validator uses (src/lib/pipeline/planRequest.ts):
+ * the first four bytes are "RIFF" and bytes 8-11 are "WAVE". An
+ * empty string passes here because the transcribe step treats it as
+ * no audio, not as malformed audio. Decoded with atob (not Buffer)
+ * so this pure module stays free of node types.
+ */
+function isWavBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  if (stripped.length === 0) return true;
+  if (stripped.length < 16) return false;
+  const head = atob(stripped.slice(0, 16));
+  return head.length >= 12 && head.slice(0, 4) === "RIFF" && head.slice(8, 12) === "WAVE";
+}
+
+/**
+ * True when the WAV is in the format Meta transcribe accepts, by the
+ * same rule the route validator uses: mono s16le at 16000 or 24000 Hz
+ * (8 kHz got a 400 on 2026-10-28). The fmt chunk is found by scanning
+ * RIFF chunks, not by assuming it sits at offset 12. Empty passes
+ * (no audio), and a WAV with no fmt chunk in the decoded head passes
+ * too and is left to the transcribe step, so this only rejects audio
+ * Meta is known to refuse.
+ */
+function isTranscribeWavBase64(value: string): boolean {
+  const stripped = value.replace(/\s/g, "");
+  if (stripped.length === 0) return true;
+  // 200 bytes covers a standard header plus small leading chunks.
+  const chunk = stripped.slice(0, 268);
+  const head = atob(chunk.slice(0, chunk.length - (chunk.length % 4)));
+  if (head.length < 12) return false;
+  const u16 = (i: number): number => head.charCodeAt(i) | (head.charCodeAt(i + 1) << 8);
+  const u32 = (i: number): number =>
+    head.charCodeAt(i) |
+    (head.charCodeAt(i + 1) << 8) |
+    (head.charCodeAt(i + 2) << 16) |
+    (head.charCodeAt(i + 3) << 24);
+  let off = 12;
+  while (off + 8 <= head.length) {
+    const id = head.slice(off, off + 4);
+    const size = u32(off + 4);
+    if (id === "fmt " && size >= 16 && off + 8 + 16 <= head.length) {
+      const format = u16(off + 8);
+      const channels = u16(off + 10);
+      const sampleRate = u32(off + 12);
+      const bits = u16(off + 22);
+      return (
+        format === 1 &&
+        channels === 1 &&
+        (sampleRate === 16000 || sampleRate === 24000) &&
+        bits === 16
+      );
+    }
+    off += 8 + size + (size % 2);
+  }
+  return true;
+}
+
 /** Max decoded bytes per runPlan frame, same shape as the reason/segment step 5 MB frame caps. */
 const MAX_RUNPLAN_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -580,6 +640,33 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     request.audioWavBase64.trim().length === 0
   ) {
     throw new Error("runPlan: audioWavBase64 must not be blank when given");
+  }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+  // a direct runPlan caller with malformed audio used to pass here
+  // and only fail at the listening step, after runPlan had started,
+  // when the transcribe step rejected it. A non-base64 string, a
+  // valid-base64 non-WAV blob, or a WAV in a format Meta refuses
+  // (stereo, 8-bit, 8 kHz) gets the same fail-fast here instead of
+  // only via the route. Empty passes (no audio), as above.
+  if (
+    typeof request.audioWavBase64 === "string" &&
+    !isBase64(request.audioWavBase64)
+  ) {
+    throw new Error("runPlan: audioWavBase64 must be valid base64");
+  }
+  if (
+    typeof request.audioWavBase64 === "string" &&
+    !isWavBase64(request.audioWavBase64)
+  ) {
+    throw new Error("runPlan: audioWavBase64 must be a WAV file (RIFF/WAVE header)");
+  }
+  if (
+    typeof request.audioWavBase64 === "string" &&
+    !isTranscribeWavBase64(request.audioWavBase64)
+  ) {
+    throw new Error(
+      "runPlan: audioWavBase64 must be mono 16-bit WAV at 16000 or 24000 Hz (the format Meta transcribe accepts)",
+    );
   }
   // Plan-side half of option (b) (2026-10-29):
   // a request may carry narration already transcribed by POST
