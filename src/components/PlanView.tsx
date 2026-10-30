@@ -4,6 +4,7 @@ import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { WorkSteps } from "./WorkSteps";
 import { MaterialsList } from "./MaterialsList";
+import { PoweredByMeta } from "./PoweredByMeta";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictFor } from "@/lib/review";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
@@ -103,33 +104,6 @@ function ReviewLine({ text, ok }: { text: string; ok: boolean }) {
       </svg>
       <span className="min-w-0">{text}</span>
     </p>
-  );
-}
-
-/** Small "how this plan was made" line, so the agent trace is visible on the result too. */
-function MadeWith({ plan, masks }: { plan: WorkPlan; masks: boolean }) {
-  const planEngine = plan.meta?.planProvider === "baseten" ? "Muse Spark Open (Meta open weights, on Baseten)" : "Muse Spark";
-  const review = planReview(plan);
-  const rows: [string, string][] = [
-    ["Plan", planEngine],
-    ["Outlines", masks ? "SAM 3.1" : "Off this run"],
-    ["After picture", plan.afterImageUrl ? "Muse Image" : "Off this run"],
-    ...(review
-      ? [["Review", !review.ran ? "Didn't run this time" : review.source === "precomputed" ? "Worked out ahead of time for this example" : `${planEngine}, review only`] as [string, string]]
-      : []),
-  ];
-  return (
-    <footer className="mt-12 border-t border-ink/10 pt-4 text-sm text-ink/70">
-      <p className="font-semibold uppercase tracking-wide">How this plan was made</p>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-        {rows.map(([k, v]) => (
-          <div key={k} className="contents">
-            <dt>{k}</dt>
-            <dd className="text-ink/75">{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </footer>
   );
 }
 
@@ -474,14 +448,14 @@ export function PlanView({
       </div>
 
       {/* The after-picture placeholder is screen-only: a saved PDF shows just the finished plan.
-          When the after-image step was skipped this run, no slot at all: "Made with" already says it was off. */}
+          When the after-image step was skipped this run, no slot at all: "Powered by Meta" already says it was off. */}
       {!plan.afterImageUrl && !plan.meta?.skipped?.afterImage && plan.workOrder.length > 0 && (
         <Section title="After the work" className="print:hidden">
           <AfterSlot frame={slotFrame} sample={sample} />
         </Section>
       )}
 
-      <MadeWith plan={plan} masks={masks} />
+      <PoweredByMeta plan={plan} sample={sample} />
     </article>
   );
 }
