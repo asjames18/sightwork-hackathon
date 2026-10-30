@@ -35,10 +35,16 @@
  *   Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
- *   short backoff (250 ms, then 500 ms), mirroring the Meta callers:
- *   any other error, or a 404 without model_not_found, still throws at
- *   once, and a 404 that survives all 3 attempts throws with the last
- *   response, so one bad hop no longer fails the whole reason step.
+ *   short backoff (250 ms, then 500 ms), mirroring the Meta callers.
+ *   Transient gateway failures (502, 503, 504) retry the same way,
+ *   with a longer backoff (1 s, then 2 s): the Oct 30 real run hit a
+ *   Baseten 504 "authentication service request timed out" at the
+ *   comparing step while the status page was all green, and that
+ *   error used to fail the run at once. A failed 5xx carries no
+ *   usage tokens, so a retry spends nothing extra; the spike cap
+ *   still applies to every successful call via the tracker. Any
+ *   other error, or a transient error surviving all 3 attempts,
+ *   still throws with the last response.
  */
 
 export interface BasetenClientOptions {
@@ -90,6 +96,12 @@ const DEFAULT_OUTPUT_PRICE_PER_MILLION = 4.25;
 const MAX_BASETEN_ATTEMPTS = 3;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
 const BASETEN_RETRY_DELAYS_MS = [250, 500];
+/** Gateway statuses treated as transient (see header): a 504 auth-service
+ *  timeout, or a 502/503 from a hop in front of Baseten, clears on retry. */
+const TRANSIENT_GATEWAY_STATUSES = [502, 503, 504];
+/** Backoff after a transient gateway failure: longer than the 404 hop
+ *  backoff, so an auth service that just timed out has time to recover. */
+const GATEWAY_RETRY_DELAYS_MS = [1000, 2000];
 
 function readEnv(name: string): string | undefined {
   try {
@@ -260,9 +272,11 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
 
       const started = Date.now();
       let res: Awaited<ReturnType<typeof fetchImpl>> | undefined;
-      // Mirror the Meta callers: only a 404 naming model_not_found is
-      // transient, so only that retries; any other error, or a 404
-      // surviving all attempts, throws with the last response.
+      // Mirror the Meta callers: only a 404 naming model_not_found, or a
+      // transient gateway status (502/503/504), retries; any other error,
+      // or a transient error surviving all attempts, throws with the last
+      // response. A 504 here used to fail the comparing step at once
+      // (Oct 30 real run: Baseten auth-service timeout, status green).
       for (let attempt = 0; attempt < MAX_BASETEN_ATTEMPTS; attempt++) {
         res = await fetchImpl(`${baseUrl}/chat/completions`, {
           method: "POST",
@@ -271,11 +285,14 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
         });
         if (res.ok) break;
         const detail = await res.text();
-        const transient = res.status === 404 && detail.includes("model_not_found");
+        const gateway = TRANSIENT_GATEWAY_STATUSES.includes(res.status);
+        const transient =
+          gateway || (res.status === 404 && detail.includes("model_not_found"));
         if (!transient || attempt === MAX_BASETEN_ATTEMPTS - 1) {
           throw new Error(`baseten: ${res.status} ${detail}`);
         }
-        await sleepImpl(BASETEN_RETRY_DELAYS_MS[attempt] ?? 500);
+        const delays = gateway ? GATEWAY_RETRY_DELAYS_MS : BASETEN_RETRY_DELAYS_MS;
+        await sleepImpl(delays[attempt] ?? 500);
       }
       if (res === undefined) {
         throw new Error("baseten: no response received");
