@@ -2,6 +2,7 @@ import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type Wor
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
+import { WorkSteps } from "./WorkSteps";
 import type { Example } from "@/lib/examples";
 
 /** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
@@ -367,55 +368,7 @@ export function PlanView({
 
       <Section title="Do the work in this order" id="steps">
         {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
-        {plan.workOrder.length > 0 && (
-          <ol className="rounded-2xl bg-white px-4 py-2 sm:px-5">
-            {plan.workOrder.map((step, i) => {
-              const last = i === plan.workOrder.length - 1;
-              const volunteer = !!step.trade && /volunteer/i.test(step.trade);
-              const chip = "inline-flex min-h-7 items-center rounded-full px-2.5 text-sm font-medium";
-              return (
-                <li key={step.order} className="relative flex gap-3 py-3">
-                  {!last && (
-                    <span aria-hidden="true" className="absolute top-12 bottom-0 left-4 w-0.5 -translate-x-1/2 bg-ink/15" />
-                  )}
-                  <span
-                    aria-hidden="true"
-                    className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-bold text-white tabular-nums"
-                  >
-                    {step.order}
-                  </span>
-                  <div className="min-w-0 pt-1">
-                    <p className="font-bold">
-                      <span className="sr-only">Step {step.order}: </span>
-                      {step.title}
-                    </p>
-                    <p className="text-sm text-ink/75">{step.detail}</p>
-                    {(step.trade || step.hours || step.dependsOn || (step.fixes && step.fixes.length > 0)) && (
-                      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
-                        {step.trade && (
-                          <li
-                            className={
-                              volunteer
-                                ? `${chip} bg-safe/10 text-safe-dark`
-                                : `${chip} border border-ink/20 bg-ink/[0.04] text-ink`
-                            }
-                          >
-                            {volunteer ? "Volunteer" : `Paid: ${step.trade}`}
-                          </li>
-                        )}
-                        {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
-                        {step.dependsOn && <li className={`${chip} bg-ink/[0.06] text-ink/80`}>After step {step.dependsOn}</li>}
-                        {step.fixes && step.fixes.length > 0 && (
-                          <li className={`${chip} bg-ink/[0.06] text-ink/80`}>Fixes #{step.fixes.join(", #")}</li>
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
+        {plan.workOrder.length > 0 && <WorkSteps plan={plan} />}
       </Section>
 
       {/* Materials and cost sit side by side on desktop (lg+) whenever a cost card renders; phones and tablets stack them. */}
