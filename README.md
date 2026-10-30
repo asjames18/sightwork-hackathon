@@ -63,7 +63,11 @@ Each run is capped at $10 of model spend, enforced in code. If a call would push
 
 On /start, **Record a walkthrough** opens the camera in the page (back camera, asks for 1920×1080 at 30 fps with sound, records at about 8 Mbps, shows the size it actually got, stops itself at 2:30). If the browser can't open the camera it falls back to the phone's camera app; **Choose a video** picks a file you already have. A Camera-app recording is usually still the sharpest.
 
-Each plan is one request: still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) and the narration as 16 kHz mono audio. The full video stays on the device. The browser keeps a request under about 9 MB, since the server accepts up to 10 MB. Some hosts cap request bodies lower (Vercel functions take 4.5 MB), so a long narrated walkthrough can come back as "too large" there.
+A narrated run makes two requests. First the browser sends the narration as 16 kHz mono audio to `POST /api/transcribe`; then it sends still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) plus the transcript text to `POST /api/plan`. If the transcribe request fails for any reason other than a bad tester code, the browser falls back to sending the audio along with the frames in one plan request, so narration is never dropped. The full video stays on the device.
+
+The browser keeps a request under about 9 MB, since the server accepts up to 10 MB. Some hosts cap request bodies lower (Vercel functions take 4.5 MB). On those, set `NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES` at build time (for example `4300000`), and the browser softens the frames to fit or says the take is too long up front, instead of the host rejecting it.
+
+Each request logs one usage line on the server with its model calls and cost: one from the transcribe route and one from the plan route. For a narrated run, add the two together to get the run's total.
 
 On the plan screen, "Save PDF" prints a clean copy of the plan.
 
