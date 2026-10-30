@@ -966,6 +966,12 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     return {
       costUsd: deps.tracker.totals().spikeTotalUsd,
       ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
+      // The region the run was asked for, when one was given: the plan
+      // itself then says where it is even when the cost step failed
+      // and costRange is null. An empty region means "not given" and
+      // stays omitted, as before; a server-set region always wins over
+      // the browser stamp because the client keeps a server value.
+      ...(request.region?.trim() ? { region: request.region } : {}),
       ...(Object.keys(skipped).length > 0 ? { skipped } : {}),
     };
   };
