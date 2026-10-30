@@ -44,6 +44,15 @@ export interface UsageTracker {
   canSpend(costUsd: number): boolean;
   totals(): UsageTotals;
   records(): readonly UsageRecord[];
+  /** Per-model call counts and costs, in first-seen model order. */
+  totalsByModel(): UsageModelTotals[];
+}
+
+/** Call count and cost for one model over a run. */
+export interface UsageModelTotals {
+  model: string;
+  calls: number;
+  totalUsd: number;
 }
 
 // Costs are kept to 4 decimals, not 2: a sub-cent call (e.g. a SAM
@@ -154,6 +163,25 @@ export function createUsageTracker(opts?: {
         remainingSpikeUsd: round4(spikeCapUsd - total),
         remainingCreditUsd: round4(creditTotalUsd - total),
       };
+    },
+    totalsByModel(): UsageModelTotals[] {
+      // First-seen order, not sorted: the spike log reads in the
+      // order models were first called, and a sorted view would
+      // hide which model the run started spending on. Totals are
+      // the same rounded per-call costs the tracker already sums,
+      // so the per-model totals add back to totals().spikeTotalUsd.
+      const byModel = new Map<string, { calls: number; totalUsd: number }>();
+      for (const r of seen) {
+        const cur = byModel.get(r.model) ?? { calls: 0, totalUsd: 0 };
+        cur.calls += 1;
+        cur.totalUsd = round4(cur.totalUsd + r.costUsd);
+        byModel.set(r.model, cur);
+      }
+      return [...byModel.entries()].map(([model, v]) => ({
+        model,
+        calls: v.calls,
+        totalUsd: v.totalUsd,
+      }));
     },
     records(): readonly UsageRecord[] {
       // Copies of the log and of each entry, not the live array or
