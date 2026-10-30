@@ -27,7 +27,15 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    launchOptions: executablePath ? { executablePath, args: ["--no-sandbox"] } : {},
+    // Fake camera + mic with auto-accepted permission, for the in-page recorder check (e2e/recorder.spec.ts).
+    launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
+      args: [
+        ...(executablePath ? ["--no-sandbox"] : []),
+        "--use-fake-device-for-media-stream",
+        "--use-fake-ui-for-media-stream",
+      ],
+    },
   },
   projects: [
     {

@@ -55,7 +55,7 @@ test("deep link /start?view=example renders the plan in the first HTML", async (
 
 test("upload a video (mock runner): processing screen, then the plan", async ({ page }) => {
   await page.goto("/start");
-  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   const card = page.getByRole("group", { name: "Your walkthrough" });
   await expect(card).toContainText("walkthrough-6s.webm");
   await expect(card).toContainText("0:06");
@@ -76,7 +76,7 @@ test("upload a video (mock runner): processing screen, then the plan", async ({ 
 
 test("a clip under 5 seconds is blocked before anything runs", async ({ page }) => {
   await page.goto("/start");
-  await page.locator('input[type="file"]').setInputFiles(SHORT_CLIP);
+  await page.getByTestId("choose-video-input").setInputFiles(SHORT_CLIP);
   await expect(page.getByRole("alert").filter({ hasText: "only a few seconds" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Make my work plan" })).toBeDisabled();
 });
@@ -89,7 +89,7 @@ test("real-run mode without a tester code stops at once and sends nothing", asyn
   await expect(page.getByText("Real runs use paid model credits, so they need a code.")).toBeVisible();
   await expectNoAxeViolations(page, "/start?runner=api");
 
-  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await expect(page.getByText("Frames and narration are sent to make your plan.")).toBeVisible();
   await page.getByRole("button", { name: "Make my work plan" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible();
@@ -106,7 +106,7 @@ test("the server gate answers 401 to an API call with no tester code", async ({ 
 
 test("a step failure (?fail=planning) shows the error card, and Try again runs it again", async ({ page }) => {
   await page.goto("/start?fail=planning");
-  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await page.getByRole("button", { name: "Make my work plan" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
   const retry = page.getByRole("button", { name: "Try again" });
@@ -118,7 +118,7 @@ test("a step failure (?fail=planning) shows the error card, and Try again runs i
 
 test("?mock=nometa: SAM and the after picture show as skipped, the plan still comes back", async ({ page }) => {
   await page.goto("/start?mock=nometa");
-  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await page.getByRole("button", { name: "Make my work plan" }).click();
   // Looking and Counting flip to skipped once Comparing starts (the step state is announced as text).
   await expect(page.getByText(/skipped this run/i).first()).toBeVisible({ timeout: 30_000 });

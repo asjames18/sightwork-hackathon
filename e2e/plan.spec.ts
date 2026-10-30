@@ -90,7 +90,7 @@ test("Open my last plan: after a run it shows on the landing and on /start, and 
   await expect(page.getByRole("heading", { level: 1, name: "Film a walkthrough. Get a work plan." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open my last plan" })).toHaveCount(0);
 
-  await page.locator('input[type="file"]').setInputFiles(WALKTHROUGH);
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await page.getByRole("button", { name: "Make my work plan" }).click();
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
 
