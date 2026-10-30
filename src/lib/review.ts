@@ -7,6 +7,9 @@
  */
 import type { Issue, PlanReview, PlanReviewItem, WorkPlan } from "./types";
 
+/** Re-exported so pipeline code can import the review types from here or from ./types. */
+export type { PlanReview, PlanReviewItem } from "./types";
+
 /** Longest reason the plan shows; longer ones are cut at a word. */
 export const MAX_REASON_CHARS = 140;
 
