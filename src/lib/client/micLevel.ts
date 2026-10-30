@@ -43,9 +43,20 @@ export function isTooQuiet(quietSince: number | null, nowSec: number): boolean {
   return quietSince !== null && nowSec - quietSince >= QUIET_HINT_SEC;
 }
 
+/**
+ * The level to show, or null when the audio graph isn't running yet. Phone browsers (Safari on iPhone
+ * above all) can keep a Web Audio context suspended until a tap; a suspended analyser reads flat
+ * silence even while the recording itself has sound, so that reading must not count as quiet.
+ */
+export function levelIfRunning(state: string | undefined, read: () => number): number | null {
+  return state === undefined || state === "running" ? read() : null;
+}
+
 export interface MicMeter {
-  /** Current loudness, 0..1. */
-  read(): number;
+  /** Current loudness, 0..1, or null while the audio context is suspended (no reading). */
+  read(): number | null;
+  /** Try to start a suspended context. Call it from a tap (Start), where phone browsers allow it. */
+  resume(): void;
   close(): void;
 }
 
@@ -67,8 +78,13 @@ export function openMicMeter(stream: MediaStream): MicMeter | null {
     ctx.resume?.().catch(() => {});
     return {
       read() {
-        analyser.getByteTimeDomainData(buf);
-        return levelFromSamples(buf);
+        return levelIfRunning(ctx.state, () => {
+          analyser.getByteTimeDomainData(buf);
+          return levelFromSamples(buf);
+        });
+      },
+      resume() {
+        if (ctx.state !== "running") ctx.resume?.().catch(() => {});
       },
       close() {
         try {

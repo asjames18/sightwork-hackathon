@@ -267,3 +267,43 @@ for (const vp of [
     await cam.getByRole("button", { name: "Cancel" }).click();
   });
 }
+
+test("Record with the mic blocked or missing: the camera still opens, video only, with the no-mic note", async ({ page }) => {
+  await page.addInitScript(() => {
+    const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      if (c?.audio) throw new DOMException("mic blocked", "NotAllowedError");
+      return orig(c);
+    };
+  });
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  const cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await expect(cam.getByTestId("mic-missing")).toBeVisible();
+  await expect(cam.getByTestId("mic-level")).toHaveCount(0);
+  await expect(page.getByText("Camera or microphone access was blocked")).toHaveCount(0);
+});
+
+test("Record while Web Audio stays suspended (phones before a tap): no false 'can't hear you'", async ({ page }) => {
+  await page.addInitScript(() => {
+    const Orig = window.AudioContext;
+    window.AudioContext = class extends Orig {
+      constructor(o?: AudioContextOptions) {
+        super(o);
+        void this.suspend();
+      }
+      resume() {
+        return Promise.resolve();
+      }
+    } as typeof AudioContext;
+  });
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  const cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await page.waitForTimeout(6500);
+  await expect(cam.getByTestId("mic-quiet")).toHaveCount(0);
+  await cam.getByRole("button", { name: "Stop recording" }).click();
+});

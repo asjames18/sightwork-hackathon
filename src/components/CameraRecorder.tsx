@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDuration, HARD_MAX_SEC, SOFT_MAX_SEC } from "@/lib/client/duration";
-import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel } from "@/lib/client/micLevel";
+import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel, type MicMeter } from "@/lib/client/micLevel";
 import { keepScreenOn } from "@/lib/client/wakeLock";
 import {
   averageBitrate,
@@ -18,6 +18,8 @@ import {
   RECORD_VIDEO_BPS,
   recordingFileName,
   secondsLeft,
+  shouldRetryWithoutMic,
+  videoOnlyConstraints,
 } from "@/lib/client/recorder";
 
 export interface RecordingInfo {
@@ -69,7 +71,12 @@ export function CameraRecorder({
   const discardRef = useRef(false);
   const startedAtRef = useRef(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meterRef = useRef<MicMeter | null>(null);
   const [phase, setPhase] = useState<Phase>("starting");
+  const phaseRef = useRef<Phase>("starting");
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
   const [settings, setSettings] = useState<MediaTrackSettings | null>(null);
   const [elapsed, setElapsed] = useState(0);
   // Live mic level (0..1), whether the stream has a mic at all, and the "can't hear you" hint.
@@ -110,6 +117,14 @@ export function CameraRecorder({
           lastName = (e as { name?: string })?.name;
           // Only loosen the request when the constraints were the problem, not on a "no".
           if (!isConstraintError(lastName)) break;
+        }
+      }
+      // A "no" or a missing mic shouldn't cost the camera: try once more with video only.
+      if (!stream && shouldRetryWithoutMic(lastName)) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(videoOnlyConstraints());
+        } catch (e) {
+          lastName = (e as { name?: string })?.name;
         }
       }
       if (cancelled) {
@@ -160,6 +175,8 @@ export function CameraRecorder({
   const start = useCallback(() => {
     const stream = streamRef.current;
     if (!stream) return;
+    // The Start tap is the gesture phone browsers need before a suspended audio context can run.
+    meterRef.current?.resume();
     const mimeType = pickRecordingMimeType((t) => MediaRecorder.isTypeSupported(t));
     let rec: MediaRecorder;
     try {
@@ -234,28 +251,41 @@ export function CameraRecorder({
     return keepScreenOn();
   }, [cameraOpen]);
 
-  // Mic meter while the camera is open. The quiet hint only counts time while recording.
+  // Mic meter while the camera is open: one audio context for the whole session (not one per phase),
+  // so the one the Start tap resumed is the one being read. The quiet hint only counts time while
+  // recording, and only on real readings: a suspended context reads flat and says nothing about the take.
   useEffect(() => {
     if (!cameraOpen || !streamRef.current) return;
     const meter = openMicMeter(streamRef.current);
     if (!meter) return;
+    meterRef.current = meter;
     let smoothed = 0;
     let quietSince: number | null = null;
     const id = setInterval(() => {
-      smoothed = smoothLevel(smoothed, meter.read());
+      const raw = meter.read();
+      if (raw === null) {
+        quietSince = null;
+        setTooQuiet(false);
+        return;
+      }
+      smoothed = smoothLevel(smoothed, raw);
       setLevel(smoothed);
-      if (phase === "recording") {
+      if (phaseRef.current === "recording") {
         const now = performance.now() / 1000;
         quietSince = nextQuietSince(quietSince, smoothed, now);
         setTooQuiet(isTooQuiet(quietSince, now));
+      } else {
+        quietSince = null;
+        setTooQuiet(false);
       }
     }, 100);
     return () => {
       clearInterval(id);
       meter.close();
+      if (meterRef.current === meter) meterRef.current = null;
       setTooQuiet(false);
     };
-  }, [cameraOpen, phase]);
+  }, [cameraOpen]);
 
   const cancel = useCallback(() => {
     discardRef.current = true;

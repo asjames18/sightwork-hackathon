@@ -56,6 +56,27 @@ export function cameraConstraintLadder(): MediaStreamConstraints[] {
   ];
 }
 
+/**
+ * Camera without the microphone: the last try after a request with audio was refused or found no mic
+ * (mic blocked while the camera is allowed, no mic, or a mic held by a call or a headset). The take then
+ * records video only and the screen says the plan will use the video only.
+ */
+export function videoOnlyConstraints(): MediaStreamConstraints {
+  return { video: cameraConstraintLadder()[0].video, audio: false };
+}
+
+/** Errors from a camera-plus-mic request worth one more try with the camera alone. */
+export function shouldRetryWithoutMic(name: string | undefined): boolean {
+  return (
+    name === "NotAllowedError" ||
+    name === "PermissionDeniedError" ||
+    name === "NotFoundError" ||
+    name === "DevicesNotFoundError" ||
+    name === "NotReadableError" ||
+    name === "TrackStartError"
+  );
+}
+
 /** Errors that mean "these constraints don't fit this camera", worth retrying with looser ones. */
 export function isConstraintError(name: string | undefined): boolean {
   return name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError" || name === "TypeError";

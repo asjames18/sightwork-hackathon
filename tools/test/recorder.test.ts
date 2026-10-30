@@ -103,3 +103,17 @@ describe("take length", () => {
     assert.equal(averageBitrate(10, 0), 0);
   });
 });
+
+test("a refused or missing mic retries with the camera alone, not on constraint errors", async () => {
+  const { shouldRetryWithoutMic, videoOnlyConstraints } = await import("@/lib/client/recorder");
+  for (const n of ["NotAllowedError", "PermissionDeniedError", "NotFoundError", "DevicesNotFoundError", "NotReadableError", "TrackStartError"]) {
+    assert.equal(shouldRetryWithoutMic(n), true, n);
+  }
+  for (const n of ["OverconstrainedError", "TypeError", "SecurityError", "AbortError", undefined]) {
+    assert.equal(shouldRetryWithoutMic(n), false, String(n));
+  }
+  const c = videoOnlyConstraints();
+  assert.equal(c.audio, false);
+  assert.deepEqual(c.video, cameraConstraintLadder()[0].video, "same camera request as the first try");
+  assert.doesNotMatch(JSON.stringify(c), /exact|min/);
+});

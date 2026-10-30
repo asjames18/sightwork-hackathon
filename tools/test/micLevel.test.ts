@@ -54,3 +54,18 @@ test("wake lock support is detected only when navigator.wakeLock.request exists"
   assert.equal(canKeepScreenOn({ wakeLock: {} }), false);
   assert.equal(canKeepScreenOn({ wakeLock: { request: async () => ({ release: async () => {} }) } }), true);
 });
+
+test("a suspended audio context gives no reading, so it can't count as quiet", async () => {
+  const { levelIfRunning } = await import("@/lib/client/micLevel");
+  let reads = 0;
+  const read = () => {
+    reads++;
+    return 0.5;
+  };
+  assert.equal(levelIfRunning("suspended", read), null);
+  assert.equal(levelIfRunning("interrupted", read), null);
+  assert.equal(levelIfRunning("closed", read), null);
+  assert.equal(reads, 0, "a suspended analyser isn't read at all");
+  assert.equal(levelIfRunning("running", read), 0.5);
+  assert.equal(levelIfRunning(undefined, read), 0.5);
+});
