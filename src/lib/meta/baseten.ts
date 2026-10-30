@@ -23,8 +23,10 @@
  * - This module makes no call on import. No call happens until a caller
  *   returned here is invoked, and tests inject a fake fetch instead.
  * - Provider limits that shape this caller (spike notes, Oct 27):
- *   at most 8 images per request; the JSON schema is NOT enforced
- *   server-side, so the schema is appended to the prompt text, the
+ *   at most 8 images per request, each at most 5 MB decoded (a direct
+ *   caller cannot push an unbounded frame onto a paid call); the JSON
+ *   schema is NOT enforced server-side, so the schema is appended to
+ *   the prompt text, the
  *   reasoning lane (returned separately from message.content) is
  *   ignored, code fences are stripped, and the parsed content is
  *   returned for the step's own validation + one retry.
@@ -80,6 +82,8 @@ export interface BasetenClient {
 const DEFAULT_BASE_URL = "https://inference.baseten.co/v1";
 const BASETEN_MODEL = "meta-models/muse-spark-open-1026";
 const MAX_IMAGES_PER_REQUEST = 8;
+/** Max decoded bytes per image. Frames are 1024 px JPEGs (tools/frames/sample-frames.mjs), so 5 MB leaves wide headroom while bounding a direct caller that bypasses the step, the same shape as the ASR caller's 32 MB audio cap. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_INPUT_PRICE_PER_MILLION = 1.25;
 const DEFAULT_OUTPUT_PRICE_PER_MILLION = 4.25;
 /** Total attempts for a transient 404 model_not_found. */
@@ -212,6 +216,19 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
           }
           if (!isImageBase64(payload)) {
             throw new Error("baseten: images must carry image data (JPEG, PNG, WebP, or GIF)");
+          }
+          // Same shape as the ASR caller's audio cap: the step's frames
+          // are small, but a direct caller bypassing the step had no
+          // bound, so an unbounded frame would ride onto a paid call
+          // before any cap could stop it. 5 MB decoded is wide
+          // headroom over a 1024 px JPEG frame; reject it here,
+          // before any fetch.
+          const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+          const decodedBytes = (payload.length * 3) / 4 - padding;
+          if (decodedBytes > MAX_IMAGE_BYTES) {
+            throw new Error(
+              `baseten: image must be at most 5 MB, got ${decodedBytes} bytes`,
+            );
           }
         }
       }
