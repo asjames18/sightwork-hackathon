@@ -9,6 +9,7 @@ import { checkLocation, CITY_MAX, isUsStateCode, isValidCity, loadLocation, save
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
+import { SpacePicker } from "./SpacePicker";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -336,6 +337,7 @@ export function UploadStep({
               {check.message}
             </p>
           )}
+          <SpacePicker />
           <div className="px-4 pb-4">
             {videoRunner === "api" && (
               <LocationFields

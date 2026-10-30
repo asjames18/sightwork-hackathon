@@ -7,6 +7,7 @@ import { BLANK_SIDE, BLANK_TAKE_MESSAGE, isBlankTake, lumaStats, type LumaStats 
 import { chooseSharpTick, frameSharpness, isSoftTick, scoreSize, tickCandidates } from "./sharpTick";
 import { normalizeNarration } from "./narrationLevel";
 import { audioOnlyMp4, blobReader } from "./movAudio";
+import { mergeByTime, planDenseTicks, sceneChangeTimes } from "./denseSampling";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -47,6 +48,17 @@ export interface BuildOptions {
    * count, spacing and size don't change. Off, or when pixels can't be read, each tick is sent as is.
    */
   sharpFrames?: boolean;
+  /**
+   * Denser frames for takes up to 45 s (about one per 1.25 s, plus up to 4 frames where the picture
+   * changes fast), inside the byte budget and the 48-frame cap; see denseSampling.ts. Default true.
+   * Off, or when the budget can't fit them, the take keeps one frame every intervalSec.
+   */
+  denseFrames?: boolean;
+  /**
+   * Read when each run starts, for fields the person picks on the video card (space type and name).
+   * Defined values win over the fixed options above.
+   */
+  runContext?: () => Partial<Pick<BuildOptions, "spaceName" | "spaceType" | "region" | "laborBasis">>;
 }
 
 const DEFAULTS = {
@@ -57,6 +69,7 @@ const DEFAULTS = {
   maxRequestBytes: 9 * 1024 * 1024,
   zones: true,
   sharpFrames: true,
+  denseFrames: true,
 };
 
 /** Smallest and largest request budgets requestBudgetBytes accepts (1 MB to the 9 MB default). */
@@ -300,9 +313,12 @@ function encodeFrame(canvas: HTMLCanvasElement, maxChars: number): string {
  * frames get whatever is left of the request budget, split evenly.
  */
 export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanRequest {
-  const o = { ...DEFAULTS, ...options };
+  const base = { ...DEFAULTS, ...options };
   return async (file, signal) => {
     checkAbort(signal);
+    const ctx = base.runContext?.() ?? {};
+    const o = { ...base };
+    for (const k of ["spaceName", "spaceType", "region", "laborBasis"] as const) if (ctx[k] !== undefined) (o as Record<string, unknown>)[k] = ctx[k];
     const url = URL.createObjectURL(file);
     try {
       const video = await loadVideo(url, signal);
@@ -320,13 +336,16 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       const wav = await extractNarration(file, narrationSampleRate(o.audioSampleRate), signal);
       const audioWavBase64 = wav ? bytesToBase64(wav) : undefined;
 
-      const times = pickFrameTimes(durationSec, o.maxFrames, o.intervalSec);
-      if (times.length === 0)
+      const legacyTimes = pickFrameTimes(durationSec, o.maxFrames, o.intervalSec);
+      if (legacyTimes.length === 0)
         throw new BuildRequestError("This video has no length we can read. Try recording it again.");
       const frameBudget = o.maxRequestBytes - (audioWavBase64?.length ?? 0) - 64 * 1024;
-      if (frameBudget < times.length * 20 * 1024)
+      if (frameBudget < legacyTimes.length * 20 * 1024)
         throw new BuildRequestError("That video is too long to send. Try a walkthrough of 90 seconds or less.");
-      const perFrame = Math.floor(frameBudget / times.length);
+      const dense = o.denseFrames ? planDenseTicks(durationSec, { frameBudgetBytes: frameBudget, legacyCount: legacyTimes.length, maxFrames: o.maxFrames }) : null;
+      const times = dense?.times ?? legacyTimes;
+      const sceneSlots = dense && o.zones ? dense.sceneSlots : 0;
+      const perFrame = Math.floor(frameBudget / (times.length + sceneSlots));
 
       const { w, h } = fitSize(video.videoWidth, video.videoHeight, o.longSide);
       const canvas = document.createElement("canvas");
@@ -369,14 +388,15 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       let frames: PlanRequest["frames"] = [];
       const signatures: (FrameSignature | null)[] = [];
       const tickScores: number[] = [];
-      for (const t of times) {
+      for (let ti = 0; ti < times.length; ti++) {
+        const t = times[ti];
         await seek(video, t, signal);
         g.drawImage(video, 0, 0, w, h);
         let out = canvas;
         let tSec = t;
         if (small && best && bestG) {
           const own = scoreCanvas(canvas, small, ss.w, ss.h) ?? NaN;
-          const candidates = tickCandidates(t, durationSec);
+          const candidates = dense ? dense.candidates[ti] : tickCandidates(t, durationSec);
           if (candidates.length > 1 && isSoftTick(own, tickScores)) {
             // Soft tick: keep its draw, try the neighbours, and send whichever is clearly sharper.
             bestG.drawImage(canvas, 0, 0);
@@ -401,6 +421,24 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
         if (o.zones) signatures.push(signCanvas(out, thumb));
       }
       if (isBlankTake(lumas)) throw new BuildRequestError(BLANK_TAKE_MESSAGE);
+      // Scene-change frames: one more angle halfway between ticks where the picture jumps (dense takes only).
+      if (sceneSlots > 0 && signatures.length === frames.length) {
+        const extraTimes = sceneChangeTimes(frames.map((f) => f.tSec), signatures, sceneSlots);
+        const extra: { frame: PlanRequest["frames"][number]; sig: FrameSignature | null; tSec: number }[] = [];
+        for (const t of extraTimes) {
+          await seek(video, t, signal);
+          g.drawImage(video, 0, 0, w, h);
+          extra.push({ frame: { tSec: t, dataUrl: encodeFrame(canvas, perFrame) }, sig: signCanvas(canvas, thumb), tSec: t });
+        }
+        if (extra.length) {
+          const merged = mergeByTime(
+            frames.map((frame, i) => ({ frame, sig: signatures[i], tSec: frame.tSec })),
+            extra,
+          );
+          frames = merged.map((m) => m.frame);
+          signatures.splice(0, signatures.length, ...merged.map((m) => m.sig));
+        }
+      }
       if (o.zones) frames = withZoneIds(frames, signatures);
       // Guard: never send more than maxFrames, and if anything ever has to go, every zone keeps a frame.
       frames = trimFramesCoveringZones(frames, Math.max(1, o.maxFrames));

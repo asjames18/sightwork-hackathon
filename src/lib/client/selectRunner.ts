@@ -1,6 +1,7 @@
 import { mockPlanJob, type PlanJobRunner } from "./planJob";
 import { createApiPlanJob } from "./apiPlanJob";
 import { createBuildPlanRequest, requestBudgetBytes } from "./buildPlanRequest";
+import { savedSpaceRequestFields } from "./spaceType";
 
 export type RunnerKind = "mock" | "api";
 
@@ -18,12 +19,14 @@ export function pickRunnerKind(search: string | null, envValue: string | undefin
 /**
  * Defaults sent with each request. Region is not set here: apiPlanJob adds the city and state the tester
  * saved on the video card (src/lib/client/location.ts) as "City, ST", and a real run won't start without them.
+ * The space type and name come from the picker on the video card, read when
+ * the run starts; nothing picked sends neither, and the server keeps its own "room" and "Walkthrough".
  * The request budget comes from NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES (unset keeps 9 MB).
  */
 const apiPlanJob = createApiPlanJob(
   createBuildPlanRequest({
-    spaceType: "room",
     maxRequestBytes: requestBudgetBytes(process.env.NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES),
+    runContext: savedSpaceRequestFields,
   }),
 );
 
