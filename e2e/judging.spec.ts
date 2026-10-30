@@ -49,3 +49,12 @@ test("/status answers 200 with the config rows and no secrets, and makes no API 
   await expectNoSideScroll(page);
   await expectNoAxeViolations(page, "/status");
 });
+
+test("/start leads with the real run as the wide example card", async ({ page }) => {
+  await page.goto("/start");
+  const first = page.locator("#examples-heading ~ button").first();
+  await expect(first).toContainText("Church sanctuary stage");
+  await expect(first).toContainText("Real run");
+  await first.click();
+  await expect(page.getByTestId("credits-summary")).toHaveText("3 Meta models ran: SAM 3.1, Muse Spark Open, Muse Image");
+});

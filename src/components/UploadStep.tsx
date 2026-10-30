@@ -512,18 +512,19 @@ function CameraIcon() {
 }
 
 /**
- * Example plans before filming: the featured hand-written sample (kitchen renovation) as a wide card, then the real run and other samples
- * for other kinds of spaces. Each card says "Real run" or "Sample" so nothing reads as a model result
+ * Example plans before filming: the real SightWork run (sanctuary stage) as the wide card, so the first plan a visitor opens is a
+ * real result, then the hand-written samples for other kinds of spaces. Each card says "Real run" or "Sample" so nothing reads as a model result
  * that wasn't one.
  */
 function ExamplePicker({ onPick }: { onPick: (id: string) => void }) {
-  const [featured, ...samples] = EXAMPLES;
+  const featured = EXAMPLES.find((e) => e.kind === "real") ?? EXAMPLES[0];
+  const samples = EXAMPLES.filter((e) => e !== featured);
   return (
     <section aria-labelledby="examples-heading" className="mt-8">
       <h2 id="examples-heading" className="text-lg font-extrabold">
         See a plan first
       </h2>
-      <p className="mt-1 text-sm text-ink/70">Samples on real photos of different spaces, plus one real SightWork run.</p>
+      <p className="mt-1 text-sm text-ink/70">One real SightWork run, plus samples on real photos of other spaces.</p>
       <ExampleCard example={featured} onPick={onPick} wide />
       <ul className="mt-3 grid grid-cols-1 gap-x-3 sm:grid-cols-2">
         {samples.map((e) => (
