@@ -4,9 +4,9 @@
  */
 
 /** Walkthroughs work best at 60 to 90 seconds; past this we warn, past the hard limit we block. */
-const SOFT_MAX_SEC = 95;
-const HARD_MAX_SEC = 150;
-const MIN_SEC = 5;
+export const SOFT_MAX_SEC = 95;
+export const HARD_MAX_SEC = 150;
+export const MIN_SEC = 5;
 
 export type Check =
   | { kind: "reading" }

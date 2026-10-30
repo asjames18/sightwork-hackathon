@@ -6,6 +6,8 @@ import { loadLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
+import { resolveVideoDuration } from "@/lib/client/videoDuration";
+import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -33,7 +35,13 @@ export function UploadStep({
   onLastPlan?: () => void;
 }) {
   const savedPlan = useSyncExternalStore(subscribeStorage, hasSavedPlan, noPlanOnServer);
+  // Two hidden pickers: "Choose a video" (library/files, no capture attribute) and the phone's own
+  // camera app (capture="environment"), used when the in-page camera can't open.
   const input = useRef<HTMLInputElement>(null);
+  const captureInput = useRef<HTMLInputElement>(null);
+  const [recording, setRecording] = useState(false);
+  const [recorded, setRecorded] = useState<RecordingInfo | null>(null);
+  const [cameraNote, setCameraNote] = useState<string | null>(null);
   // The picker button unmounts once a video is chosen, so move focus to the preview card
   // instead of letting keyboard and screen-reader users fall back to the top of the page.
   const card = useRef<HTMLDivElement>(null);
@@ -45,10 +53,17 @@ export function UploadStep({
     setRunner(pickRunnerKind(window.location.search, process.env.NEXT_PUBLIC_SIGHTWORK_RUNNER));
   }, []);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
+  const previewUrl = useRef<string | null>(null);
+  useEffect(() => {
+    previewUrl.current = preview?.url ?? null;
+  }, [preview]);
   useEffect(() => { if (preview) card.current?.focus(); }, [preview]);
 
-  const pick = useCallback((file: File) => {
+  const pick = useCallback((file: File, info: RecordingInfo | null = null) => {
     setDropError(false);
+    setRecording(false);
+    setCameraNote(null);
+    setRecorded(info);
     setCheck({ kind: "reading" });
     setPreview({ url: URL.createObjectURL(file), file });
   }, []);
@@ -57,7 +72,7 @@ export function UploadStep({
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState(false);
   useEffect(() => {
-    if (preview) return;
+    if (preview || recording) return;
     let depth = 0;
     const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
     const enter = (e: DragEvent) => {
@@ -92,7 +107,23 @@ export function UploadStep({
       window.removeEventListener("dragover", over);
       window.removeEventListener("drop", drop);
     };
-  }, [preview, pick]);
+  }, [preview, recording, pick]);
+
+  // Record: the in-page camera when this browser has it, otherwise straight to the phone's camera app
+  // (still inside the tap, so the browser allows opening the picker).
+  const startRecord = () => {
+    setCameraNote(null);
+    if (canRecordInPage()) setRecording(true);
+    else captureInput.current?.click();
+  };
+
+  const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Clear so picking the same file again still fires a change.
+    e.target.value = "";
+    if (!file) return;
+    pick(file);
+  };
 
   const durationSec = check.kind === "ok" || check.kind === "warn" ? check.durationSec : null;
   const canSend = check.kind === "ok" || check.kind === "warn";
@@ -112,34 +143,72 @@ export function UploadStep({
         ref={input}
         type="file"
         accept="video/*"
+        className="hidden"
+        data-testid="choose-video-input"
+        onChange={onFileInput}
+      />
+      <input
+        ref={captureInput}
+        type="file"
+        accept="video/*"
         capture="environment"
         className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          // Clear so picking the same file again still fires a change.
-          e.target.value = "";
-          if (!file) return;
-          pick(file);
-        }}
+        data-testid="camera-app-input"
+        onChange={onFileInput}
       />
 
       {!preview ? (
         <>
-          <button
-            type="button"
-            onClick={() => input.current?.click()}
-            className={`mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-7 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink motion-safe:active:scale-[.99] ${
-              dragging ? "border-dashed border-accent-dark bg-accent/5" : "border-ink/20 bg-white hover:border-ink/40"
-            }`}
-          >
-            <CameraIcon />
-            <span className="rounded-xl bg-accent-dark px-5 py-3 text-base font-semibold text-white">
-              {dragging ? "Drop your video here" : "Record or choose a video"}
-            </span>
-            <span className="text-sm text-ink/70">
-              MP4 or MOV, about 60 to 90 seconds<span className="hidden [@media(pointer:fine)]:inline">. Or drag it here.</span>
-            </span>
-          </button>
+          {recording ? (
+            <CameraRecorder
+              onRecorded={(file, info) => pick(file, info)}
+              onCancel={() => setRecording(false)}
+              onUnavailable={(message) => {
+                setRecording(false);
+                setCameraNote(message);
+              }}
+            />
+          ) : (
+            <div
+              className={`mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-7 text-center transition-colors ${
+                dragging ? "border-dashed border-accent-dark bg-accent/5" : "border-ink/20 bg-white"
+              }`}
+            >
+              <CameraIcon />
+              {dragging ? (
+                <p className="text-base font-semibold text-accent-dark">Drop your video here</p>
+              ) : null}
+              <div className="flex w-full max-w-sm flex-col gap-2">
+                <button type="button" onClick={startRecord} className="btn-primary w-full text-base motion-safe:active:scale-[.99]">
+                  Record a walkthrough
+                </button>
+                <button
+                  type="button"
+                  onClick={() => input.current?.click()}
+                  className="btn-secondary w-full text-base motion-safe:active:scale-[.99]"
+                >
+                  Choose a video
+                </button>
+              </div>
+              <span className="text-sm text-ink/70">
+                MP4 or MOV, about 60 to 90 seconds<span className="hidden [@media(pointer:fine)]:inline">. Or drag it here.</span>
+              </span>
+              <p className="text-xs text-ink/65">For the sharpest video, record in your Camera app and choose it here.</p>
+            </div>
+          )}
+          {cameraNote && (
+            <div role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p>{cameraNote}</p>
+              <p className="mt-1 flex flex-wrap gap-x-4">
+                <button type="button" onClick={() => captureInput.current?.click()} className="btn-tertiary text-sm">
+                  Open the camera app
+                </button>
+                <button type="button" onClick={() => input.current?.click()} className="btn-tertiary text-sm">
+                  Choose a video
+                </button>
+              </p>
+            </div>
+          )}
           {dropError && (
             <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
               That file isn&apos;t a video. Drop an MP4 or MOV walkthrough.
@@ -177,7 +246,13 @@ export function UploadStep({
             playsInline
             preload="metadata"
             className="max-h-[60vh] w-full bg-black object-contain [@media(min-width:640px)_and_(max-height:820px)]:max-h-[38vh]"
-            onLoadedMetadata={(e) => setCheck(checkDuration(e.currentTarget.duration))}
+            onLoadedMetadata={(e) => {
+              const url = preview.url;
+              // In-page recordings (WebM) report an unknown length until scanned; work it out first.
+              void resolveVideoDuration(e.currentTarget).then((d) => {
+                if (previewUrl.current === url) setCheck(checkDuration(d));
+              });
+            }}
             onError={() =>
               setCheck({ kind: "block", message: "This browser can't play that video. Try an MP4, or record it again here." })
             }
@@ -186,6 +261,11 @@ export function UploadStep({
             <p className="min-w-0 truncate text-sm text-ink/70">
               {preview.file.name}
               {durationSec !== null && <span className="text-ink/65"> · {formatDuration(durationSec)}</span>}
+              {recorded?.resolution ? (
+                <span className="block text-xs text-ink/65" data-testid="recorded-at">
+                  Recorded here at {recorded.resolution}
+                </span>
+              ) : null}
             </p>
             <button
               type="button"

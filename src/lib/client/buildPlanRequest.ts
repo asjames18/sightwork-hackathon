@@ -2,6 +2,7 @@ import type { LaborBasis, PlanRequest } from "@/lib/types";
 import type { BuildPlanRequest } from "./apiPlanJob";
 import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
 import { trimFramesCoveringZones } from "./zoneCoverage";
+import { resolveVideoDuration } from "./videoDuration";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -241,7 +242,9 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
     const url = URL.createObjectURL(file);
     try {
       const video = await loadVideo(url, signal);
-      const durationSec = video.duration;
+      // In-page recordings (WebM from MediaRecorder) carry no duration header until scanned.
+      const durationSec = await resolveVideoDuration(video);
+      checkAbort(signal);
       if (!Number.isFinite(durationSec) || durationSec <= 0)
         throw new BuildRequestError("This video has no length we can read. Try recording it again.");
 
