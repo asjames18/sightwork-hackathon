@@ -29,6 +29,7 @@ export function UploadStep({
   onVideo,
   onExample,
   onLastPlan,
+  recent,
   resumeFile,
 }: {
   /** Starts the run. `runner` is chosen here, once per video (see ownVideoRunnerKind). */
@@ -39,6 +40,8 @@ export function UploadStep({
   onExample: (id?: string) => void;
   /** Reopens the last finished plan on this device; the link only shows when one is saved. */
   onLastPlan?: () => void;
+  /** The "Your recent plans" list, shown under "Open my last plan". */
+  recent?: React.ReactNode;
 }) {
   const savedPlan = useSyncExternalStore(subscribeStorage, hasSavedPlan, noPlanOnServer);
   // Two hidden pickers: "Choose a video" (library/files, no capture attribute) and the phone's own
@@ -276,6 +279,7 @@ export function UploadStep({
               </button>
             </p>
           ) : null}
+          {recent}
           {runner === "api" && <TesterCode />}
           <FilmingTips />
           <ExamplePicker onPick={onExample} />

@@ -8,6 +8,8 @@ import { planJobFor, type RunnerKind } from "@/lib/client/selectRunner";
 import { isResumeFailure, isTesterCodeFailure } from "@/lib/client/apiPlanJob";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
+import { addRecentPlan } from "@/lib/client/recentPlans";
+import { RecentPlans } from "./RecentPlans";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
 import { PlanView } from "./PlanView";
@@ -35,8 +37,11 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
       // The preview (mock) runner ends on an example plan: keep its Real run / Sample label.
-      setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name, example: EXAMPLES.find((e) => e.plan === job.plan) });
+      const example = EXAMPLES.find((e) => e.plan === job.plan);
+      setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name, example });
       saveLastPlan(job.plan, stage.file.name);
+      // Only real runs go on the recent list; a preview run that ends on an example plan doesn't.
+      if (!example) void addRecentPlan(job.plan, stage.file.name);
     }
   }, [job, stage]);
 
@@ -166,6 +171,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           resumeFile={stage.resume}
           onExample={showExample}
           onLastPlan={showLastPlan}
+          recent={<RecentPlans onOpen={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })} />}
         />
       )}
       {stage.kind === "processing" && (
