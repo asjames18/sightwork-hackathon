@@ -15,15 +15,36 @@ You film one walkthrough. SightWork returns:
 - **After image:** an AI-generated picture of the finished space.
 
 ## How it works
-SightWork is a multi-step agent built on Meta's Muse models through the Meta Model API:
-1. It samples the key frames from the walkthrough.
-2. **Muse Voice Transcribe** turns the narration into text, so SightWork knows what the person said.
-3. **SAM 3.1** finds and counts the items.
-4. **Muse Spark** compares what was said with what the video shows, ranks the problems (including ones nobody mentioned) and picks a proof frame for each.
-5. **Muse Spark** turns the findings into materials, an ordered work plan and a rough cost range.
-6. **Muse Image** generates the "after" image.
+SightWork is a multi-step agent where every model is a Meta model. Each step has one job:
 
-The planning steps (4 and 5) run on **Muse Spark Open**, Meta's open-weights model, served on Baseten. SAM 3.1 outlines and the Muse Image "after" picture are optional: when either one is unavailable, the plan still comes back complete, and the "How this plan was made" section at the bottom of the plan marks those steps "Off this run." A full run with every step takes a few minutes.
+| Step | Meta model | Where it runs | What it does |
+|---|---|---|---|
+| 0. Pick frames | (on the device) | Browser | Sharpest still about every 2 s, plus the narration as 16 kHz audio. The video never leaves the phone. |
+| 1. Listen | **Muse Voice Transcribe** | Meta Model API | Narration to timestamped text, so SightWork knows what was said. |
+| 2. Look and count | **SAM 3.1** | Meta Model API | Outlines and counts what's in the room, frame by frame. |
+| 3. Compare and plan | **Muse Spark Open** (default) or **Muse Spark** | Meta open weights on Baseten, or Meta Model API | Checks what was said against what was seen, ranks the problems (including ones nobody mentioned) with a proof frame each, then writes the materials and the ordered work steps. |
+| 4. Price | **Muse Spark** with web search | Meta Model API | A rough local cost range, when a location is given. |
+| 5. Picture | **Muse Image** | Meta Model API | An AI concept of the finished space. |
+| 6. Review | same plan model, review only | as step 3 | Checks every problem against its proof photo and marks any it can't back as Unverified. Never edits the plan. |
+
+```mermaid
+flowchart LR
+  V[Phone walkthrough] -->|frames + 16 kHz audio, on device| G{Tester-code gate}
+  G --> T[Muse Voice Transcribe]
+  G --> S[SAM 3.1 outlines + counts]
+  T --> P[Muse Spark Open on Baseten: compare + plan]
+  S --> P
+  P --> C[Muse Spark + web search: cost range]
+  P --> I[Muse Image: after picture]
+  P --> R[Reviewer pass: proof-photo check]
+  C --> W[Work plan]
+  I --> W
+  R --> W
+```
+
+SAM 3.1, Muse Image and the cost step are optional: when one is unavailable, the plan still comes back complete and says what was skipped. Every plan ends with a **Powered by Meta AI** panel listing each step, the Meta model behind it, where it ran, and whether it ran for that plan (hand-written samples say no model ran). The processing screen names the model under each step while it runs. A full run takes about 2 to 3 minutes and has cost $0.38 to $0.72 in model calls on real walkthroughs.
+
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How the build maps to the judging criteria: [docs/JUDGING.md](docs/JUDGING.md).
 
 ## Built during the hackathon
 Everything in this repository was written during the event (Oct 26 – Nov 4, 2026). The idea and planning came before; no earlier code is included. Antonio built SightWork with AI coding assistance and deploys it himself.
@@ -83,6 +104,12 @@ On the plan screen:
 - **Work steps are a checklist.** Tick each step as it's done; ticks are saved on this device for that plan, so a crew lead can come back to it later. "Clear ticks" resets them.
 - **Materials are a shopping list.** Tick each item as you get it (saved on this device for that plan), see how many are in hand and a rough materials subtotal when unit costs are known, and **Send shopping list** shares only what's still needed, with quantities, the problems each item fixes and the per-unit estimate.
 - **Save PDF** prints a clean copy of the plan (the share and checklist controls are left off the paper).
+
+### Status page
+`/status` shows whether the site is up, which build is live, whether real runs are on, and whether the plan engine and the Meta Model API are configured, as presence checks only (no key, code or URL is ever shown). It makes no model calls, so it costs nothing to check. It also lists the safeguards that are always on.
+
+### Eval
+`npm run eval` scores plans against labeled answer keys in `tools/eval/keys/` (recall, recall on high-severity items, precision, and whether the #1 problem is a high-severity one). It is offline and deterministic (keyword matching on each problem's title and detail), and `npm test` holds the real sanctuary run to its baseline so a prompt or pipeline change that loses a known hazard fails the checks. Today's baseline on the real sanctuary run: recall 0.8, high-severity recall 1.0, precision 1.0. The key is a draft labeled from the run's frames; confirm on site before treating it as ground truth.
 
 ## Status
 Every step runs end to end on a real walkthrough: frames and narration in, a full plan with SAM counts and an after picture out. Polish continues through the end of the hackathon.

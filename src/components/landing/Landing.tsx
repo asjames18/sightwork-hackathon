@@ -44,12 +44,20 @@ const audiences = [
   { title: "Churches and nonprofits.", body: "Turn a walkthrough into a volunteer work-day list." },
 ];
 
-/** The Meta models in the pipeline, in the order a run uses them. All four ran on the featured real run (Oct 29). */
+/** The Meta models in the pipeline, in the order a run uses them. The featured real run (Oct 29) used SAM 3.1, Muse Spark Open and Muse Image; Transcribe runs when the video has speech. */
 const metaModels = [
-  { name: "Muse Voice Transcribe", role: "Turns what you say on the walkthrough into text." },
-  { name: "SAM 3.1", role: "Outlines and counts what's in the room, frame by frame." },
-  { name: "Muse Spark Open", role: "Compares what you said with what it saw, then writes the plan. Meta open weights, on Baseten." },
-  { name: "Muse Image", role: "Draws an AI concept of the finished space." },
+  { step: "Listen", name: "Muse Voice Transcribe", role: "Turns what you say on the walkthrough into text, with timestamps." },
+  { step: "Look and count", name: "SAM 3.1", role: "Outlines and counts what's in the room, frame by frame." },
+  { step: "Compare, plan, review", name: "Muse Spark Open", role: "Checks what you said against what it saw, writes the plan, then reviews every problem against its photo. Meta open weights, on Baseten." },
+  { step: "Picture", name: "Muse Image", role: "Draws an AI concept of the finished space." },
+];
+
+/** Impact strip. Every number is from real runs on the live site (Oct 29 and 30, 2026). */
+const impact = [
+  { value: "1 minute", label: "of phone video is all it takes" },
+  { value: "2 to 3 min", label: "from upload to a full plan, in real runs" },
+  { value: "Under $1", label: "in model calls per plan ($0.38 to $0.72 so far)" },
+  { value: "0", label: "accounts, apps or site visits needed for the first look" },
 ];
 
 /** Fine print. Cost and after-picture lines join only if those steps run at submission. */
@@ -81,7 +89,7 @@ export function Landing() {
       </header>
 
       <main id="top">
-        <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-16">
+        <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-14">
           <div>
           <h1 className="max-w-2xl text-[32px] font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             Walk the room. Get the work plan.
@@ -92,12 +100,35 @@ export function Landing() {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/start" className={primary}>Film a walkthrough</Link>
-            <Link href="/start?view=example" className={secondary}>See an example plan</Link>
+            <Link href="/start?view=example&ex=sanctuary" className={secondary}>See a real run</Link>
           </div>
           <LastPlanLink />
           <p className="mt-4 text-sm text-ink/70">Free to try in this demo. No account needed.</p>
           </div>
-          <HeroPhone />
+          <RealRunHero />
+        </section>
+
+        <section aria-labelledby="impact-heading" className="border-t border-ink/10 bg-ink text-white">
+          <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-14">
+            <h2 id="impact-heading" className="max-w-3xl text-[28px] font-extrabold leading-tight">
+              Most churches, schools and nonprofits have no facilities staff. They have volunteers and a phone.
+            </h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-white/80">
+              SightWork turns a walkthrough into a plan a volunteer team can pick up on work day: what to fix first, who does it, what to buy,
+              and proof from the video, ready to share or print.
+            </p>
+            <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4">
+              {impact.map((m) => (
+                <div key={m.label} className="border-l-2 border-accent pl-4">
+                  <dt className="sr-only">{m.label}</dt>
+                  <dd>
+                    <span className="block text-3xl font-extrabold tracking-tight">{m.value}</span>
+                    <span className="mt-1 block text-sm leading-snug text-white/75">{m.label}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
         <section aria-labelledby="how-heading" className="border-t border-ink/10">
@@ -187,15 +218,24 @@ export function Landing() {
         <section aria-labelledby="meta-heading" className="border-t border-ink/10">
           <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 md:py-16">
             <h2 id="meta-heading" className="text-[28px] font-extrabold leading-tight">Built on Meta&apos;s models</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink/75">Four Meta models, one job each.</p>
-            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {metaModels.map((m) => (
-                <li key={m.name} className="rounded-2xl border border-ink/10 bg-white p-5">
-                  <h3 className="text-lg font-bold">{m.name}</h3>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink/75">
+              Four Meta models, one job each, chained into one agent run. Every plan ends with a &ldquo;Powered by Meta AI&rdquo; panel
+              that says which model did each step and whether it ran.
+            </p>
+            <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {metaModels.map((m, i) => (
+                <li key={m.name} className="relative rounded-2xl border border-ink/10 bg-white p-5">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[#0866ff]">
+                    {i + 1}. {m.step}
+                  </span>
+                  <h3 className="mt-1 text-lg font-bold">{m.name}</h3>
                   <p className="mt-2 text-base leading-relaxed text-ink/75">{m.role}</p>
                 </li>
               ))}
-            </ul>
+            </ol>
+            <p className="mt-6 text-sm text-ink/70">
+              Live config and safeguards: <Link href="/status" className="underline underline-offset-2 hover:text-ink">status page</Link>.
+            </p>
             <p className="mt-6 text-sm text-ink/70">Built for the Meta AI Developer Hackathon 2026.</p>
           </div>
         </section>
@@ -235,37 +275,82 @@ export function Landing() {
         </section>
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-ink/70 sm:px-6">
-        Built for the Meta AI Developer Hackathon 2026.
+      <footer className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-ink/70 sm:px-6">
+        <span>Built for the Meta AI Developer Hackathon 2026.</span>
+        <nav aria-label="Site" className="flex gap-4">
+          <Link href="/status" className={`underline underline-offset-2 hover:text-ink ${ring}`}>Status</Link>
+          <Link href="/credits" className={`underline underline-offset-2 hover:text-ink ${ring}`}>Image credits</Link>
+        </nav>
       </footer>
     </>
   );
 }
 
 /**
- * Hero visual: a phone frame showing the top of the real plan screen, rendered from the featured SAMPLE plan
- * (kitchen renovation on CC0 photos; public/landing/sample-plan.webp, 600x1408). Labeled "Sample" with a solid chip that stays
- * legible at 375 px. Decorative copy of on-page content, so the image alt describes it briefly.
- * Swap in a before/after crop once the after image runs at submission.
+ * Hero visual: the REAL sanctuary run (src/lib/examples/sanctuary-run.json), the walkthrough frame the after picture was
+ * drawn from next to Muse Image's after picture, with that run's own numbers. Labeled "Real run"; the after picture is
+ * labeled as an AI concept, as on the plan screen.
  */
-function HeroPhone() {
+function RealRunHero() {
   return (
-    <figure className="relative mx-auto w-full max-w-[260px] sm:max-w-[280px] lg:max-w-[300px]">
-      <div className="rounded-[2.5rem] bg-ink p-2.5 shadow-2xl shadow-ink/25">
-        <div className="relative aspect-[9/17] overflow-hidden rounded-[2rem] bg-white">
-          <Image
-            src="/landing/sample-plan.webp"
-            alt="SightWork plan screen for a sample kitchen renovation: 6 problems, 3 you didn't mention, 8 work steps, then a frame from the walkthrough."
-            width={600}
-            height={1408}
-            sizes="(min-width: 1024px) 280px, 260px"
-            priority
-            className="h-full w-full object-cover object-top"
-          />
+    <figure className="relative mx-auto w-full max-w-[440px]">
+      <div className="overflow-hidden rounded-3xl border border-ink/10 bg-white shadow-2xl shadow-ink/15">
+        <div className="grid grid-cols-2 gap-px bg-ink/10">
+          <div className="relative bg-ink">
+            <Image
+              src="/examples/sanctuary/f6.webp"
+              alt="Frame from a real walkthrough of a church sanctuary stage: cables and cords across the floor."
+              width={1024}
+              height={576}
+              sizes="(min-width: 1024px) 220px, 50vw"
+              priority
+              className="aspect-[4/5] h-full w-full object-cover"
+            />
+            <span className="absolute left-2 top-2 rounded-full bg-ink/85 px-2 py-0.5 text-xs font-semibold text-white">Before</span>
+          </div>
+          <div className="relative bg-ink">
+            <Image
+              src="/examples/sanctuary/after.webp"
+              alt="AI concept of the same stage after the work: cables cleared and the floor cleaned."
+              width={1280}
+              height={853}
+              sizes="(min-width: 1024px) 220px, 50vw"
+              priority
+              className="aspect-[4/5] h-full w-full object-cover"
+            />
+            <span className="absolute left-2 top-2 rounded-full bg-ink/85 px-2 py-0.5 text-xs font-semibold text-white">After, AI concept</span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-5">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-safe-dark px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">Real run</span>
+            Church sanctuary stage, 44 s video
+          </p>
+          <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
+            {[
+              ["4", "problems, worst first"],
+              ["64", "chairs counted"],
+              ["$0.38", "in model calls"],
+            ].map(([v, l]) => (
+              <div key={l} className="rounded-xl bg-paper px-2 py-2.5">
+                <dt className="sr-only">{l}</dt>
+                <dd>
+                  <span className="block text-2xl font-extrabold tracking-tight">{v}</span>
+                  <span className="block text-xs leading-tight text-ink/70">{l}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-sm text-ink/75">
+            <span className="font-semibold text-ink">Top problem:</span> loose cables and extension cords across the stage floor, a trip hazard.
+          </p>
         </div>
       </div>
-      <figcaption className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-ink px-3 py-1 text-[13px] font-semibold uppercase tracking-wide text-white shadow">
-        Sample
+      <figcaption className="mt-3 text-center text-sm text-ink/70">
+        <Link href="/start?view=example&ex=sanctuary" className={`font-semibold text-accent-dark underline underline-offset-2 ${ring}`}>
+          Open this real plan
+        </Link>{" "}
+        · nothing edited except a covered logo
       </figcaption>
     </figure>
   );
