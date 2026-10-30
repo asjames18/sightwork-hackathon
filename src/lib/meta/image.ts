@@ -89,6 +89,8 @@ const DEFAULT_OUTPUT_FORMAT = "jpeg";
  * bounds one call's loop spend to 4 x $0.01.
  */
 const MAX_IMAGES_PER_CALL = 4;
+/** Max decoded bytes for the hero frame, same shape as the SAM, Baseten and Spark callers' 5 MB image caps. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Total attempts for a transient 404 model_not_found. */
 const MAX_IMAGE_ATTEMPTS = 3;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
@@ -241,6 +243,19 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
       }
       if (!isImageBase64(payload)) {
         throw new Error("image: image must carry image data (JPEG, PNG, WebP, or GIF)");
+      }
+      // Same shape as the SAM/Baseten/Spark caps: the renderAfter
+      // step's hero frames are small, but a direct caller bypassing
+      // the step had no bound, so an unbounded hero frame would ride
+      // onto a paid Image call before any cap could stop it. 5 MB
+      // decoded is wide headroom over a 1024 px JPEG frame; reject
+      // it here, before any fetch.
+      const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+      const decodedBytes = (payload.length * 3) / 4 - padding;
+      if (decodedBytes > MAX_IMAGE_BYTES) {
+        throw new Error(
+          `image: image must be at most 5 MB, got ${decodedBytes} bytes`,
+        );
       }
     }
     const wanted = req.n ?? 1;
