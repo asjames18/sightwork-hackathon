@@ -718,7 +718,18 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     if (!Array.isArray(request.transcriptTurns)) {
       throw new Error("runPlan: transcriptTurns must be an array when given");
     }
-    if (request.transcript === undefined) {
+    // Null means no narration (the transcribe route's empty result),
+    // so non-empty turns with a null transcript contradict it just as
+    // turns with no transcript at all do: the listening stage would
+    // hand the reason step a null transcript while the finished plan
+    // still carried the turns. An empty turns array with null stays
+    // valid — that is the real empty-narration case from
+    // /api/transcribe. (The route validator in planRequest.ts still
+    // checks only undefined here; that side is a follow-up piece.)
+    if (
+      request.transcript === undefined ||
+      (request.transcript === null && request.transcriptTurns.length > 0)
+    ) {
       throw new Error("runPlan: transcriptTurns given without transcript");
     }
     request.transcriptTurns.forEach((turn, i) => {
