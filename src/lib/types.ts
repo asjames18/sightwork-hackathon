@@ -81,6 +81,16 @@ export interface PlanRequest {
   frames: { tSec: number; dataUrl: string; zoneId?: number }[];
   /** Narration as base64 WAV (mono, 16-bit PCM, 16 or 24 kHz). */
   audioWavBase64?: string;
+  /**
+   * Narration already transcribed by POST /api/transcribe, in its TranscribeOutput
+   * shape: one "[startSec] text" line per turn, or null for a take with no speech.
+   * Lets a hosted run keep the plan request under the platform body cap by sending
+   * the transcript instead of the WAV. Optional: omit it (and transcriptTurns) and the
+   * pipeline transcribes audioWavBase64 as before.
+   */
+  transcript?: string | null;
+  /** Turns matching `transcript`, as returned by POST /api/transcribe. */
+  transcriptTurns?: TranscriptTurn[];
   /** Region for cost estimates, e.g. "Sebring, FL". Omit it and costRange is null. */
   region?: string;
   laborBasis?: LaborBasis;
