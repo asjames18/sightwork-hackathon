@@ -52,6 +52,15 @@ function deps(answers: unknown[], calls: Parameters<ReviewDeps["callSpark"]>[0][
   return { d, calls, tracker };
 }
 
+/** A retried review spends twice: every call that answered is on the tracker, and the spike total counts both. */
+function assertReviewSpend(tracker: ReturnType<typeof createUsageTracker>, n: number) {
+  const reviews = tracker.records().filter((r) => r.step === "review");
+  assert.equal(reviews.length, n, `${n} review usage record(s)`);
+  for (const r of reviews) assert.equal(r.costUsd, 0.03);
+  assert.equal(tracker.totals().calls, n, "every call that answered is counted");
+  assert.equal(tracker.totals().spikeTotalUsd, Math.round(n * 0.03 * 10000) / 10000, "the spike total counts each try");
+}
+
 test("planted problem: the reviewer marks the smell as not backed, the plan line says 2 of 3", async () => {
   const { d, calls, tracker } = deps([plantedAnswer]);
   const review = await runReview(input, d);
@@ -68,11 +77,12 @@ test("planted problem: the reviewer marks the smell as not backed, the plan line
 });
 
 test("planted problem: an invalid first answer is retried once with a fix-up note, then accepted", async () => {
-  const { d, calls } = deps(["not json at all", plantedAnswer]);
+  const { d, calls, tracker } = deps(["not json at all", plantedAnswer]);
   const review = await runReview(input, d);
   assert.equal(calls.length, 2);
   assert.match(calls[1].prompt, /failed validation/);
   assert.deepEqual(reviewTally(review), { verified: 2, total: 3 });
+  assertReviewSpend(tracker, 2);
 });
 
 test("planted problem: a reviewer that invents an id or repeats one can't flip a verdict", async () => {
@@ -83,9 +93,10 @@ test("planted problem: a reviewer that invents an id or repeats one can't flip a
 });
 
 test("planted problem: a provider error leaves the plan standing with Review didn't run", async () => {
-  const { d, calls } = deps([new Error("504 from provider")]);
+  const { d, calls, tracker } = deps([new Error("504 from provider")]);
   const review = await runReview(input, d);
   assert.equal(calls.length, 1, "no retry after a thrown call");
+  assertReviewSpend(tracker, 0);
   assert.deepEqual(review, { ran: false, items: [] });
   assert.match(reviewLine(review) ?? "", /^Review didn't run/);
 });
@@ -103,8 +114,9 @@ test("REVIEW_SCHEMA requires ran and items, so a schema-true answer parses on th
 
 test("an answer missing ran (off schema) is retried once, then the plan says Review didn't run", async () => {
   const { ran: _ran, ...noRan } = plantedAnswer;
-  const { d, calls } = deps([noRan, noRan]);
+  const { d, calls, tracker } = deps([noRan, noRan]);
   const review = await runReview(input, d);
   assert.equal(calls.length, 2);
   assert.deepEqual(review, { ran: false, items: [] });
+  assertReviewSpend(tracker, 2);
 });
