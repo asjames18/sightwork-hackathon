@@ -90,13 +90,21 @@ test("planted problem: a provider error leaves the plan standing with Review did
   assert.match(reviewLine(review) ?? "", /^Review didn't run/);
 });
 
-test(
-  "an answer shaped exactly like REVIEW_SCHEMA (items, no ran field) is accepted",
-  { todo: "REVIEW_SCHEMA requires only items, but parseReview needs a boolean ran, so a schema-true answer reads as not a review" },
-  async () => {
-    const { ran: _ran, ...schemaShaped } = plantedAnswer;
-    const { d } = deps([schemaShaped, schemaShaped]);
-    const review = await runReview(input, d);
-    assert.equal(review.ran, true);
-  },
-);
+test("REVIEW_SCHEMA requires ran and items, so a schema-true answer parses on the first call", async () => {
+  const schema = REVIEW_SCHEMA as { required?: string[]; properties?: Record<string, { type?: string }> };
+  assert.deepEqual([...(schema.required ?? [])].sort(), ["items", "ran"]);
+  assert.equal(schema.properties?.ran?.type, "boolean");
+  const { d, calls } = deps([plantedAnswer]);
+  const review = await runReview(input, d);
+  assert.equal(calls.length, 1, "no retry for a schema-true answer");
+  assert.equal(review.ran, true);
+  assert.deepEqual(reviewTally(review), { verified: 2, total: 3 });
+});
+
+test("an answer missing ran (off schema) is retried once, then the plan says Review didn't run", async () => {
+  const { ran: _ran, ...noRan } = plantedAnswer;
+  const { d, calls } = deps([noRan, noRan]);
+  const review = await runReview(input, d);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(review, { ran: false, items: [] });
+});
