@@ -37,8 +37,11 @@ import {
   type PlanProvider,
   type PlanRequest,
   type PlanStep,
+  type RunStep,
+  type StepCheck,
   type WorkPlan,
 } from "../types";
+import { stepChecksForPlan, transcriptWords } from "../stepChecks";
 import { estimateCost, type CostDeps, type CostInput } from "./cost";
 import { MAX_PLAN_FRAMES } from "./planRequest";
 import {
@@ -788,11 +791,19 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // so its skip has no later running line and still arrives only via
   // the done plan's meta.skipped.
   const skippedSteps: Exclude<PlanStep, "done">[] = [];
-  const emit = (step: Exclude<PlanStep, "done">): void => {
+  /**
+   * One running line, optionally carrying the check for the step it
+   * names (2026-10-30: after a step's output is checked and
+   * before the next step uses it, send one more running line for the
+   * same step with its check; skipped rides along as usual). A check
+   * line is never a failure: ok:false means the run carried on with
+   * the finding marked.
+   */
+  const emit = (step: RunStep, check?: StepCheck): void => {
     deps.onStatus?.(
       skippedSteps.length > 0
-        ? { state: "running", step, skipped: [...skippedSteps] }
-        : { state: "running", step },
+        ? { state: "running", step, skipped: [...skippedSteps], ...(check ? { check } : {}) }
+        : { state: "running", step, ...(check ? { check } : {}) },
     );
   };
 
@@ -852,6 +863,21 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       if (isAbort(err)) throw err;
       throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
     }
+  }
+
+  // listening check: the narration this run actually has, by the
+  // same rule stepChecks.ts uses for the finished plan (words from
+  // the turns when present, else the "[12.4] text" transcript lines;
+  // no narration reads as a passing check, not a failure).
+  {
+    const narrated = Boolean(transcript?.trim()) || transcriptTurns.length > 0;
+    const words = narrated ? transcriptWords({ transcript, transcriptTurns }) : 0;
+    emit(
+      "listening",
+      narrated
+        ? { ok: words > 0, note: `Transcript: ${words} ${words === 1 ? "word" : "words"}` }
+        : { ok: true, note: "No narration in this video" },
+    );
   }
 
   // looking + counting: SAM hazards and counts on the request frames.
@@ -954,6 +980,38 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     throw new PlanStepError("comparing", PLAIN_FAILURE_MESSAGE.comparing, detailOf(err));
   }
 
+  // counting + comparing checks: the reason output is the first
+  // point where both are computable (the inventory carries the SAM
+  // method, the issues carry the mentioned flag), so both checks land
+  // here, before planning uses the reason output. Counting follows
+  // stepChecks.ts: only when segmentation ran and the inventory
+  // actually carries SAM outlines; a failed segment step gets no
+  // counting check, as on the finished plan. Comparing only when
+  // the run was narrated.
+  if (
+    segmentation !== null &&
+    reason.inventory.length > 0 &&
+    reason.inventory.some((i) => i.method === "sam" || i.method === "sam+model")
+  ) {
+    const noOutline = reason.inventory.filter(
+      (i) => i.method !== "sam" && i.method !== "sam+model",
+    ).length;
+    emit(
+      "counting",
+      noOutline === 0
+        ? { ok: true, note: "Counts match the outlines" }
+        : {
+            ok: false,
+            note: `${noOutline} ${noOutline === 1 ? "count" : "counts"} had no outline, marked estimated`,
+          },
+    );
+  }
+  if (Boolean(transcript?.trim()) || transcriptTurns.length > 0) {
+    const said = reason.issues.filter((i) => !i.unmentioned).length;
+    const notSaid = reason.issues.length - said;
+    emit("comparing", { ok: true, note: `${said} you mentioned, ${notSaid} you didn't` });
+  }
+
   // planning: region-grounded cost range (null without a region),
   // then assemble the plan shell the render step edits from.
   // Cost is optional (Grok Bot, 2026-10-27 2:15 PM): when a region
@@ -1035,6 +1093,14 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     throw new PlanStepError("planning", PLAIN_FAILURE_MESSAGE.planning, detailOf(err));
   }
 
+  // planning check: the draft is the first full plan, so its own
+  // planning entry from stepChecks.ts is exact here (proof-frame
+  // coverage), and it lands before picturing uses the draft.
+  {
+    const planningCheck = stepChecksForPlan(draft).planning;
+    if (planningCheck) emit("planning", planningCheck);
+  }
+
   // picturing: render the finished space, or null when skipped/failed.
   // runRenderAfter never throws for a model failure; it returns null
   // with a skip reason, so a failed render still yields a full plan.
@@ -1060,6 +1126,12 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       PLAIN_FAILURE_MESSAGE.planning,
       `runPlan: final plan failed contract check:\n${unexplained.join("\n")}`,
     );
+  }
+  // picturing check: only when an after picture was actually made,
+  // matching stepChecks.ts (a skipped render gets no picturing entry).
+  {
+    const picturingCheck = stepChecksForPlan(plan).picturing;
+    if (picturingCheck) emit("picturing", picturingCheck);
   }
   return plan;
 }
