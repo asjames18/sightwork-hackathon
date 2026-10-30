@@ -63,7 +63,9 @@ test("review row: ran, didn't run, or precomputed", () => {
 test("hand-written samples never claim a model ran", () => {
   for (const e of EXAMPLES.filter((x) => x.kind === "sample")) {
     const c = metaCredits(e.plan, { sample: true });
-    assert.ok(c.every((r) => r.status === "sample"), e.id);
+    // Every model row says "in a real run"; the example's proof check says it was worked out ahead of time.
+    assert.ok(c.filter((r) => r.step !== "Review").every((r) => r.status === "sample"), e.id);
+    assert.equal(c.find((r) => r.step === "Review")?.status, "precomputed", e.id);
     assert.equal(modelsThatRan(c).length, 0);
     assert.match(creditsSummary(c), /^Sample plan written by hand/);
   }

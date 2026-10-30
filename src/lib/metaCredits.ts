@@ -82,10 +82,10 @@ export function metaCredits(plan: WorkPlan, opts: { sample?: boolean } = {}): Me
       job: "Checks every problem against its proof photo, review only",
       model: engine.model,
       host: engine.host,
-      ...(sample
-        ? { status: "sample" as const }
-        : precomputed
-          ? { status: "precomputed" as const, note: "Worked out ahead of time for this example" }
+      ...(precomputed
+        ? { status: "precomputed" as const, note: "Worked out ahead of time for this example" }
+        : sample
+          ? { status: "sample" as const }
           : review.ran
             ? { status: "ran" as const }
             : { status: "off" as const, note: "Didn't run this time" }),
