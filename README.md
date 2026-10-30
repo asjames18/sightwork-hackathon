@@ -86,3 +86,7 @@ On the plan screen:
 
 ## Status
 Every step runs end to end on a real walkthrough: frames and narration in, a full plan with SAM counts and an after picture out. Polish continues through the end of the hackathon.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
