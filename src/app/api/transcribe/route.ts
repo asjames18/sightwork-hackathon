@@ -29,6 +29,13 @@
  * The plan route does not pass a cleanup prompt, so neither does
  * this route: raw turns are returned as-is. No call happens on
  * import, and the key is read from process.env only by the caller.
+ *
+ * Body cap: the route rejects bodies over MAX_TRANSCRIBE_BODY_BYTES
+ * with a 413 before JSON.parse, mirroring the plan route's 10 MB cap.
+ * The cap covers the largest audio the transcribe step accepts
+ * (32 MB decoded, src/lib/pipeline/transcribe.ts) once base64-encoded,
+ * plus JSON framing, so it rejects only bodies the step would reject
+ * anyway — no valid request changes.
  */
 
 import { createAsrTranscribeCaller } from "../../../lib/meta/transcribe";
@@ -48,6 +55,20 @@ export const maxDuration = 300;
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Largest transcribe request body the route parses: base64 of the
+ * 32 MB audio the transcribe step accepts, plus JSON framing.
+ * 32 MB decoded encodes to ~44.74 MB; 46 MB leaves room for the
+ * field names and spaceType while still rejecting, before JSON.parse,
+ * any body the step would reject for size anyway.
+ */
+export const MAX_TRANSCRIBE_BODY_BYTES = 46 * 1024 * 1024;
+
+/** True when the raw request body is over MAX_TRANSCRIBE_BODY_BYTES. */
+export function transcribeBodyTooLarge(bodyText: string): boolean {
+  return new TextEncoder().encode(bodyText).length > MAX_TRANSCRIBE_BODY_BYTES;
+}
+
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function errorResponse(message: string, status: number): Response {
@@ -58,9 +79,23 @@ function errorResponse(message: string, status: number): Response {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  let bodyText: string;
+  try {
+    bodyText = await req.text();
+  } catch {
+    return errorResponse("could not read transcribe request body", 400);
+  }
+
+  // Reject an oversize body before JSON.parse: a body over the cap
+  // cannot be a valid request (the step caps audio at 32 MB decoded),
+  // so the 413 changes no valid request, it just fails fast.
+  if (transcribeBodyTooLarge(bodyText)) {
+    return errorResponse("transcribe request body too large", 413);
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await req.text());
+    parsed = JSON.parse(bodyText);
   } catch {
     return errorResponse("could not read transcribe request", 400);
   }
