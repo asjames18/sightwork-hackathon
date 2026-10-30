@@ -227,6 +227,11 @@ export async function POST(req: Request): Promise<Response> {
             tracker
               .records()
               .map((r) => `${r.model}/${r.step} $${r.costUsd} ${r.latencyMs}ms`)
+              .join(", ") +
+            `; per-model ` +
+            tracker
+              .totalsByModel()
+              .map((m) => `${m.model}: ${m.calls} calls $${m.totalUsd}`)
               .join(", "),
         );
       } catch (err) {
@@ -239,6 +244,11 @@ export async function POST(req: Request): Promise<Response> {
               tracker
                 .records()
                 .map((r) => `${r.model}/${r.step} $${r.costUsd} ${r.latencyMs}ms`)
+                .join(", ") +
+              `; per-model ` +
+              tracker
+                .totalsByModel()
+                .map((m) => `${m.model}: ${m.calls} calls $${m.totalUsd}`)
                 .join(", "),
           );
         }
