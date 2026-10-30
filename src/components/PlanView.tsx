@@ -1,6 +1,7 @@
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
+import { SharePlanButton } from "./SharePlanButton";
 import type { Example } from "@/lib/examples";
 
 /** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
@@ -201,6 +202,8 @@ export function PlanView({
       ) : (
         plan.generatedFrom && <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
       )}
+
+      <SharePlanButton plan={plan} sample={sample} />
 
       {plan.issues.length > 0 && (
         <a

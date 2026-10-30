@@ -1,0 +1,55 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { WorkPlan } from "@/lib/types";
+import { planToText, sharePlanText, type ShareResult } from "@/lib/client/planText";
+
+const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
+  copied: "Plan copied. Paste it into a text or email.",
+  cancelled: "",
+  failed: "Couldn't share from this browser. Use Save PDF instead.",
+};
+
+/** Sends the plan as plain text: the phone's share sheet when there is one, else the clipboard. */
+export function SharePlanButton({ plan, sample = false }: { plan: WorkPlan; sample?: boolean }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  async function onShare() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+    const result = await sharePlanText(`Work plan: ${plan.spaceName}`, planToText(plan, { sample }), navigator, coarse);
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
+      <button
+        type="button"
+        onClick={onShare}
+        disabled={busy}
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 13V3M6 7l4-4 4 4" />
+          <path d="M4 11v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-5" />
+        </svg>
+        Send to your team
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </p>
+    </div>
+  );
+}
