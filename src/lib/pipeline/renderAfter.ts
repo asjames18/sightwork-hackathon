@@ -302,6 +302,12 @@ function isUsableImage(s: unknown): s is string {
 }
 
 /**
+ * Max hero-frame size from prompt 04 (5 MB decoded), same bound as the
+ * reason/segment step caps and the Image caller.
+ */
+const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
  * Validate the renderAfter input shape before any work. Throws with a
  * clear reason: error; a bad plan used to surface as a TypeError inside
  * the hero pick or the visible-changes build instead.
@@ -329,6 +335,31 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
         f.tSec < 0
       ) {
         throw new Error(`renderAfter: plan.frames[${i}] has no valid index/tSec`);
+      }
+      // Same shape as the reason/segment step caps: a direct
+      // runRenderAfter caller bypassing runPlan had no bound on the
+      // hero frame, so an unbounded data URL would ride onto a paid
+      // Image call before any cap could stop it. 5 MB decoded is
+      // wide headroom over a 1024 px JPEG frame; reject it here,
+      // before any work. Non-data URLs pass (they cannot be sized
+      // without fetching) and non-base64 payloads are left to the
+      // usable-image skip path in runRenderAfter.
+      if (
+        typeof f.url === "string" &&
+        f.url.startsWith("data:image/") &&
+        f.url.includes(";base64,")
+      ) {
+        const payload = f.url.slice(f.url.indexOf(";base64,") + 8);
+        const stripped = payload.replace(/\s/g, "");
+        if (stripped.length > 0 && isBase64(stripped)) {
+          const padding = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+          const decodedBytes = (stripped.length * 3) / 4 - padding;
+          if (decodedBytes > MAX_RENDER_AFTER_IMAGE_BYTES) {
+            throw new Error(
+              `renderAfter: plan.frames[${i}].url must be at most 5 MB, got ${decodedBytes} bytes`,
+            );
+          }
+        }
       }
     });
   }
