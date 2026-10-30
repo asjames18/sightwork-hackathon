@@ -93,13 +93,18 @@ const MAX_REVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
  * verdict per problem: problemId is String(issue.rank), verified is
  * whether the problem is visible in at least one proof photo, reason
  * is one plain sentence (parseReview clips it to 140 characters).
- * summary is optional. No $defs, so no inlining is needed.
+ * ran is required, not optional: parseReview rejects any answer
+ * without a boolean ran, so a schema without it made every
+ * schema-following review fail validation and end as "Review didn't
+ * run" (2026-10-30). summary is optional. No $defs, so no inlining
+ * is needed.
  */
 export const REVIEW_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
-  required: ["items"],
+  required: ["ran", "items"],
   properties: {
+    ran: { type: "boolean" },
     items: {
       type: "array",
       items: {
