@@ -61,6 +61,9 @@ export function CameraRecorder({
   onUnavailable: (message: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef<HTMLButtonElement>(null);
+  const stopRef = useRef<HTMLButtonElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const discardRef = useRef(false);
@@ -211,6 +214,19 @@ export function CameraRecorder({
     }, 250);
   }, [settings, stop, stopTracks]);
 
+  // Once the camera is live, bring the whole card (preview and Start) into view under the sticky header,
+  // so a small or sideways phone doesn't leave Start below the fold. Focus goes to Start without a second scroll.
+  useEffect(() => {
+    if (phase !== "ready") return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    cardRef.current?.scrollIntoView?.({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    startRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+  // Start swaps for Stop in the same spot; keep keyboard and screen reader focus on it.
+  useEffect(() => {
+    if (phase === "recording") stopRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+
   // Keep the screen on while the camera is open, so auto-lock can't end a take mid-walk.
   const cameraOpen = phase === "ready" || phase === "recording";
   useEffect(() => {
@@ -258,7 +274,8 @@ export function CameraRecorder({
     <div
       role="group"
       aria-label="Camera"
-      className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink/10"
+      ref={cardRef}
+      className="mt-6 scroll-mt-[calc(3.5rem+1px+env(safe-area-inset-top)+0.5rem)] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink/10"
       data-phase={phase}
       data-width={settings?.width ?? ""}
       data-height={settings?.height ?? ""}
@@ -270,7 +287,7 @@ export function CameraRecorder({
           playsInline
           autoPlay
           aria-label="Live camera preview"
-          className="max-h-[60vh] w-full bg-black object-contain [@media(min-width:640px)_and_(max-height:820px)]:max-h-[38vh]"
+          className="max-h-[60vh] w-full bg-black object-contain [@media(min-width:640px)_and_(max-height:820px)]:max-h-[max(7rem,calc(100dvh-15.5rem))]"
         />
         {phase === "starting" && (
           <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/90">
@@ -340,6 +357,7 @@ export function CameraRecorder({
           {recording || phase === "finishing" ? (
             <button
               type="button"
+              ref={stopRef}
               onClick={stop}
               disabled={phase === "finishing"}
               className="btn-primary w-full text-lg sm:flex-1"
@@ -350,6 +368,7 @@ export function CameraRecorder({
           ) : (
             <button
               type="button"
+              ref={startRef}
               onClick={start}
               disabled={phase !== "ready"}
               className="btn-primary w-full text-lg sm:flex-1"

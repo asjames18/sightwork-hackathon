@@ -223,3 +223,47 @@ test("Record: the screen is kept on while the camera is open, and the mic level 
     .poll(() => page.evaluate(() => (window as unknown as { __wake: { released: number } }).__wake.released))
     .toBeGreaterThan(0);
 });
+
+// Small and sideways phones (plus tablet and laptop sizes): when the camera opens, the card lands under the sticky header with the whole
+// preview and Start on screen (no scrolling to find it), focus is on Start, then on Stop once recording.
+for (const vp of [
+  { width: 320, height: 568 },
+  { width: 667, height: 375 },
+  { width: 768, height: 1024 },
+  { width: 1280, height: 800 },
+]) {
+  test(`Record on a ${vp.width}x${vp.height} screen: preview and Start fit on screen, focus follows Start then Stop`, async ({ page }, info) => {
+    test.skip(info.project.name !== "phone-390", "phone sizes only");
+    await page.setViewportSize(vp);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/start");
+    await page.getByRole("button", { name: "Record a walkthrough" }).click();
+    const cam = page.getByRole("group", { name: "Camera" });
+    await expect(cam).toHaveAttribute("data-phase", "ready");
+    const start = cam.getByRole("button", { name: "Start recording" });
+    await expect(start).toBeFocused();
+    // Measured in the page, so Playwright's own scroll-before-click can't hide a bad layout.
+    const fit = async (name: string) =>
+      page.evaluate((name) => {
+        const header = document.querySelector("header")!.getBoundingClientRect();
+        const video = document.querySelector('[aria-label="Camera"] video')!.getBoundingClientRect();
+        const btn = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Camera"] button')].find((b) => b.textContent?.includes(name))!.getBoundingClientRect();
+        return { headerBottom: header.bottom, videoTop: video.top, videoHeight: video.height, btnBottom: btn.bottom, vh: window.innerHeight };
+      }, name);
+    await expect.poll(async () => (await fit("Start recording")).videoTop).toBeGreaterThanOrEqual((await fit("Start recording")).headerBottom - 1);
+    const ready = await fit("Start recording");
+    expect(ready.btnBottom, "Start is on screen").toBeLessThanOrEqual(ready.vh);
+    expect(ready.videoHeight, "the preview is still big enough to aim with").toBeGreaterThanOrEqual(100);
+    await expectNoSideScroll(page);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `recorder-fit-${vp.width}x${vp.height}.png`) });
+
+    await page.keyboard.press("Enter");
+    const stop = cam.getByRole("button", { name: "Stop recording" });
+    await expect(stop).toBeFocused();
+    const rec = await fit("Stop recording");
+    expect(rec.videoTop).toBeGreaterThanOrEqual(rec.headerBottom - 1);
+    expect(rec.btnBottom, "Stop is on screen").toBeLessThanOrEqual(rec.vh);
+    await expectNoAxeViolations(page, `recording at ${vp.width}x${vp.height}`);
+    await cam.getByRole("button", { name: "Cancel" }).click();
+  });
+}
