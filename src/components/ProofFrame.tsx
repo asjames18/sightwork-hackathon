@@ -43,6 +43,8 @@ export function ProofFrame({
   outlineUnavailable = false,
   priority = false,
   frameOnlyLabel = "Frame only, outlines off this run",
+  boxSource,
+  compact = false,
 }: {
   frame: PlanFrame | undefined;
   box?: Box;
@@ -51,6 +53,10 @@ export function ProofFrame({
   priority?: boolean;
   /** Badge on a frame with no box when outlines are unavailable. Real runs say outlines were off this run (as "Made with" does); samples say just "Frame only". */
   frameOnlyLabel?: string;
+  /** Where the box came from. A SAM box is drawn solid and labeled, even on a plan whose outline step is otherwise off. */
+  boxSource?: "sam" | "model";
+  /** Small thumbnail (the "Worth a closer look" list): no corner badges. */
+  compact?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   if (!frame)
@@ -60,6 +66,8 @@ export function ProofFrame({
       </div>
     );
   const sized = Boolean(frame.width && frame.height);
+  const samBox = Boolean(box) && boxSource === "sam";
+  const dashed = outlineUnavailable && !samBox;
   const label = caption ?? `Frame at ${frame.tSec} s`;
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
@@ -86,8 +94,13 @@ export function ProofFrame({
           decoding="async"
           className={sized ? "block h-auto w-full" : "block h-auto max-h-[60vh] w-auto max-w-full lg:max-h-[45vh]"}
         />
-        {box && <OutlineBox box={box} dashed={outlineUnavailable} />}
-        {!box && outlineUnavailable && (
+        {box && <OutlineBox box={box} dashed={dashed} />}
+        {samBox && !compact && (
+          <span className="absolute right-2 top-2 whitespace-nowrap rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">
+            Outlined by SAM 3.1
+          </span>
+        )}
+        {!box && outlineUnavailable && !compact && (
           <span className="absolute right-2 top-2 whitespace-nowrap rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white/90 backdrop-blur-sm">
             {frameOnlyLabel}
           </span>
@@ -101,8 +114,8 @@ export function ProofFrame({
           </svg>
         </span>
       </button>
-      <figcaption className="flex justify-between gap-2 bg-ink px-3 py-1.5 text-sm text-white/85">
-        <span className="truncate">{caption ?? "Proof frame"}</span>
+      <figcaption className={`flex gap-2 bg-ink px-3 py-1.5 text-sm text-white/85 ${compact ? "justify-end" : "justify-between"}`}>
+        <span className={compact ? "sr-only" : "truncate"}>{caption ?? "Proof frame"}</span>
         <span className="shrink-0 tabular-nums">{frame.tSec.toFixed(1)} s</span>
       </figcaption>
       <dialog
@@ -149,7 +162,7 @@ export function ProofFrame({
                   : "block h-auto max-h-[calc(100dvh-8rem)] w-auto max-w-[calc(100vw-1.5rem)] rounded-lg sm:max-w-[calc(100vw-3rem)]"
               }
             />
-            {box && <OutlineBox box={box} dashed={outlineUnavailable} />}
+            {box && <OutlineBox box={box} dashed={dashed} />}
           </div>
           <p className="flex w-full justify-between gap-3 text-sm text-white/90">
             <span>{caption ?? "Proof frame"}</span>

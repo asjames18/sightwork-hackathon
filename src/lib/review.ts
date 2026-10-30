@@ -10,6 +10,30 @@ import type { Issue, PlanReview, PlanReviewItem, WorkPlan } from "./types";
 /** Re-exported so pipeline code can import the review types from here or from ./types. */
 export type { PlanReview, PlanReviewItem } from "./types";
 
+/**
+ * The reviewer's answer for one problem. "partly": the photos back some of the claim (say a cable on the stage,
+ * not down the steps); `supportedScope` says what they do back. Older reviews only send `verified`, read as
+ * "verified" or "not_shown". Optional fields proposed in handoffs/grokbot-log.md (Oct 30, 4:30 PM ET).
+ */
+export type ReviewVerdict = "verified" | "partly" | "not_shown";
+
+export type ReviewItem = PlanReviewItem & { verdict?: ReviewVerdict; supportedScope?: string };
+
+const isVerdict = (v: unknown): v is ReviewVerdict => v === "verified" || v === "partly" || v === "not_shown";
+
+/** The verdict kind for a checked item. */
+export function verdictKind(item: PlanReviewItem | undefined): ReviewVerdict | undefined {
+  if (!item) return undefined;
+  const v = (item as ReviewItem).verdict;
+  return isVerdict(v) ? v : item.verified ? "verified" : "not_shown";
+}
+
+/** What the photos do back, for a "partly" verdict. */
+export function supportedScope(item: PlanReviewItem | undefined): string | undefined {
+  const s = (item as ReviewItem | undefined)?.supportedScope;
+  return typeof s === "string" && s.trim() ? s : undefined;
+}
+
 /** Longest reason the plan shows; longer ones are cut at a word. */
 export const MAX_REASON_CHARS = 140;
 
@@ -40,10 +64,18 @@ export function parseReview(v: unknown, issues: Pick<Issue, "rank">[]): PlanRevi
     if (!raw || typeof raw !== "object") continue;
     const it = raw as Record<string, unknown>;
     const id = typeof it.problemId === "number" ? String(it.problemId) : it.problemId;
-    if (typeof id !== "string" || !ids.has(id) || seen.has(id) || typeof it.verified !== "boolean") continue;
+    const verdict = isVerdict(it.verdict) ? it.verdict : undefined;
+    // `verified` is the field every review sends; a newer one may send only `verdict`.
+    const verified = typeof it.verified === "boolean" ? it.verified : verdict ? verdict === "verified" : undefined;
+    if (typeof id !== "string" || !ids.has(id) || seen.has(id) || verified === undefined) continue;
     seen.add(id);
     const reason = typeof it.reason === "string" ? clip(it.reason, MAX_REASON_CHARS) : "";
-    items.push({ problemId: id, verified: it.verified, reason });
+    const item: ReviewItem = { problemId: id, verified, reason };
+    // A verdict that contradicts `verified` (verified true but "not_shown") is ignored: the boolean wins.
+    if (verdict && !(verified && verdict === "not_shown") && !(!verified && verdict === "verified")) item.verdict = verdict;
+    if (item.verdict === "partly" && typeof it.supportedScope === "string" && it.supportedScope.trim())
+      item.supportedScope = clip(it.supportedScope, MAX_REASON_CHARS);
+    items.push(item);
   }
   const review: PlanReview = { ran: o.ran, items: o.ran ? items : [] };
   if (typeof o.summary === "string" && o.summary.trim()) review.summary = clip(o.summary, 200);
@@ -65,7 +97,12 @@ export function verdictFor(review: PlanReview | undefined, issue: Pick<Issue, "r
 /** How many reviewed problems are backed by a photo, out of the problems the reviewer answered for. */
 export function reviewTally(review: PlanReview | undefined): { verified: number; total: number } | null {
   if (!review?.ran || review.items.length === 0) return null;
-  return { verified: review.items.filter((i) => i.verified).length, total: review.items.length };
+  return { verified: review.items.filter((i) => verdictKind(i) === "verified").length, total: review.items.length };
+}
+
+/** How many reviewed problems the photos back only partly. */
+export function partlyCount(review: PlanReview | undefined): number {
+  return review?.ran ? review.items.filter((i) => verdictKind(i) === "partly").length : 0;
 }
 
 /**
@@ -77,7 +114,7 @@ export function reviewLine(review: PlanReview | undefined): string | null {
   if (!review.ran) return "Review didn't run. Check each problem against its photo before you act on it.";
   const t = reviewTally(review);
   if (!t) return null;
-  const n = `${t.verified} of ${t.total} problem${t.total === 1 ? "" : "s"} backed by a photo`;
+  const n = `${t.verified} of ${t.total} problem${t.total === 1 ? "" : "s"} backed by a photo${partlyCount(review) ? `, ${partlyCount(review)} partly` : ""}`;
   return review.source === "precomputed"
     ? `Proof check for this example: ${n}. Worked out ahead of time from the plan's own photos; no model ran.`
     : `Reviewed by a separate check: ${n}.`;

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import { loadDoneSteps, progressLine, saveDoneSteps } from "@/lib/client/stepProgress";
+import { shareLabel, type CostShare } from "@/lib/costShares";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
 /** Ordered work steps as a checklist: tick steps off as the work happens; progress stays on this device for this plan. */
-export function WorkSteps({ plan }: { plan: WorkPlan }) {
+export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each step's share of the rough cost, summing to the total (costShares.ts). */ stepCosts?: Map<number, CostShare> | null }) {
   const [done, setDone] = useState<number[]>([]);
   const [ready, setReady] = useState(false);
   const total = plan.workOrder.length;
@@ -80,7 +81,7 @@ export function WorkSteps({ plan }: { plan: WorkPlan }) {
                   {step.title}
                 </p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                {(step.trade || step.hours || step.dependsOn || (step.fixes && step.fixes.length > 0)) && (
+                {(step.trade || step.hours || step.dependsOn || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order)) && (
                   <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
                     {step.trade && (
                       <li
@@ -95,6 +96,12 @@ export function WorkSteps({ plan }: { plan: WorkPlan }) {
                     {step.dependsOn && <li className={`${chip} bg-ink/[0.06] text-ink/80`}>After step {step.dependsOn}</li>}
                     {step.fixes && step.fixes.length > 0 && (
                       <li className={`${chip} bg-ink/[0.06] text-ink/80`}>Fixes #{step.fixes.join(", #")}</li>
+                    )}
+                    {stepCosts?.get(step.order) && (
+                      <li className={`${chip} border border-ink/15 bg-white font-semibold text-ink tabular-nums`} data-testid="step-cost">
+                        <span className="sr-only">Cost share: </span>
+                        {shareLabel(stepCosts.get(step.order)!)}
+                      </li>
                     )}
                   </ul>
                 )}

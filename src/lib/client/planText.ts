@@ -1,5 +1,5 @@
 import { COST_LABEL, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
-import { planReview, reviewTally, verdictFor } from "@/lib/review";
+import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -44,9 +44,18 @@ export function issueNote(issue: Issue, narrated: boolean, verdict?: PlanReviewI
   else if (issue.unmentioned) parts.push("Spotted on video, not mentioned on the walk.");
   else if (issue.status === "mentioned_not_seen") parts.push("Mentioned on the walk, not seen on video. Check in person.");
   else parts.push("Mentioned on the walk and seen on video.");
-  if (verdict?.verified === false && issue.status !== "mentioned_not_seen") parts.push("No photo backs it yet. Check in person.");
+  const kind = verdictKind(verdict);
+  if (kind === "partly") {
+    const scope = supportedScope(verdict);
+    parts.push(scope ? `The photos back part of it: ${clean(scope).replace(/[.]$/, "")}. Check the rest in person.` : "The photos back part of it. Check the rest in person.");
+  } else if (verdict?.verified === false && issue.status !== "mentioned_not_seen") parts.push("No photo backs it yet. Check in person.");
   return parts.join(" ");
 }
+
+const partly = (review: Parameters<typeof partlyCount>[0]) => {
+  const n = partlyCount(review);
+  return n > 0 ? `, ${n} partly backed` : "";
+};
 
 /** The reviewer pass in plain words, e.g. "Each problem was checked against a photo: 1 of 1 confirmed." */
 export function plainReviewLine(plan: Pick<WorkPlan, "review" | "issues">): string | null {
@@ -57,7 +66,7 @@ export function plainReviewLine(plan: Pick<WorkPlan, "review" | "issues">): stri
   if (!t) return null;
   return review.source === "precomputed"
     ? `Each problem was matched to its photo ahead of time: ${t.verified} of ${t.total} have one.`
-    : `Each problem was checked against a photo: ${t.verified} of ${t.total} confirmed.`;
+    : `Each problem was checked against a photo: ${t.verified} of ${t.total} confirmed${partly(review)}.`;
 }
 
 export interface PlanTextOptions {

@@ -135,3 +135,34 @@ test("stream parser: reviewing step, check notes, and the done plan's review", (
   assert.ok(junk && junk.state === "done");
   assert.equal("review" in junk.plan, false);
 });
+
+test("partly backed: verdict and scope kept, tally and share text say so; contradictions fall back to verified", async () => {
+  const { verdictKind, supportedScope } = await import("@/lib/review");
+  const r = parseReview(
+    {
+      ran: true,
+      source: "model",
+      items: [
+        { problemId: "1", verified: false, verdict: "partly", supportedScope: "cable on the stage only", reason: "Photo D shows the cable on the stage, not the steps." },
+        { problemId: "2", verdict: "verified", reason: "only a verdict" },
+      ],
+    },
+    plan().issues,
+  )!;
+  assert.equal(verdictKind(r.items[0]), "partly");
+  assert.equal(supportedScope(r.items[0]), "cable on the stage only");
+  assert.equal(r.items[1].verified, true, "verdict alone sets verified");
+  assert.deepEqual(reviewTally(r), { verified: 1, total: 2 });
+  assert.equal(reviewLine(r), "Reviewed by a separate check: 1 of 2 problems backed by a photo, 1 partly.");
+  const text = planToText({ ...plan(), review: r });
+  assert.match(text, /The photos back part of it: cable on the stage only\. Check the rest in person\./);
+  assert.match(text, /1 of 2 confirmed, 1 partly backed\./);
+  assert.doesNotMatch(text, /No photo backs it yet/);
+  // verified true with "not_shown" contradicts itself: the boolean wins and the verdict is dropped.
+  const c = parseReview({ ran: true, items: [{ problemId: "1", verified: true, verdict: "not_shown", reason: "" }] }, plan().issues)!;
+  assert.equal(verdictKind(c.items[0]), "verified");
+  // Older reviews: no verdict field.
+  const old = parseReview({ ran: true, items: [{ problemId: "1", verified: false, reason: "no" }] }, plan().issues)!;
+  assert.equal(verdictKind(old.items[0]), "not_shown");
+  assert.equal(supportedScope(old.items[0]), undefined);
+});

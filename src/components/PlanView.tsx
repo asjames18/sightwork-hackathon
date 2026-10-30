@@ -6,16 +6,11 @@ import { WorkSteps } from "./WorkSteps";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import type { Example } from "@/lib/examples";
-import { planReview, reviewLine, verdictFor } from "@/lib/review";
+import { planReview, reviewLine, verdictKind } from "@/lib/review";
+import { ProblemList } from "./ProblemList";
+import { rankedIssues, watchItems } from "@/lib/planExtras";
+import { issueCostShares, stepCostShares } from "@/lib/costShares";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
-
-/** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
-const SEVERITY_BORDER: Record<Issue["severity"], string> = {
-  high: "border-l-red-600",
-  medium: "border-l-amber-500",
-  low: "border-l-ink/25",
-};
-const SEVERITY_LABEL: Record<Issue["severity"], string> = { high: "High", medium: "Medium", low: "Low" };
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -53,20 +48,6 @@ export function planMetaParts(plan: WorkPlan): string[] | null {
   if (n > 0) parts.push(`${n} ${n === 1 ? "frame" : "frames"}`);
   parts.push(isNarrated(plan) ? "narrated" : "no narration");
   return parts;
-}
-
-function SaidBadge({ issue, narrated }: { issue: Issue; narrated: boolean }) {
-  if (!narrated)
-    return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">Seen on camera</span>;
-  if (issue.unmentioned)
-    return <span className="rounded-full bg-accent-dark px-2 py-0.5 text-xs font-bold text-white">You didn&apos;t mention this</span>;
-  if (issue.status === "mentioned_not_seen")
-    return <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">You said it, check in person</span>;
-  return (
-    <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold">
-      You said it{issue.mention ? ` at ${issue.mention.saidAtSec.toFixed(0)} s` : ""}
-    </span>
-  );
 }
 
 /** Where the after picture goes when there isn't one yet: the real frame, dimmed, with a plain note. */
@@ -122,8 +103,13 @@ export function PlanView({
 }) {
   const frames = plan.frames ?? [];
   const narrated = isNarrated(plan);
+  // Ranked problems only: anything the server marked watch: true shows under "Worth a closer look" instead.
+  const issues = rankedIssues(plan);
+  const watch = watchItems(plan);
+  const issueCosts = issueCostShares(plan);
+  const stepCosts = stepCostShares(plan);
   const metaParts = planMetaParts(plan);
-  const unmentioned = narrated ? plan.issues.filter((i) => i.unmentioned) : [];
+  const unmentioned = narrated ? rankedIssues(plan).filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
   // Hand-written samples (example cards, or the stand-in plan shown after a preview upload) never ran the
@@ -148,7 +134,7 @@ export function PlanView({
       : undefined;
   // Summary stat row: never show a slot that can be empty, so "not mentioned" needs narration and cost needs a costRange.
   const stats: { label: string; value: string; accent?: boolean; small?: boolean }[] = [
-    { label: narrated ? "Problems found" : "Problems found on camera", value: String(plan.issues.length) },
+    { label: narrated ? "Problems found" : "Problems found on camera", value: String(issues.length) },
     ...(narrated ? [{ label: "You didn't mention", value: String(unmentioned.length), accent: unmentioned.length > 0 }] : []),
     ...(plan.workOrder.length > 0 ? [{ label: "Work steps", value: String(plan.workOrder.length) }] : []),
     ...(plan.costRange ? [{ label: "Rough cost", value: `${usd(plan.costRange.low)}–${usd(plan.costRange.high)}`, small: true }] : []),
@@ -219,7 +205,7 @@ export function PlanView({
           </dl>
           <p className="mt-4 text-sm text-white/80">
             {unmentioned.length > 0 && <span className="font-semibold text-white">Not mentioned: </span>}
-            {(unmentioned.length > 0 ? unmentioned : plan.issues).map((i) => i.title).join(" · ")}
+            {(unmentioned.length > 0 ? unmentioned : issues).map((i) => i.title).join(" · ")}
           </p>
         </a>
       )}
@@ -291,46 +277,8 @@ export function PlanView({
                 : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
-        {reviewText && <ReviewLine text={reviewText} ok={review?.ran === true && review.items.every((i) => i.verified)} />}
-        <ol className="flex flex-col gap-3">
-          {plan.issues.map((issue) => {
-            const proof = issue.proofFrames?.[0];
-            const verdict = verdictFor(review, issue);
-            const unverified = verdict?.verified === false;
-            return (
-              <li
-                key={issue.rank}
-                className={`min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm ${SEVERITY_BORDER[issue.severity]} ${
-                  issue.status !== "mentioned_not_seen" ? "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] md:items-start md:gap-4" : ""
-                }`}
-              >
-                <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-lg font-extrabold tabular-nums">#{issue.rank}</span>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-ink/70">{SEVERITY_LABEL[issue.severity]} priority</span>
-                  <SaidBadge issue={issue} narrated={narrated} />
-                  {unverified && (
-                    <span className="rounded-full border border-amber-800 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">Unverified</span>
-                  )}
-                </div>
-                <h3 className="mt-2 text-lg font-bold leading-snug">{issue.title}</h3>
-                <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
-                {unverified && verdict.reason && (
-                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    <span className="font-semibold">Not backed by a photo: </span>
-                    {verdict.reason}
-                  </p>
-                )}
-                </div>
-                {issue.status !== "mentioned_not_seen" && (
-                  <div className="mt-3 min-w-0 md:mt-0">
-                    <ProofFrame frame={frames[proof?.frameIndex ?? issue.frameIndex]} box={proof?.box} caption={proof?.caption} outlineUnavailable={!masks} frameOnlyLabel={sample ? "Frame only" : undefined} />
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        {reviewText && <ReviewLine text={reviewText} ok={review?.ran === true && review.items.every((i) => verdictKind(i) === "verified")} />}
+        <ProblemList plan={plan} issues={issues} watch={watch} narrated={narrated} review={review} masks={masks} sample={sample} issueCosts={issueCosts} />
       </Section>
 
       {narrated && plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
@@ -376,7 +324,7 @@ export function PlanView({
 
       <Section title="Do the work in this order" id="steps">
         {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
-        {plan.workOrder.length > 0 && <WorkSteps plan={plan} />}
+        {plan.workOrder.length > 0 && <WorkSteps plan={plan} stepCosts={stepCosts} />}
       </Section>
 
       {/* Materials and cost sit side by side on desktop (lg+) whenever a cost card renders; phones and tablets stack them. */}
@@ -406,6 +354,15 @@ export function PlanView({
                 <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
               </p>
               <p className="mt-1 text-sm text-ink/70">{plan.costRange.label}</p>
+              {(issueCosts || stepCosts) && (
+                <p className="mt-2 text-sm text-ink/70" data-testid="cost-shares-note">
+                  {issueCosts && stepCosts
+                    ? "Split by problem and by step above. Each list adds up to this total."
+                    : issueCosts
+                      ? "Split by problem above. The shares add up to this total."
+                      : "Split by step above. The step costs add up to this total."}
+                </p>
+              )}
               <details className="group mt-3 border-t border-ink/10 pt-3">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
                   <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
