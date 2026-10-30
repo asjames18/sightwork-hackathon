@@ -120,3 +120,23 @@ test("an answer missing ran (off schema) is retried once, then the plan says Rev
   assert.deepEqual(review, { ran: false, items: [] });
   assertReviewSpend(tracker, 2);
 });
+
+test("a repeated proof photo (two frames, same frameIndex) is refused before any call: ran:false, nothing spent", async () => {
+  const dup: ReviewInput = { ...input, frames: [{ frameIndex: 4, dataUrl: png(4) }, { frameIndex: 4, dataUrl: png(7) }] };
+  const { d, calls, tracker } = deps([plantedAnswer]);
+  const review = await runReview(dup, d);
+  assert.equal(calls.length, 0, "no call is spent on a repeated photo");
+  assertReviewSpend(tracker, 0);
+  assert.deepEqual(review, { ran: false, items: [] });
+  assert.match(reviewLine(review) ?? "", /^Review didn't run/);
+});
+
+test("distinct frames on the same input still spend exactly one call", async () => {
+  const two: ReviewInput = { ...input, frames: [{ frameIndex: 4, dataUrl: png(4) }, { frameIndex: 5, dataUrl: png(5) }] };
+  const { d, calls, tracker } = deps([plantedAnswer]);
+  const review = await runReview(two, d);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].images.length, 2);
+  assert.equal(review.ran, true);
+  assertReviewSpend(tracker, 1);
+});
