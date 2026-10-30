@@ -317,6 +317,18 @@ export function validatePlanRequest(body: unknown): string[] {
               t.endSec < 0))
         ) {
           problems.push(`transcriptTurns[${i}] is not a valid turn`);
+        } else if (
+          // A turn that ends before it starts is malformed, not just
+          // out of order: the "said vs saw" alignment reads turns in
+          // time order, so an inverted turn would misplace narration
+          // instead of failing. The shape check above already rejects
+          // a non-numeric endSec, so this only fires on a real number
+          // earlier than startSec. Real turns (from /api/transcribe)
+          // never invert, so no current run changes.
+          typeof t.endSec === "number" &&
+          t.endSec < t.startSec
+        ) {
+          problems.push(`transcriptTurns[${i}].endSec must not be earlier than startSec`);
         }
       });
     }
