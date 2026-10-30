@@ -60,6 +60,12 @@ import {
   planBodyTooLarge,
   validatePlanRequest,
 } from "../../../lib/pipeline/planRequest";
+import {
+  RATE_LIMIT_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+  clientIp,
+  createRateLimiter,
+} from "../../../lib/pipeline/rateLimit";
 import { createUsageTracker } from "../../../lib/pipeline/usage";
 import { PlanStepError, REASON_MAX_FRAMES, runPlan } from "../../../lib/pipeline/runPlan";
 import { uploadCheck } from "../../../lib/stepChecks";
@@ -114,6 +120,18 @@ export function resolveSegmentConcurrency(
 }
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Per-IP brake for paid plan runs (2026-10-30): 30 validated requests
+ * per IP per 10 minutes; only requests that would spend money count
+ * (the check runs after validation, before any model wiring). A
+ * blocked caller gets 429 with Retry-After. Per-instance memory:
+ * see rateLimit.ts.
+ */
+const planRateLimiter = createRateLimiter(
+  RATE_LIMIT_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+);
 
 const NDJSON = { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" };
 
@@ -172,6 +190,22 @@ export async function POST(req: Request): Promise<Response> {
     return failedLine("uploading", "That plan request was incomplete. Try again.");
   }
   const request = parsed as PlanRequest;
+
+  // Rate limit after validation, before any model wiring: only a
+  // request that would spend money counts against the bucket.
+  const planLimit = planRateLimiter.check(clientIp(req));
+  if (!planLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many plan requests. Try again shortly." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(planLimit.retryAfterSec),
+        },
+      },
+    );
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
