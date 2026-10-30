@@ -20,6 +20,8 @@
  * wiring time even in baseten mode; the reason engine is the only
  * step that moves. The plan's meta.planProvider records which engine
  * wrote the reason step, so a finished plan names its own engine.
+ * SEGMENT_CONCURRENCY, when set to a whole number >= 1, caps SAM calls in
+ * flight for the segment step; unset keeps the segment default.
  * The shared usage tracker enforces the $10 spike cap in code, and
  * every call it records is logged server-side when the run finishes, successfully or not.
  *
@@ -79,6 +81,28 @@ export function resolvePlanProvider(
   if (raw === undefined || raw === "") return "baseten";
   if (raw === "baseten" || raw === "meta") return raw;
   throw new Error(`plan route: unknown PLAN_PROVIDER "${env.PLAN_PROVIDER}" (want baseten or meta)`);
+}
+
+/**
+ * SAM concurrency for the segment step, from SEGMENT_CONCURRENCY.
+ * Blank/unset keeps runSegment's own default (DEFAULT_SEGMENT_CONCURRENCY);
+ * a whole number >= 1 is passed through to runPlan as segmentConcurrency.
+ * Anything else fails fast here, before any step runs, so a typo never
+ * silently picks a pool size. Takes an env record so tests can pass one
+ * in; defaults to process.env.
+ */
+export function resolveSegmentConcurrency(
+  env: Record<string, string | undefined> = process.env,
+): number | undefined {
+  const raw = env.SEGMENT_CONCURRENCY?.trim();
+  if (raw === undefined || raw === "") return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(
+      `plan route: unknown SEGMENT_CONCURRENCY "${env.SEGMENT_CONCURRENCY}" (want a whole number >= 1)`,
+    );
+  }
+  return value;
 }
 
 export const dynamic = "force-dynamic";
@@ -157,6 +181,7 @@ export async function POST(req: Request): Promise<Response> {
         const meta = createMetaClient();
         tracker = createUsageTracker();
         const provider = resolvePlanProvider();
+        const segmentConcurrency = resolveSegmentConcurrency();
         const reasonCaller =
           provider === "baseten"
             ? createReasonBasetenCaller(createBasetenClient())
@@ -185,6 +210,7 @@ export async function POST(req: Request): Promise<Response> {
           ...deps,
           tracker,
           planProvider: provider,
+          segmentConcurrency,
           // Baseten reason cap (Grok Bot, 2026-10-27 11:43 AM): the
           // reason step takes at most 8 images in baseten mode;
           // runPlan subsets and remaps. Meta mode is untouched.
