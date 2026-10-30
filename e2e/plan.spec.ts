@@ -164,3 +164,28 @@ test("/start sample cards: featured image loads first, the rest lazy from small 
   const box = await page.locator('a[href="/credits"]').first().boundingBox();
   expect(box!.height).toBeGreaterThanOrEqual(24);
 });
+
+test("plan screen: tap a proof photo to see it full size with its outline; Esc closes and focus returns", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 740 });
+  await page.goto(REAL_RUN);
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  const open = page.getByRole("button", { name: /^See full size: / }).first();
+  await open.scrollIntoViewIfNeeded();
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: /^Proof photo: / });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+  const img = dialog.locator("img");
+  await expect(img).toBeVisible();
+  const box = await img.boundingBox();
+  expect(box!.width).toBeLessThanOrEqual(375);
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "proof photo full view");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(open).toBeFocused();
+  await open.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toBeHidden();
+});
