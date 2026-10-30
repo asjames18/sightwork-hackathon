@@ -21,6 +21,11 @@
  *
  * Wiring mirrors the plan route's transcribe deps (Meta ASR caller,
  * per-request usage tracker enforcing the $10 spike cap in code).
+ * Like the plan route, this route logs a per-model usage summary on
+ * done and on failure: a split run's transcribe call is a separate
+ * request from the plan request, so without this line its cost would
+ * be invisible to spike tracking and a double transcribe (browser
+ * call + plan re-transcribe) would not show up in the server log.
  * The plan route does not pass a cleanup prompt, so neither does
  * this route: raw turns are returned as-is. No call happens on
  * import, and the key is read from process.env only by the caller.
@@ -76,13 +81,44 @@ export async function POST(req: Request): Promise<Response> {
     });
   }
 
+  // Tracker lives outside the try so a failed run still logs its
+  // partial usage (including zero calls on a wiring failure, which
+  // proves the failure spent nothing) — same pattern as the plan
+  // route's failed-run line.
+  const tracker = createUsageTracker();
   try {
     const out = await runTranscribe(input, {
       callTranscribe: createAsrTranscribeCaller(),
-      tracker: createUsageTracker(),
+      tracker,
     });
+    console.log(
+      `transcribe route: done, spike total $${tracker.totals().spikeTotalUsd}, ` +
+        `${tracker.records().length} calls: ` +
+        tracker
+          .records()
+          .map((r) => `${r.model}/${r.step} $${r.costUsd} ${r.latencyMs}ms`)
+          .join(", ") +
+        `; per-model ` +
+        tracker
+          .totalsByModel()
+          .map((m) => `${m.model}: ${m.calls} calls $${m.totalUsd}`)
+          .join(", "),
+    );
     return new Response(JSON.stringify(out), { headers: JSON_HEADERS });
   } catch (err) {
+    console.error(
+      `transcribe route: failed after ${tracker.records().length} calls, ` +
+        `spike total $${tracker.totals().spikeTotalUsd}: ` +
+        tracker
+          .records()
+          .map((r) => `${r.model}/${r.step} $${r.costUsd} ${r.latencyMs}ms`)
+          .join(", ") +
+        `; per-model ` +
+        tracker
+          .totalsByModel()
+          .map((m) => `${m.model}: ${m.calls} calls $${m.totalUsd}`)
+          .join(", "),
+    );
     console.error(`transcribe route: ${err instanceof Error ? err.message : String(err)}`);
     return errorResponse("We couldn't transcribe that narration. Try again.", 500);
   }
