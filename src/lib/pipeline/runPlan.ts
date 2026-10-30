@@ -963,8 +963,29 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     if (masksSkipped) skipped.masks = true;
     if (afterImageSkipped) skipped.afterImage = true;
     if (costSkipped) skipped.cost = true;
+    // Which model actually wrote each step, from the usage records
+    // the steps already logged (judging ask, 2026-10-30 4:44 PM):
+    // the panel stops inferring model ids and shows the real ones.
+    // Record steps map to panel keys: estimateCost -> cost,
+    // renderAfter -> image. First model per step wins; retries keep
+    // the same model, and cleanup records ride under no key, so a
+    // step that never called records no model.
+    const MODEL_STEP_KEYS: Record<string, string> = {
+      transcribe: "transcribe",
+      segment: "segment",
+      reason: "reason",
+      estimateCost: "cost",
+      renderAfter: "image",
+      review: "review",
+    };
+    const models: Record<string, string> = {};
+    for (const rec of deps.tracker.records()) {
+      const key = MODEL_STEP_KEYS[rec.step];
+      if (key && !(key in models)) models[key] = rec.model;
+    }
     return {
       costUsd: deps.tracker.totals().spikeTotalUsd,
+      ...(Object.keys(models).length > 0 ? { models } : {}),
       ...(deps.planProvider ? { planProvider: deps.planProvider } : {}),
       // The region the run was asked for, when one was given: the plan
       // itself then says where it is even when the cost step failed
