@@ -44,16 +44,17 @@ To run the local checks, run `npm test` (Node 22.18 or newer, no extra packages)
 To run the browser checks, run `npm run e2e` (Playwright; run `npx playwright install chromium` once, or set `E2E_CHROME_PATH` to an installed Chrome). It builds the app, starts it locally with the example runner and every model key blanked, and walks landing → /start → example plan → upload a small test video → processing → plan, plus the 5-second minimum, the tester-code gate (in the browser and on the server), plan-screen keyboard use (section chips, before/after slider keys), Save PDF and the print view, Open my last plan, the step check notes and the review line with an Unverified badge (on a stubbed run), the 404 page and /credits, the in-page recorder on Chromium's fake camera (a 1080p take at the 8 Mbps setting, cancel and blocked-camera fallbacks, WebM length), at 390 px and 1440 px with an axe accessibility scan on each screen. Every browser request to `/api` is blocked and fails the test, so it never calls a model. Set `E2E_SKIP_BUILD=1` to reuse the last build, or `E2E_BASE_URL` to test a server that's already running. It isn't part of `npm run build` or `npm test`.
 
 ### Preview with example data (no API calls, no keys)
-By default the browser uses a built-in example run, so every screen works without any keys. These links jump straight to a screen (older `/?view=` style links still work and redirect to `/start` with the query kept):
+The example plans open without any keys. A video you record or choose is always sent as a real run (see "Real runs"), so your own walkthrough is never answered with an example plan. To walk the whole flow with example data instead, add `?runner=mock`; `?fail=` and `?mock=` below also use the example run. These links jump straight to a screen (older `/?view=` style links still work and redirect to `/start` with the query kept):
 - `http://localhost:3000/start?view=example` opens the example plan.
 - `?view=example&mock=nometa` shows a plan made without SAM outlines or an after picture.
 - `?view=example&mock=nocost` shows a plan whose cost step failed.
 - `?view=last` reopens the last finished plan on this device.
+- `?runner=mock`, then upload any video: the processing screen plays the example run and ends on the example plan. Nothing is sent anywhere.
 - `?mock=nometa` (without `view`), then upload any video: the processing screen runs with SAM and the after picture turned off. Looking and Counting flip to "skipped this run" once Comparing starts, the same timing as a real run with no Meta access.
 - `?fail=<step>` (for example `?fail=planning`), then upload any video: the preview stops at that step with a failure message, so the error screen can be checked. Nothing is sent anywhere.
 
 ### Real runs
-To send a walkthrough to the models, open `http://localhost:3000/start?runner=api` (or set `NEXT_PUBLIC_SIGHTWORK_RUNNER=api`) and upload a video. The server reads these keys from the environment only:
+To send a walkthrough to the models, record or choose a video on `http://localhost:3000/start`. A real run needs the tester code the server is set up with (`SIGHTWORK_TEST_CODE`): if none is saved on the device yet, the video card asks for it and the run starts once it's saved, with the same video. A code the server refuses says so and asks again. Only an explicit `?runner=mock` or a build with `NEXT_PUBLIC_SIGHTWORK_RUNNER=mock` sends videos to the example run. The server reads these keys from the environment only:
 - `BASETEN_API_KEY`: Muse Spark Open on Baseten, which writes the plan (the default, `PLAN_PROVIDER=baseten`).
 - `META_API_KEY` (or `MODEL_API_KEY`): the Meta Model API for narration transcription, SAM 3.1 outlines and the Muse Image after picture. Set `PLAN_PROVIDER=meta` to run the planning steps on Muse Spark instead.
 
@@ -65,9 +66,11 @@ On /start, **Record a walkthrough** opens the camera in the page (back camera, a
 
 While the in-page camera is open, the screen stays on (where the browser supports screen wake lock), so phone auto-lock can't end a take mid-walk. A small meter in the corner shows the mic level, and if a take has been quiet for 5 seconds a hint asks you to say what you see. With no mic at all, a note says the plan will use the video only.
 
-A narrated run makes two requests. First the browser sends the narration as 16 kHz mono audio to `POST /api/transcribe`; then it sends still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) plus the transcript text to `POST /api/plan`. If the transcribe request fails for any reason other than a bad tester code, the browser falls back to sending the audio along with the frames in one plan request, so narration is never dropped. The full video stays on the device.
+A narrated run makes two requests. First the browser sends the narration as 16 kHz mono audio to `POST /api/transcribe`; then it sends still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) plus the transcript text to `POST /api/plan`. Narration recorded from arm's length in a big room is often very quiet, so before the audio is encoded the browser lifts a quiet take until its loud parts sit near full level (up to +24 dB, read from the loudest 0.1% so one click doesn't set it, never clipped and never turned down). If the transcribe request fails for any reason other than a bad tester code, the browser falls back to sending the audio along with the frames in one plan request, so narration is never dropped. The full video stays on the device.
 
 The browser keeps a request under about 9 MB, since the server accepts up to 10 MB. Some hosts cap request bodies lower (Vercel functions take 4.5 MB). On those, set `NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES` at build time (for example `4300000`), and the browser softens the frames to fit or says the take is too long up front, instead of the host rejecting it.
+
+A brief gateway error from the plan model (502, 503 or 504) is retried up to three times, a second and then two seconds apart, before the step fails; a failed attempt costs nothing.
 
 Each request logs one usage line on the server with its model calls and cost: one from the transcribe route and one from the plan route. For a narrated run, add the two together to get the run's total.
 
@@ -78,6 +81,7 @@ Each finished step can carry a short check note under it ("Checked: …", or "Fl
 On the plan screen:
 - **Send to your team** shares the plan as plain text: the phone's share sheet on touch devices, the clipboard elsewhere. The text follows the screen (problems worst first, work steps in order, materials, and the cost range with its "rough estimate, not a quote" label).
 - **Work steps are a checklist.** Tick each step as it's done; ticks are saved on this device for that plan, so a crew lead can come back to it later. "Clear ticks" resets them.
+- **Materials are a shopping list.** Tick each item as you get it (saved on this device for that plan), see how many are in hand and a rough materials subtotal when unit costs are known, and **Send shopping list** shares only what's still needed, with quantities, the problems each item fixes and the per-unit estimate.
 - **Save PDF** prints a clean copy of the plan (the share and checklist controls are left off the paper).
 
 ## Status
