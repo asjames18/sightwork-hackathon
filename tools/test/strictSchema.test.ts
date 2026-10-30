@@ -78,15 +78,9 @@ describe("strictProblems (the checker itself)", () => {
 describe("schemas sent with strict: true", () => {
   const costProblems = strictProblems(COST_SCHEMA);
   const onlyKnown = costProblems.every((p) => p === "$.unitCosts[].sourceIndex: not in required");
-  test(
-    "COST_SCHEMA has no strict-mode problems (Meta refuses it with a 400 otherwise)",
-    // Known open item: sourceIndex is optional. Remove the todo once it is
-    // required with type ["integer", "null"]; any other problem fails now.
-    onlyKnown && costProblems.length > 0 ? { todo: "unitCosts[].sourceIndex must be required and null-able" } : {},
-    () => {
-      assert.deepEqual(costProblems, []);
-    },
-  );
+  test("COST_SCHEMA has no strict-mode problems (Meta refuses it with a 400 otherwise)", () => {
+    assert.deepEqual(costProblems, []);
+  });
   test("COST_SCHEMA has no problems beyond the one known open item", () => {
     assert.ok(onlyKnown, costProblems.join("\n"));
   });
