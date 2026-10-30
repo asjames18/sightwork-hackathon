@@ -82,6 +82,8 @@ test("a clip under 5 seconds is blocked before anything runs", async ({ page }) 
 });
 
 test("real-run mode without a tester code asks for it on the video card and sends nothing", async ({ page }) => {
+  // City and state are saved here (e2e/city-region.spec.ts covers asking for them).
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   const code = page.getByLabel("Tester code for real runs");
   await expect(code).toBeVisible();
@@ -120,6 +122,8 @@ async function stubRealRun(page: import("@playwright/test").Page) {
     record(r);
     return r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "failed", step: "planning", message: "Stub stop for the test." }) + "\n" });
   });
+  // Real runs need a city and state (e2e/city-region.spec.ts); saved here so these checks reach the code prompt.
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   return sent;
 }
 
@@ -171,6 +175,7 @@ test("quiet narration is brought up to a level speech recognition can hear befor
     r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "failed", step: "planning", message: "Stub stop for the test." }) + "\n" }),
   );
   await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(QUIET_NARRATION_CLIP);
   await page.getByRole("button", { name: "Make my work plan" }).click();
@@ -198,6 +203,7 @@ test("a chosen phone .mov with a Spatial Audio track listed first still sends it
     r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "failed", step: "planning", message: "Stub stop for the test." }) + "\n" }),
   );
   await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(PHONE_MOV_SPATIAL_FIRST);
   await page.getByRole("button", { name: "Make my work plan" }).click();
@@ -213,6 +219,7 @@ test("a code the server refuses goes back to the same video with the code prompt
   await page.route("**/api/transcribe", (r) => r.fulfill({ status: 401, json: { error: "x" } }));
   await page.route("**/api/plan", (r) => r.fulfill({ status: 401, json: { error: "x" } }));
   await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "wrong-code"));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   await page.getByRole("button", { name: "Make my work plan" }).click();
@@ -227,6 +234,7 @@ test("a code the server refuses goes back to the same video with the code prompt
 
 test("real run of an all-black take stops on the device with a clear message and sends nothing", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" })));
   await page.goto("/start?runner=api");
   await page.getByTestId("choose-video-input").setInputFiles(BLANK_CLIP);
   await page.getByRole("button", { name: "Make my work plan" }).click();

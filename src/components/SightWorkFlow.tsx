@@ -5,7 +5,7 @@ import Link from "next/link";
 import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { planJobFor, type RunnerKind } from "@/lib/client/selectRunner";
-import { isTesterCodeFailure } from "@/lib/client/apiPlanJob";
+import { isResumeFailure, isTesterCodeFailure } from "@/lib/client/apiPlanJob";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { UploadStep } from "./UploadStep";
@@ -183,10 +183,11 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           failure={job?.state === "failed" ? { message: job.message } : null}
           onRetry={() => setStage({ ...stage, run: stage.run + 1 })}
           onEnterCode={
-            stage.runner === "api" && job?.state === "failed" && isTesterCodeFailure(job.message)
+            stage.runner === "api" && job?.state === "failed" && isResumeFailure(job.message)
               ? () => setStage({ kind: "upload", resume: stage.file })
               : undefined
           }
+          enterCodeLabel={job?.state === "failed" && !isTesterCodeFailure(job.message) ? "Add city and state" : undefined}
           onExample={() => showExample()}
           skipped={skipped}
           checks={checks}

@@ -63,6 +63,7 @@ describe("own video runner", () => {
   test("a saved code the server refuses says so plainly, not a generic failure", async () => {
     fakeWindow("?runner=api");
     window.localStorage.setItem("sightwork:test-code", "not-the-code");
+    window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" }));
     const realFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response(JSON.stringify({ error: "x" }), { status: 401 })) as typeof fetch;
     try {

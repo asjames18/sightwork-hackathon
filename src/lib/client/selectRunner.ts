@@ -16,7 +16,8 @@ export function pickRunnerKind(search: string | null, envValue: string | undefin
 }
 
 /**
- * Demo defaults sent with each request. Region is left out until Antonio picks one, so no cost range is asked for.
+ * Defaults sent with each request. Region is not set here: apiPlanJob adds the city and state the tester
+ * saved on the video card (src/lib/client/location.ts) as "City, ST", and a real run won't start without them.
  * The request budget comes from NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES (unset keeps 9 MB).
  */
 const apiPlanJob = createApiPlanJob(

@@ -6,6 +6,7 @@ import { WorkSteps } from "./WorkSteps";
 import { MaterialsList } from "./MaterialsList";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictFor } from "@/lib/review";
+import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
 
 /** Severity shows as the card's left border plus a quiet label, so the one accent chip ("You didn't mention this") stands alone. */
 const SEVERITY_BORDER: Record<Issue["severity"], string> = {
@@ -418,13 +419,13 @@ export function PlanView({
                 ? "The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for your area."
                 : sample
                   ? "This sample has no cost range. On a real run with a city or region, SightWork prices the materials and labor for that area."
-                  : "This run didn\u2019t include a city or region, so there\u2019s no cost range. The materials and work steps above are complete."}
+                  : "This run didn\u2019t include a city and state, so there\u2019s no cost range. New runs ask for them before the plan is made."}
             </Empty>
           </Section>
         )}
 
         {plan.costRange && (
-          <Section title="What it might cost" id="cost">
+          <Section title={<>Cost range for <span data-testid="cost-region">{plan.costRange.region}</span></>} id="cost">
             <div className="rounded-2xl bg-white p-4">
               <p className="text-3xl font-extrabold tabular-nums">
                 <span className="whitespace-nowrap">{usd(plan.costRange.low)}</span> –{" "}
@@ -441,6 +442,7 @@ export function PlanView({
                 <p className="mt-2 text-sm">
                   Region: {plan.costRange.region} · Labor: {plan.costRange.laborBasis}
                 </p>
+                <AreaIndex region={plan.costRange.region} />
                 <ul className="mt-2 list-disc pl-5 text-sm text-ink/70">
                   {plan.costRange.assumptions.map((a) => (
                     <li key={a}>{a}</li>
@@ -525,5 +527,20 @@ function ExampleBanner({ example, videoName, onMakeYourOwn }: { example: Example
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * PROTOTYPE: how the priced state compares with the US average (src/lib/regionalCost.ts), shown under
+ * "How we got this" so a tester can sanity-check the range. Labeled as an estimate; nothing is recomputed.
+ */
+function AreaIndex({ region }: { region: string }) {
+  const state = stateFromRegion(region);
+  const f = state ? regionalFactors(state) : null;
+  if (!f) return null;
+  return (
+    <p className="mt-2 text-sm text-ink/70" data-testid="area-index">
+      Area check: {describeFactors(f)} <span className="text-ink/60">({COST_INDEX_LABEL}; {COST_INDEX_SOURCE}.)</span>
+    </p>
   );
 }
