@@ -69,6 +69,8 @@ const DEFAULT_REQUEST_COST_USD = 0.0025;
 
 /** Total attempts for a transient 404 model_not_found, Grok Bot's ask. */
 const MAX_SAM_ATTEMPTS = 3;
+/** Max decoded bytes per frame. Frames are 1024 px JPEGs (tools/frames/sample-frames.mjs), so 5 MB leaves wide headroom while bounding a direct caller that bypasses the segment step, the same shape as the Baseten caller's 5 MB image cap and the ASR caller's 32 MB audio cap. */
+const MAX_SAM_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Backoff between those attempts: 250 ms after attempt 1, 500 ms after 2. */
 const SAM_RETRY_DELAYS_MS = [250, 500];
 
@@ -254,6 +256,19 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
       }
       if (!isImageBase64(payload)) {
         throw new Error("sam: dataUrl must carry image data (JPEG, PNG, WebP, or GIF)");
+      }
+      // Same shape as the Baseten caller's image cap: the segment
+      // step's frames are small, but a direct caller bypassing the
+      // step had no bound, so an unbounded frame would ride onto a
+      // paid SAM call before any cap could stop it. 5 MB decoded is
+      // wide headroom over a 1024 px JPEG frame; reject it here,
+      // before any fetch.
+      const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+      const decodedBytes = (payload.length * 3) / 4 - padding;
+      if (decodedBytes > MAX_SAM_IMAGE_BYTES) {
+        throw new Error(
+          `sam: image must be at most 5 MB, got ${decodedBytes} bytes`,
+        );
       }
     }
     const body: Record<string, unknown> = {
