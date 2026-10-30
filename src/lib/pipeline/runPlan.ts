@@ -430,6 +430,9 @@ function isImageBase64(value: string): boolean {
   return false;
 }
 
+/** Max decoded bytes per runPlan frame, same shape as the reason/segment step 5 MB frame caps. */
+const MAX_RUNPLAN_IMAGE_BYTES = 5 * 1024 * 1024;
+
 export function validateRunPlanRequest(request: PlanRequest): void {
   if (request === null || typeof request !== "object" || Array.isArray(request)) {
     throw new Error("runPlan: request is not an object");
@@ -524,6 +527,24 @@ export function validateRunPlanRequest(request: PlanRequest): void {
         throw new Error(
           `runPlan: frames[${i}].dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`,
         );
+      }
+      // Same shape as the reason step's and segment step's frame caps:
+      // the runPlan frames are 1024 px JPEGs, but a direct runPlan
+      // caller had no per-frame bound here, so an unbounded frame
+      // only surfaced at the reason/segment step caps mid-run, after
+      // request budgeting. Reject it at validation instead, before
+      // any step runs, so the orchestrator fails fast with the frame
+      // index. 5 MB decoded is wide headroom over a 1024 px JPEG
+      // frame, so no valid request changes.
+      {
+        const stripped = payload.replace(/\s/g, "");
+        const padding = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+        const decodedBytes = (stripped.length * 3) / 4 - padding;
+        if (decodedBytes > MAX_RUNPLAN_IMAGE_BYTES) {
+          throw new Error(
+            `runPlan: frames[${i}].dataUrl must be at most 5 MB, got ${decodedBytes} bytes`,
+          );
+        }
       }
     }
     prevTsec = frame.tSec;
