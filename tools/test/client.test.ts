@@ -171,6 +171,78 @@ describe("API runner (fake fetch, nothing leaves the machine)", () => {
   });
 });
 
+describe("transcribe split (fake fetch, nothing leaves the machine)", () => {
+  type Call = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
+  async function runSplit(transcribe: { status?: number; json?: unknown; throws?: boolean }, request?: Partial<PlanRequest>) {
+    fakeWindow();
+    saveTestCode("tester-2");
+    const calls: Call[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url, headers: init.headers as Record<string, string>, body: JSON.parse(init.body as string) });
+      if (url === "/api/transcribe") {
+        if (transcribe.throws) throw new TypeError("network down");
+        return new Response(JSON.stringify(transcribe.json ?? { error: "x" }), { status: transcribe.status ?? 200 });
+      }
+      return new Response('{"state":"done","plan":{"issues":[]}}\n', { status: 200 });
+    }) as typeof fetch;
+    const statuses: PlanJobStatus[] = [];
+    const req: PlanRequest = {
+      durationSec: 40,
+      spaceType: "room",
+      frames: [{ tSec: 0, dataUrl: "data:image/jpeg;base64,AA==" }],
+      audioWavBase64: "UklGRg==",
+      ...request,
+    };
+    const realWarn = console.warn;
+    console.warn = () => {};
+    try {
+      await createApiPlanJob(async () => req)({ file: {} as File, onStatus: (s) => statuses.push(s), signal: new AbortController().signal });
+    } finally {
+      globalThis.fetch = realFetch;
+      console.warn = realWarn;
+    }
+    return { calls, statuses };
+  }
+
+  test("narration goes to /api/transcribe first; the plan request carries the transcript, not the WAV", async () => {
+    const turns = [{ startSec: 1.2, text: "the steps have no handrail" }];
+    const { calls, statuses } = await runSplit({ json: { transcript: "[1.2] the steps have no handrail", transcriptTurns: turns } });
+    assert.deepEqual(calls.map((c) => c.url), ["/api/transcribe", "/api/plan"]);
+    assert.equal(calls[0].headers[TEST_CODE_HEADER], "tester-2");
+    assert.deepEqual(calls[0].body, { audioWavBase64: "UklGRg==", spaceType: "room" });
+    assert.equal(calls[1].body.audioWavBase64, undefined);
+    assert.equal(calls[1].body.transcript, "[1.2] the steps have no handrail");
+    assert.deepEqual(calls[1].body.transcriptTurns, turns);
+    assert.equal(statuses.at(-1)?.state, "done");
+  });
+  test("no speech: null transcript and empty turns are sent together", async () => {
+    const { calls } = await runSplit({ json: { transcript: "  ", transcriptTurns: [] } });
+    assert.equal(calls[1].body.transcript, null);
+    assert.deepEqual(calls[1].body.transcriptTurns, []);
+    assert.equal(calls[1].body.audioWavBase64, undefined);
+  });
+  test("transcribe 500, a bad body, or a network error keeps the old WAV request", async () => {
+    for (const t of [{ status: 500 }, { json: { transcript: 3 } }, { json: { transcript: "x", transcriptTurns: [{ startSec: "a" }] } }, { throws: true }]) {
+      const { calls, statuses } = await runSplit(t);
+      assert.equal(calls.at(-1)?.url, "/api/plan");
+      assert.equal(calls.at(-1)?.body.audioWavBase64, "UklGRg==");
+      assert.equal(calls.at(-1)?.body.transcript, undefined);
+      assert.equal(statuses.at(-1)?.state, "done");
+    }
+  });
+  test("transcribe 401 stops with the tester-code sentence and no plan request", async () => {
+    const { calls, statuses } = await runSplit({ status: 401 });
+    assert.deepEqual(calls.map((c) => c.url), ["/api/transcribe"]);
+    const last = statuses.at(-1);
+    assert.ok(last?.state === "failed" && /tester code/.test(last.message));
+  });
+  test("no narration: no transcribe call", async () => {
+    const { calls } = await runSplit({}, { audioWavBase64: undefined });
+    assert.deepEqual(calls.map((c) => c.url), ["/api/plan"]);
+  });
+});
+
 describe("request budget setting", () => {
   const DEFAULT = 9 * 1024 * 1024;
   test("blank, junk and out-of-range values keep the 9 MB default", () => {

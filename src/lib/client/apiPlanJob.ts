@@ -57,7 +57,7 @@ export function messageForStatus(status: number): string {
 }
 
 /** Reads a JSON {error} (or short plain text) from a non-OK response and logs it. Never throws. */
-async function logServerError(res: Response): Promise<void> {
+async function logServerError(res: Response, what = "plan"): Promise<void> {
   try {
     const text = (await res.text()).slice(0, 500);
     let detail = text;
@@ -68,9 +68,64 @@ async function logServerError(res: Response): Promise<void> {
     } catch {
       /* plain text body */
     }
-    console.warn(`plan request failed: HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+    console.warn(`${what} request failed: HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
   } catch {
     /* body unreadable; the status is enough */
+  }
+}
+
+/** Shape POST /api/transcribe answers with (TranscribeOutput). */
+type TranscribeAnswer = { transcript: string | null; transcriptTurns: NonNullable<PlanRequest["transcriptTurns"]> };
+
+function isTurn(v: unknown): boolean {
+  if (!v || typeof v !== "object") return false;
+  const t = v as Record<string, unknown>;
+  return typeof t.startSec === "number" && Number.isFinite(t.startSec) && typeof t.text === "string";
+}
+
+/** Checks a /api/transcribe body. A blank transcript counts as no narration (null), which /api/plan accepts. */
+export function parseTranscribeAnswer(v: unknown): TranscribeAnswer | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.transcript !== null && typeof o.transcript !== "string") return null;
+  const turns = o.transcriptTurns === undefined ? [] : o.transcriptTurns;
+  if (!Array.isArray(turns) || !turns.every(isTurn)) return null;
+  const transcript = typeof o.transcript === "string" && o.transcript.trim() ? o.transcript : null;
+  return { transcript, transcriptTurns: transcript ? (turns as TranscribeAnswer["transcriptTurns"]) : [] };
+}
+
+/**
+ * Option (b) for the 4.5 MB body cap: when the request carries narration, POST it alone to
+ * /api/transcribe first and send the plan request with the transcript instead of the WAV.
+ * Returns the request to send, or "unauthorized" on 401. Any other failure keeps the original
+ * WAV-carrying request, so narration is never silently dropped (same behavior as before the split).
+ */
+async function splitNarration(
+  body: PlanRequest,
+  endpoint: string,
+  code: string,
+  signal: AbortSignal,
+): Promise<PlanRequest | "unauthorized"> {
+  if (!body.audioWavBase64 || body.transcript !== undefined) return body;
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", [TEST_CODE_HEADER]: code },
+      body: JSON.stringify(body.spaceType ? { audioWavBase64: body.audioWavBase64, spaceType: body.spaceType } : { audioWavBase64: body.audioWavBase64 }),
+      signal,
+    });
+    if (res.status === 401) return "unauthorized";
+    if (!res.ok) {
+      await logServerError(res, "transcribe");
+      return body;
+    }
+    const answer = parseTranscribeAnswer(await res.json());
+    if (!answer) return body;
+    const { audioWavBase64: _wav, ...rest } = body;
+    void _wav;
+    return { ...rest, transcript: answer.transcript, transcriptTurns: answer.transcriptTurns };
+  } catch {
+    return body;
   }
 }
 
@@ -78,8 +133,13 @@ async function logServerError(res: Response): Promise<void> {
  * Real runner for POST /api/plan. The server streams newline-delimited JSON, one
  * PlanJobStatus per line; the last line is done or failed. Aborting the signal
  * cancels the request, and the server stops its work on disconnect.
+ * With narration, POST /api/transcribe runs first (pass null to skip that split).
  */
-export function createApiPlanJob(buildRequest: BuildPlanRequest, endpoint = "/api/plan"): PlanJobRunner {
+export function createApiPlanJob(
+  buildRequest: BuildPlanRequest,
+  endpoint = "/api/plan",
+  transcribeEndpoint: string | null = "/api/transcribe",
+): PlanJobRunner {
   return async ({ file, onStatus, signal }) => {
     let lastStep: RunStep = "uploading";
     const report = (s: PlanJobStatus) => {
@@ -106,6 +166,16 @@ export function createApiPlanJob(buildRequest: BuildPlanRequest, endpoint = "/ap
       return;
     }
     if (signal.aborted) return;
+
+    if (transcribeEndpoint) {
+      const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal);
+      if (signal.aborted) return;
+      if (split === "unauthorized") {
+        fail(messageForStatus(401));
+        return;
+      }
+      body = split;
+    }
 
     let res: Response;
     try {
