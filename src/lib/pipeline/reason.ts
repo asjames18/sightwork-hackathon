@@ -127,6 +127,9 @@ export interface ReasonDeps {
 
 const SPARK_MODEL = "muse-spark-1.3";
 
+/** Max decoded bytes per reason frame, same shape as the Spark caller's 5 MB image cap. */
+const MAX_REASON_IMAGE_BYTES = 5 * 1024 * 1024;
+
 /**
  * Inline local `#/$defs/<name>` references and drop `$defs`.
  * Anything else (including `anyOf`) is passed through unchanged.
@@ -370,6 +373,20 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
       if (!isImageBase64(payload)) {
         throw new Error(
           `reason: frame ${i} dataUrl must carry image data (JPEG, PNG, WebP, or GIF)`,
+        );
+      }
+      // Same shape as the Spark caller's 5 MB image cap: the reason
+      // frames are 1024 px JPEGs, but a direct runReason caller
+      // bypassing runPlan had no bound here, so an unbounded frame
+      // would ride onto a paid Spark call before any cap could stop
+      // it. 5 MB decoded is wide headroom over a 1024 px JPEG frame;
+      // reject it here, before any fetch.
+      const stripped = payload.replace(/\s/g, "");
+      const padding = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+      const decodedBytes = (stripped.length * 3) / 4 - padding;
+      if (decodedBytes > MAX_REASON_IMAGE_BYTES) {
+        throw new Error(
+          `reason: frame ${i} dataUrl must be at most 5 MB, got ${decodedBytes} bytes`,
         );
       }
     }
