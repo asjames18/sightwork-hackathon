@@ -5,7 +5,10 @@
  * video's frames + narration and reads one PlanJobStatus per line:
  * running statuses in stage order, then a final done or failed line.
  * This route emits the first "uploading" status itself, right after
- * it parses the body; runPlan starts at "listening".
+ * it parses the body; runPlan starts at "listening". Right after
+ * validation it sends a second uploading line carrying the frame-count
+ * check (uploadCheck), matching runPlan's check-line pattern, before
+ * any wiring runs.
  *
  * Wiring: runPlan's step deps get the real callers plus the
  * per-request prompt builders from planPrompts.ts, so prompts 03
@@ -55,6 +58,7 @@ import {
 } from "../../../lib/pipeline/planRequest";
 import { createUsageTracker } from "../../../lib/pipeline/usage";
 import { PlanStepError, REASON_MAX_FRAMES, runPlan } from "../../../lib/pipeline/runPlan";
+import { uploadCheck } from "../../../lib/stepChecks";
 import type { PlanJobStatus, PlanRequest, PlanStep } from "../../../lib/types";
 
 export const runtime = "nodejs";
@@ -172,6 +176,12 @@ export async function POST(req: Request): Promise<Response> {
         controller.enqueue(encoder.encode(line(status)));
       };
       push({ state: "running", step: "uploading" });
+      // Uploading check (2026-10-30): the request is already validated,
+      // so the frame count is the check — one more running line for the
+      // same step, as runPlan does for its steps. Sharp swaps are
+      // browser-side only and are not in the request, so the note is
+      // the count alone, matching stepChecksForPlan on the finished plan.
+      push({ state: "running", step: "uploading", check: uploadCheck(request.frames.length) });
 
       let tracker: ReturnType<typeof createUsageTracker> | undefined;
       let wired = false;
