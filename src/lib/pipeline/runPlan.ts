@@ -49,7 +49,11 @@ import {
 } from "./reason";
 import { runRenderAfter, type RenderAfterDeps } from "./renderAfter";
 import { runSegment, type SegmentDeps } from "./segment";
-import { runTranscribe, type TranscribeDeps } from "./transcribe";
+import {
+  MAX_AUDIO_BYTES,
+  runTranscribe,
+  type TranscribeDeps,
+} from "./transcribe";
 import type { UsageTracker } from "./usage";
 
 /** A pipeline failure, mapped to the UI step that stopped. */
@@ -653,6 +657,25 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     !isBase64(request.audioWavBase64)
   ) {
     throw new Error("runPlan: audioWavBase64 must be valid base64");
+  }
+  // Parity with validateTranscribeInput (src/lib/pipeline/transcribe.ts):
+  // the transcribe step caps audio at 32 MB, but a direct runPlan
+  // caller with oversized audio used to pass here and only fail at
+  // the listening step, after the run had started. A direct caller
+  // gets the same fail-fast here instead of only via the step.
+  // The route validator needs no such check: its 10 MB body cap
+  // already bounds audio below 32 MB. Empty passes (no audio).
+  // Byte count mirrors transcribe's audioByteLength (floor of the
+  // whitespace-stripped length times 3/4, padding ignored), so the
+  // boundary agrees with the step's own check.
+  if (typeof request.audioWavBase64 === "string") {
+    const stripped = request.audioWavBase64.replace(/\s/g, "");
+    const bytes = Math.floor((stripped.length * 3) / 4);
+    if (bytes > MAX_AUDIO_BYTES) {
+      throw new Error(
+        `runPlan: audioWavBase64 must be at most 32 MB, got ${bytes} bytes`,
+      );
+    }
   }
   if (
     typeof request.audioWavBase64 === "string" &&
