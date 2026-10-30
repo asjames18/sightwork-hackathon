@@ -604,6 +604,18 @@ export function validateRunPlanRequest(request: PlanRequest): void {
             turn.endSec < 0))
       ) {
         throw new Error(`runPlan: transcriptTurns[${i}] is not a valid turn`);
+      } else if (
+        // A turn that ends before it starts is malformed, not just
+        // out of order: the "said vs saw" alignment reads turns in
+        // time order, so an inverted turn would misplace narration
+        // instead of failing. The shape check above already rejects
+        // a non-numeric endSec, so this only fires on a real number
+        // earlier than startSec. Real turns (from /api/transcribe)
+        // never invert, so no current run changes.
+        typeof turn.endSec === "number" &&
+        turn.endSec < turn.startSec
+      ) {
+        throw new Error(`runPlan: transcriptTurns[${i}].endSec must not be earlier than startSec`);
       }
     });
   }
