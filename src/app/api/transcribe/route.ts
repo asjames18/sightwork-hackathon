@@ -44,6 +44,12 @@ import {
   validateTranscribeInput,
 } from "../../../lib/pipeline/transcribe";
 import { createUsageTracker } from "../../../lib/pipeline/usage";
+import {
+  RATE_LIMIT_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+  clientIp,
+  createRateLimiter,
+} from "../../../lib/pipeline/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -54,6 +60,18 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Per-IP brake for paid transcribe runs (2026-10-30): 30 spending
+ * requests per IP per 10 minutes, separate bucket from /api/plan.
+ * The check runs after validation and after the free empty-audio
+ * return, so only a request that would spend money counts.
+ * Per-instance memory: see rateLimit.ts.
+ */
+const transcribeRateLimiter = createRateLimiter(
+  RATE_LIMIT_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+);
 
 /**
  * Largest transcribe request body the route parses: base64 of the
@@ -120,6 +138,22 @@ export async function POST(req: Request): Promise<Response> {
   // partial usage (including zero calls on a wiring failure, which
   // proves the failure spent nothing) — same pattern as the plan
   // route's failed-run line.
+  // Rate limit after validation and after the free empty-audio return:
+  // only a request that would spend money counts against the bucket.
+  const transcribeLimit = transcribeRateLimiter.check(clientIp(req));
+  if (!transcribeLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many transcribe requests. Try again shortly." }),
+      {
+        status: 429,
+        headers: {
+          ...JSON_HEADERS,
+          "Retry-After": String(transcribeLimit.retryAfterSec),
+        },
+      },
+    );
+  }
+
   const tracker = createUsageTracker();
   try {
     const out = await runTranscribe(input, {
