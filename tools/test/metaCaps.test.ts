@@ -1,4 +1,4 @@
-/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20, Baseten 5 MB image cap acd7c36, SAM 5 MB image cap 52302fd, Spark 5 MB per-image cap 7498507): over-cap requests throw before any fetch. No network. */
+/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20, Baseten 5 MB image cap acd7c36, SAM 5 MB image cap 52302fd, Spark 5 MB per-image cap 7498507, Image 5 MB hero frame cap f8f723c): over-cap requests throw before any fetch. No network. */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createMetaClient } from "@/lib/meta/client";
@@ -145,6 +145,26 @@ describe("meta spend caps", () => {
     const client = createMetaClient({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
     await assert.rejects(
       client.callSpark({ model: "muse-spark-1.3", prompt: "p", images: [jpegDataUrl(MB5)], schema: {} }),
+      (err: Error) => !/at most 5 MB/.test(err.message),
+    );
+    assert.ok(f.calls() >= 1);
+  });
+
+  test("Image: a 5 MB + 1 byte hero frame throws before any fetch", async () => {
+    const f = noFetch();
+    const caller = createImageCaller({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      caller({ model: "muse-image-1.0", prompt: "p", image: jpegDataUrl(MB5 + 1) }),
+      /at most 5 MB/,
+    );
+    assert.equal(f.calls(), 0);
+  });
+
+  test("Image: an exactly 5 MB hero frame passes the cap and reaches fetch", async () => {
+    const f = noFetch();
+    const caller = createImageCaller({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      caller({ model: "muse-image-1.0", prompt: "p", image: jpegDataUrl(MB5) }),
       (err: Error) => !/at most 5 MB/.test(err.message),
     );
     assert.ok(f.calls() >= 1);
