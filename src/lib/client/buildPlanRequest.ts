@@ -5,6 +5,7 @@ import { trimFramesCoveringZones } from "./zoneCoverage";
 import { resolveVideoDuration } from "./videoDuration";
 import { BLANK_SIDE, BLANK_TAKE_MESSAGE, isBlankTake, lumaStats, type LumaStats } from "./blankTake";
 import { chooseSharpTick, frameSharpness, isSoftTick, scoreSize, tickCandidates } from "./sharpTick";
+import { normalizeNarration } from "./narrationLevel";
 
 /**
  * Browser-side request builder: turns the picked walkthrough video into a PlanRequest
@@ -229,7 +230,7 @@ async function extractNarration(file: File, sampleRate: number, signal: AbortSig
   const rendered = await offline.startRendering();
   checkAbort(signal);
   const mono = downmix([rendered.getChannelData(0)]);
-  return isSilent(mono) ? null : encodeWav(mono, sampleRate);
+  return isSilent(mono) ? null : encodeWav(normalizeNarration(mono), sampleRate);
 }
 
 /**

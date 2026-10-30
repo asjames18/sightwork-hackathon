@@ -9,6 +9,8 @@ export const WALKTHROUGH = path.join(FIXTURES, "walkthrough-6s.webm");
 export const SHORT_CLIP = path.join(FIXTURES, "clip-3s.webm");
 /** 6 s of plain black: a take with nothing to see (lens covered). */
 export const BLANK_CLIP = path.join(FIXTURES, "blank-6s.webm");
+/** 6 s test picture with a quiet 220 Hz tone (about -26 dBFS), standing in for narration from arm's length. */
+export const QUIET_NARRATION_CLIP = path.join(FIXTURES, "quiet-narration-6s.webm");
 
 /**
  * `page` with /api/** aborted in the browser and every attempt recorded, plus console errors and

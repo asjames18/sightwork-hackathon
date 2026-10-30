@@ -1,4 +1,4 @@
-import { test, expect, WALKTHROUGH, SHORT_CLIP, BLANK_CLIP, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
+import { test, expect, WALKTHROUGH, SHORT_CLIP, BLANK_CLIP, QUIET_NARRATION_CLIP, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
 
 // Every test uses both fixtures, so /api stays blocked and console errors fail the test.
 test.beforeEach(async ({ apiCalls, pageErrors }) => {
@@ -156,6 +156,28 @@ test("own recorded video, no code saved: prompt, then a real run on that take (n
   await cam.getByRole("button", { name: "Stop recording" }).click();
   await expect(page.getByRole("group", { name: "Your walkthrough" })).toContainText(/walkthrough-\d{4}-\d{2}-\d{2}-\d{4}\.(webm|mp4)/);
   await saveCodeAndRun(page, sent);
+});
+
+test("quiet narration is brought up to a level speech recognition can hear before it is sent", async ({ page }) => {
+  let peak = -1;
+  await page.route("**/api/transcribe", (r) => {
+    const body = JSON.parse(r.request().postData() ?? "{}") as { audioWavBase64?: string };
+    const wav = Buffer.from(body.audioWavBase64 ?? "", "base64");
+    peak = 0;
+    for (let o = 44; o + 1 < wav.length; o += 2) peak = Math.max(peak, Math.abs(wav.readInt16LE(o)) / 32768);
+    return r.fulfill({ json: { transcript: "", transcriptTurns: [] } });
+  });
+  await page.route("**/api/plan", (r) =>
+    r.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ state: "failed", step: "planning", message: "Stub stop for the test." }) + "\n" }),
+  );
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(QUIET_NARRATION_CLIP);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByText("Stub stop for the test.")).toBeVisible({ timeout: 30_000 });
+  // The source tone peaks near 0.05; the sent WAV is lifted to about 0.7 without clipping.
+  expect(peak, "narration was sent").toBeGreaterThan(0.5);
+  expect(peak).toBeLessThan(0.95);
 });
 
 test.describe("server refuses the code", () => {
