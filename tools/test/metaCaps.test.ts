@@ -1,10 +1,11 @@
-/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20, Baseten 5 MB image cap acd7c36): over-cap requests throw before any fetch. No network. */
+/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20, Baseten 5 MB image cap acd7c36, SAM 5 MB image cap 52302fd): over-cap requests throw before any fetch. No network. */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createMetaClient } from "@/lib/meta/client";
 import { createImageCaller } from "@/lib/meta/image";
 import { createAsrTranscribeCaller } from "@/lib/meta/transcribe";
 import { createBasetenClient } from "@/lib/meta/baseten";
+import { createSamSegmentCaller } from "@/lib/meta/sam";
 
 /** Base64 of a WAV-headed buffer of exactly `bytes` bytes (RIFF/WAVE header, zero padding). */
 function wavBase64(bytes: number): string {
@@ -105,6 +106,25 @@ describe("meta spend caps", () => {
     const client = createBasetenClient({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
     await assert.rejects(
       client.callSpark({ model: "ignored", prompt: "p", images: [jpegDataUrl(MB5)], schema: {} }),
+      (err: Error) => !/at most 5 MB/.test(err.message),
+    );
+    assert.ok(f.calls() >= 1);
+  });
+  test("SAM: a 5 MB + 1 byte image throws before any fetch", async () => {
+    const f = noFetch();
+    const segment = createSamSegmentCaller({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      segment({ model: "sam-3.1", concept: "chair", frameIndex: 0, dataUrl: jpegDataUrl(MB5 + 1) }),
+      /at most 5 MB/,
+    );
+    assert.equal(f.calls(), 0);
+  });
+
+  test("SAM: an exactly 5 MB image passes the cap and reaches fetch", async () => {
+    const f = noFetch();
+    const segment = createSamSegmentCaller({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      segment({ model: "sam-3.1", concept: "chair", frameIndex: 0, dataUrl: jpegDataUrl(MB5) }),
       (err: Error) => !/at most 5 MB/.test(err.message),
     );
     assert.ok(f.calls() >= 1);
