@@ -1,9 +1,10 @@
-/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20): over-cap requests throw before any fetch. No network. */
+/** Spend bounds on the Meta callers (image n cap 3cde733, Spark image cap 7a9f99c, ASR 32 MB audio cap c8aaf20, Baseten 5 MB image cap acd7c36): over-cap requests throw before any fetch. No network. */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createMetaClient } from "@/lib/meta/client";
 import { createImageCaller } from "@/lib/meta/image";
 import { createAsrTranscribeCaller } from "@/lib/meta/transcribe";
+import { createBasetenClient } from "@/lib/meta/baseten";
 
 /** Base64 of a WAV-headed buffer of exactly `bytes` bytes (RIFF/WAVE header, zero padding). */
 function wavBase64(bytes: number): string {
@@ -14,6 +15,14 @@ function wavBase64(bytes: number): string {
 }
 
 const MB32 = 32 * 1024 * 1024;
+const MB5 = 5 * 1024 * 1024;
+
+/** data:image/jpeg URL whose decoded payload is exactly `bytes` bytes (JPEG SOI/APP0 header, zero padding). */
+function jpegDataUrl(bytes: number): string {
+  const buf = Buffer.alloc(bytes);
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0]).copy(buf, 0);
+  return "data:image/jpeg;base64," + buf.toString("base64");
+}
 
 const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2w==";
 
@@ -77,6 +86,26 @@ describe("meta spend caps", () => {
     await assert.rejects(
       caller({ model: "muse-voice-transcribe-1.0", mode: "standard", audioWavBase64: wavBase64(MB32), keywordBias: [] }),
       (err: Error) => !/at most 32 MB/.test(err.message),
+    );
+    assert.ok(f.calls() >= 1);
+  });
+
+  test("Baseten: a 5 MB + 1 byte image throws before any fetch", async () => {
+    const f = noFetch();
+    const client = createBasetenClient({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      client.callSpark({ model: "ignored", prompt: "p", images: [jpegDataUrl(MB5 + 1)], schema: {} }),
+      /at most 5 MB/,
+    );
+    assert.equal(f.calls(), 0);
+  });
+
+  test("Baseten: an exactly 5 MB image passes the cap and reaches fetch", async () => {
+    const f = noFetch();
+    const client = createBasetenClient({ apiKey: "test-key", fetchImpl: f.fetchImpl, sleepImpl: async () => {} });
+    await assert.rejects(
+      client.callSpark({ model: "ignored", prompt: "p", images: [jpegDataUrl(MB5)], schema: {} }),
+      (err: Error) => !/at most 5 MB/.test(err.message),
     );
     assert.ok(f.calls() >= 1);
   });
