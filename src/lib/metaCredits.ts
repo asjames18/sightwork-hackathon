@@ -21,6 +21,50 @@ export interface MetaCredit {
   status: CreditStatus;
   /** One short line shown when the step didn't run or ran with nothing to do. */
   note?: string;
+  /** Exact model id the server recorded for this step (plan.meta.models), only on rows that ran. */
+  modelId?: string;
+}
+
+/** plan.meta.models key for each step, as the server records it. */
+const STEP_MODEL_KEY: Record<string, string> = {
+  Listen: "transcribe",
+  "Look and count": "segment",
+  "Compare and plan": "reason",
+  Price: "cost",
+  Picture: "image",
+  Review: "review",
+};
+
+/**
+ * Friendly name and host for a recorded model id ("meta-models/muse-spark-open-1026", "sam-3.1", ...).
+ * null when the id isn't one we know, so the row keeps its default label and still shows the raw id.
+ */
+export function modelLabel(id: string): { model: string; host: string } | null {
+  const k = id.trim().toLowerCase();
+  if (!k) return null;
+  if (k.includes("spark-open")) return { model: MODEL_NAMES.sparkOpen, host: "Meta open weights, on Baseten" };
+  if (k.includes("transcribe")) return { model: MODEL_NAMES.transcribe, host: "Meta Model API" };
+  if (k.includes("muse-spark")) return { model: MODEL_NAMES.spark, host: "Meta Model API" };
+  if (k.includes("muse-image")) return { model: MODEL_NAMES.image, host: "Meta Model API" };
+  if (/(^|[^a-z])sam[-_ ]?3/.test(k)) return { model: MODEL_NAMES.sam, host: "Meta Model API" };
+  return null;
+}
+
+/**
+ * Rows that ran take the model the server says actually did the step: exact id shown, and the name and host
+ * follow that id (so a step that ran on Muse Spark Open isn't labeled Muse Spark). Samples and rows that
+ * didn't run are left as they are. The Price row keeps its ", web search" note.
+ */
+function withRecordedModels(rows: MetaCredit[], models: Record<string, string> | undefined): MetaCredit[] {
+  if (!models) return rows;
+  return rows.map((r) => {
+    const key = STEP_MODEL_KEY[r.step];
+    const id = key ? models[key] : undefined;
+    if (r.status !== "ran" || typeof id !== "string" || !id.trim()) return r;
+    const label = modelLabel(id);
+    const extra = r.host.endsWith(", web search") ? ", web search" : "";
+    return label ? { ...r, model: label.model, host: label.host + extra, modelId: id.trim() } : { ...r, modelId: id.trim() };
+  });
 }
 
 export const MODEL_NAMES = {
@@ -91,7 +135,7 @@ export function metaCredits(plan: WorkPlan, opts: { sample?: boolean } = {}): Me
             : { status: "off" as const, note: "Didn't run this time" }),
     });
   }
-  return rows;
+  return sample ? rows : withRecordedModels(rows, plan.meta?.models);
 }
 
 /** Distinct Meta models that actually ran for this plan, in run order (empty for samples). */

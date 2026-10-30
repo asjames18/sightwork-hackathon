@@ -1,7 +1,7 @@
 /** "Powered by Meta" credits: one row per step, real runs vs samples, skipped steps. No network. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creditsSummary, metaCredits, modelsThatRan, planEngine } from "@/lib/metaCredits";
+import { creditsSummary, metaCredits, modelLabel, modelsThatRan, planEngine } from "@/lib/metaCredits";
 import { EXAMPLES } from "@/lib/examples";
 import type { WorkPlan } from "@/lib/types";
 
@@ -83,4 +83,65 @@ test("a sample with explicit skip flags (the ?mock=nometa preview) still shows t
   assert.equal(by["Look and count"], "off");
   assert.equal(by["Picture"], "off");
   assert.equal(by["Compare and plan"], "sample");
+});
+
+test("recorded model ids (plan.meta.models) show on rows that ran and fix the name and host", () => {
+  const c = metaCredits(
+    plan({
+      costRange: { low: 100, high: 200 } as WorkPlan["costRange"],
+      review: { ran: true, items: [], source: "model" },
+      meta: {
+        planProvider: "baseten",
+        models: {
+          transcribe: "muse-voice-transcribe-1.0",
+          segment: "sam-3.1",
+          reason: "meta-models/muse-spark-open-1026",
+          cost: "muse-spark-1.3",
+          image: "muse-image-1.0",
+          review: "meta-models/muse-spark-open-1026",
+        },
+      },
+    }),
+  );
+  const by = Object.fromEntries(c.map((r) => [r.step, r]));
+  assert.equal(by["Listen"].modelId, "muse-voice-transcribe-1.0");
+  assert.equal(by["Look and count"].modelId, "sam-3.1");
+  assert.equal(by["Compare and plan"].model, "Muse Spark Open");
+  assert.equal(by["Compare and plan"].modelId, "meta-models/muse-spark-open-1026");
+  assert.equal(by["Price"].model, "Muse Spark");
+  assert.equal(by["Price"].host, "Meta Model API, web search");
+  assert.equal(by["Picture"].modelId, "muse-image-1.0");
+  assert.equal(by["Review"].model, "Muse Spark Open");
+  assert.equal(by["Review"].host, "Meta open weights, on Baseten");
+});
+
+test("recorded ids never mark a step as ran, and a row that didn't run shows no id", () => {
+  const c = metaCredits(plan({ afterImageUrl: null, meta: { planProvider: "baseten", skipped: { afterImage: true }, models: { image: "muse-image-1.0" } } }));
+  const pic = c.find((r) => r.step === "Picture");
+  assert.equal(pic?.status, "off");
+  assert.equal(pic?.modelId, undefined);
+});
+
+test("a price step that ran on Muse Spark Open is credited to it, keeping the web search note", () => {
+  const c = metaCredits(plan({ costRange: { low: 1, high: 2 } as WorkPlan["costRange"], meta: { planProvider: "baseten", models: { cost: "meta-models/muse-spark-open-1026" } } }));
+  const price = c.find((r) => r.step === "Price");
+  assert.equal(price?.model, "Muse Spark Open");
+  assert.equal(price?.host, "Meta open weights, on Baseten, web search");
+});
+
+test("unknown model id keeps the default label but still shows the id; samples never show ids", () => {
+  const c = metaCredits(plan({ meta: { planProvider: "baseten", models: { reason: "some-new-model-2" } } }));
+  const r = c.find((x) => x.step === "Compare and plan");
+  assert.equal(r?.model, "Muse Spark Open");
+  assert.equal(r?.modelId, "some-new-model-2");
+  const s = metaCredits(plan({ meta: { isExample: true, models: { reason: "meta-models/muse-spark-open-1026" } } }));
+  assert.ok(s.every((x) => x.modelId === undefined));
+});
+
+test("modelLabel maps known ids and ignores blanks", () => {
+  assert.equal(modelLabel("SAM-3.1")?.model, "SAM 3.1");
+  assert.equal(modelLabel("muse-spark")?.model, "Muse Spark");
+  assert.equal(modelLabel("muse-voice-transcribe-1.0")?.model, "Muse Voice Transcribe");
+  assert.equal(modelLabel("   "), null);
+  assert.equal(modelLabel("samsung-x"), null);
 });

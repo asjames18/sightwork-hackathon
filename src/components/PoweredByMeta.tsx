@@ -25,9 +25,28 @@ function MetaMark({ className = "" }: { className?: string }) {
   );
 }
 
+/** A long model id ("meta-models/muse-spark-open-1026") may wrap after a slash on narrow phones, not mid-word. */
+function IdWithBreaks({ id }: { id: string }) {
+  const parts = id.split("/");
+  return (
+    <>
+      {parts.map((p, i) => (
+        <span key={i}>
+          {p}
+          {i < parts.length - 1 ? (
+            <>
+              /<wbr />
+            </>
+          ) : null}
+        </span>
+      ))}
+    </>
+  );
+}
+
 /**
  * "Powered by Meta" panel at the end of the plan: every pipeline step, the Meta model that does it, where it ran,
- * and whether it ran for this plan. Samples say no model ran. Printed with the PDF.
+ * and whether it ran for this plan; a step that ran shows the exact model id the server recorded. Samples say no model ran. Printed with the PDF.
  */
 export function PoweredByMeta({ plan, sample }: { plan: WorkPlan; sample?: boolean }) {
   const credits = metaCredits(plan, { sample });
@@ -51,6 +70,11 @@ export function PoweredByMeta({ plan, sample }: { plan: WorkPlan; sample?: boole
               <span className="block text-sm text-ink/70">
                 {c.job}. {c.host}.{c.note ? ` ${c.note}.` : ""}
               </span>
+              {c.modelId ? (
+                <span className="mt-0.5 block font-mono text-xs text-ink/70 [overflow-wrap:anywhere]" data-testid="credit-model-id">
+                  Model ID: <IdWithBreaks id={c.modelId} />
+                </span>
+              ) : null}
             </span>
             <span className={`justify-self-start rounded-full px-2.5 py-0.5 text-xs font-semibold sm:justify-self-end ${STATUS_CLASS[c.status]}`}>
               {STATUS_LABEL[c.status]}

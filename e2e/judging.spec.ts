@@ -57,4 +57,12 @@ test("/start leads with the real run as the wide example card", async ({ page })
   await expect(first).toContainText("Real run");
   await first.click();
   await expect(page.getByTestId("credits-summary")).toHaveText("3 Meta models ran: SAM 3.1, Muse Spark Open, Muse Image");
+  // Each step that ran shows the exact model id the run recorded.
+  await expect(page.getByTestId("credit-model-id")).toHaveText([
+    "Model ID: sam-3.1",
+    "Model ID: meta-models/muse-spark-open-1026",
+    "Model ID: muse-image-1.0",
+  ]);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });

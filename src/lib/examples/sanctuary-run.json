@@ -436,6 +436,11 @@
  "heroFrameIndex": 6,
  "meta": {
   "costUsd": 0.3814,
+  "models": {
+   "segment": "sam-3.1",
+   "reason": "meta-models/muse-spark-open-1026",
+   "image": "muse-image-1.0"
+  },
   "planProvider": "baseten"
  },
  "afterImageLabel": "AI concept, not a render"
