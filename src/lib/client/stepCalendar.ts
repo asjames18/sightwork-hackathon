@@ -138,20 +138,34 @@ export function stepDescription(plan: Pick<WorkPlan, "spaceName" | "issues" | "w
   return lines.join("\n");
 }
 
-/** The whole plan as one .ics calendar. `now` sets the start (next workday) and DTSTAMP. */
-export function planCalendar(plan: Pick<WorkPlan, "spaceName" | "issues" | "workOrder">, now: Date = new Date()): string {
+export interface PlanCalendarOptions {
+  /** Only these step numbers (one crew's steps). The schedule is still the whole plan's, so times match the full calendar. */
+  only?: readonly number[];
+  /** Added to the calendar name, e.g. the crew label. */
+  label?: string;
+}
+
+/** The whole plan (or one crew's steps of it) as one .ics calendar. `now` sets the start (next workday) and DTSTAMP. */
+export function planCalendar(
+  plan: Pick<WorkPlan, "spaceName" | "issues" | "workOrder">,
+  now: Date = new Date(),
+  opts: PlanCalendarOptions = {},
+): string {
   const key = planKey(plan);
   const steps = new Map(plan.workOrder.map((s) => [s.order, s]));
   const space = clean(plan.spaceName) || "Walkthrough";
+  const keep = opts.only ? new Set(opts.only) : null;
+  const label = clean(opts.label);
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//SightWork//Work steps//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:${icsEscape(`SightWork: ${space}`)}`,
+    `X-WR-CALNAME:${icsEscape(`SightWork: ${space}${label ? `, ${label}` : ""}`)}`,
   ];
   for (const b of scheduleSteps(plan.workOrder, now)) {
+    if (keep && !keep.has(b.order)) continue;
     const step = steps.get(b.order)!;
     const part = b.parts > 1 ? ` (day ${b.part} of ${b.parts})` : "";
     lines.push(
@@ -183,4 +197,43 @@ export function calendarSummary(steps: readonly WorkStep[], now: Date = new Date
   const days = new Set(blocks.map((b) => b.start.toDateString())).size;
   const first = blocks[0].start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return `Starts ${first}, 9 AM; ${days} workday${days === 1 ? "" : "s"}, 9 to 5.`;
+}
+
+/** "Crew name" -> "crew-name" for a file name; "crew" when nothing is left. */
+export function fileSlug(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+  return slug || "crew";
+}
+
+/** sightwork-<crew>-steps-<yyyy-mm-dd>.ics */
+export function crewCalendarFileName(label: string, now: Date = new Date()): string {
+  return calendarFileName(now).replace(/^sightwork-steps-/, `sightwork-${fileSlug(label)}-steps-`);
+}
+
+const hourLabel = (d: Date) => {
+  const h = d.getHours() % 12 || 12;
+  const m = d.getMinutes();
+  return `${h}${m ? `:${pad(m)}` : ""} ${d.getHours() < 12 ? "AM" : "PM"}`;
+};
+const dayLabel = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+/**
+ * When each step falls on the starting schedule, in words: "Mon, Nov 2, 9 AM to 1 PM", and for a step that runs
+ * over more than one day, "Mon, Nov 2, 9 AM to 5 PM; Tue, Nov 3, 9 AM to 12 PM". Same schedule as the .ics file.
+ */
+export function stepWhen(steps: readonly WorkStep[], now: Date = new Date()): Map<number, string> {
+  const out = new Map<number, string[]>();
+  for (const b of scheduleSteps(steps, now)) {
+    const parts = out.get(b.order) ?? [];
+    parts.push(`${dayLabel(b.start)}, ${hourLabel(b.start)} to ${hourLabel(b.end)}`);
+    out.set(b.order, parts);
+  }
+  return new Map([...out].map(([k, v]) => [k, v.join("; ")]));
 }

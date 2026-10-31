@@ -1,6 +1,7 @@
 import type { WorkPlan, WorkStep } from "@/lib/types";
 import { hoursLabel, stepsLabel, type CrewRow } from "./crewSummary";
 import { MAX_SHARE_CHARS, SHARE_SIGNOFF, planLocation, shareDate } from "./planText";
+import { stepWhen } from "./stepCalendar";
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`);
@@ -12,6 +13,11 @@ export interface CrewHandoutOptions {
   sample?: boolean;
   /** Date shown in the header. Default: now. */
   date?: Date;
+  /**
+   * When set, each step gets a "When:" line from the plan's starting schedule (weekdays 9 to 5 from the next
+   * workday after this date), the same times as the "Add to calendar" file. Off by default.
+   */
+  scheduleFrom?: Date;
 }
 
 /** Share-sheet title for one crew's handout. */
@@ -41,10 +47,13 @@ export function crewHandoutText(plan: WorkPlan, crew: Pick<CrewRow, "label" | "p
   lines.push(`${count}${hrs ? `, ${hrs} of work` : ""}${crew.paid ? "" : ", volunteer work"}.`);
   if (sample) lines.push("Example plan with sample data, not a real run.");
 
+  const when = opts.scheduleFrom ? stepWhen(plan.workOrder, opts.scheduleFrom) : null;
   const fixed = new Set<number>();
-  lines.push("", "Your steps, in the plan's order:");
+  lines.push("", when ? "Your steps, in the plan's order, on a starting schedule (weekdays 9 to 5):" : "Your steps, in the plan's order:");
   for (const s of ours) {
     lines.push(`Step ${s.order}. ${clean(s.title)}${validHours(s.hours) ? ` (${span(s.hours)} h)` : ""}`);
+    const at = when?.get(s.order);
+    if (at) lines.push(`   When: ${at}`);
     if (s.detail?.trim()) lines.push(`   ${clean(s.detail)}`);
     const fixes = (s.fixes ?? []).filter((r) => issueTitle.has(r));
     for (const r of fixes) fixed.add(r);
