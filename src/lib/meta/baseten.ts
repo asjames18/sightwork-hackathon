@@ -329,7 +329,19 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
         throw new Error("baseten: no response received");
       }
       const latencyMs = Date.now() - started;
-      const parsed = (await res.json()) as Record<string, unknown>;
+      // A 200 body that is not JSON has no usage tokens to price:
+      // unlike SAM's flat rate, Baseten bills by token, and the
+      // counts live inside the body that failed to parse. So this
+      // stays a plain error (the step's recordFailedCall records
+      // nothing, as for any unpriceable failure), but a named one —
+      // res.json() used to throw a raw SyntaxError here, surfacing
+      // parser internals instead of the caller and the cause.
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = (await res.json()) as Record<string, unknown>;
+      } catch {
+        throw new Error("baseten: response was not JSON");
+      }
       // Usage is priced BEFORE the answer text is parsed, mirroring
       // the Meta caller: a response whose text is not JSON, or that
       // has no text, still spent its tokens, and the failures below
