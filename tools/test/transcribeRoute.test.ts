@@ -62,7 +62,7 @@ test("POST: a no-narration body of exactly 46 MB passes the cap and returns the 
   const calls = await withNoFetch(async () => {
     const res = await POST(post(paddedBody(MAX_TRANSCRIBE_BODY_BYTES)));
     assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { transcript: null, transcriptTurns: [] });
+    assert.deepEqual(await res.json(), { transcript: null, transcriptTurns: [], costUsd: 0 });
   });
   assert.equal(calls, 0);
 });
