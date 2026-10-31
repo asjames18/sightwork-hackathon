@@ -48,7 +48,7 @@ import {
   type WorkPlan,
   type WorkStep,
 } from "../types";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 
 /** SAM segmentation result, per prompt 02. Counts are summed across zones (each zone's best frame), floored at the whole-video single-frame max; with no zones the take is one zone, so the count is the old single-frame max. */
 export interface SegmentationResult {
@@ -591,7 +591,18 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   let best: { output: ReasonOutput; errs: string[] } | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE });
+    // A caller throw after billing (e.g. MetaCallError on a non-JSON
+    // response) still spent money: record it before rethrowing, or
+    // the route total misses the failed-parse spend. A tracker throw
+    // here is a spike-cap stop and replaces the original error, as on
+    // the success path. No retry: a throw is not a shape failure.
+    let res: Awaited<ReturnType<typeof deps.callSpark>>;
+    try {
+      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE });
+    } catch (err) {
+      recordFailedCall(deps.tracker, SPARK_MODEL, "reason", err);
+      throw err;
+    }
     // The tracker enforces the spike cap: a throw here stops the run.
     // Record the model the caller actually used: the Baseten adapter
     // reports its configured model, so the route's done log line names
