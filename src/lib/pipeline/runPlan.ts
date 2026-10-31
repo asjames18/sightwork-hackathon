@@ -994,13 +994,18 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     // Record steps map to panel keys: estimateCost -> cost,
     // renderAfter -> image. First model per step wins; retries keep
     // the same model, and cleanup records ride under no key, so a
-    // step that never called records no model.
+    // step that never called records no model. The renderAfter
+    // judge call records under its own step, so it gets its own
+    // key: it runs a different model than the image call, and
+    // without this its model was dropped from meta.models even
+    // though its spend was already in meta.costUsd.
     const MODEL_STEP_KEYS: Record<string, string> = {
       transcribe: "transcribe",
       segment: "segment",
       reason: "reason",
       estimateCost: "cost",
       renderAfter: "image",
+      renderAfterJudge: "judge",
       review: "review",
     };
     const models: Record<string, string> = {};
