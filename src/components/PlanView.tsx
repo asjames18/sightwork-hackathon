@@ -1,4 +1,4 @@
-import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
+import { AFTER_IMAGE_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
@@ -362,6 +362,7 @@ export function PlanView({
                 <span className="whitespace-nowrap">{usd(plan.costRange.high)}</span>
               </p>
               <p className="mt-1 text-sm text-ink/70">{plan.costRange.label}</p>
+              <LivePrices pricing={plan.costRange.pricing} region={plan.costRange.region} />
               {(issueCosts || stepCosts) && (
                 <p className="mt-2 text-sm text-ink/70" data-testid="cost-shares-note">
                   {issueCosts && stepCosts
@@ -480,6 +481,27 @@ function AreaIndex({ region }: { region: string }) {
   return (
     <p className="mt-2 text-sm text-ink/70" data-testid="area-index">
       Area check: {describeFactors(f)} <span className="text-ink/60">({COST_INDEX_LABEL}; {COST_INDEX_SOURCE}.)</span>
+    </p>
+  );
+}
+
+/** One line under the cost range: how many material prices came from a live web search for this place. */
+function LivePrices({ pricing, region }: { pricing: unknown; region: string }) {
+  const p = parsePricingCounts(pricing);
+  if (!p || p.priced === 0) return null;
+  const text =
+    p.grounded === p.priced
+      ? `All ${p.priced} material prices looked up live on the web for ${region}.`
+      : p.grounded === 0
+        ? `No live prices found, so the ${p.priced} material prices are regional estimates for ${region}.`
+        : `${p.grounded} of ${p.priced} material prices looked up live on the web for ${region}; the rest are regional estimates.`;
+  return (
+    <p className="mt-2 flex items-start gap-2 text-sm text-ink" data-testid="cost-live-prices">
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-accent">
+        <circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M13 13l4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <span>{text}</span>
     </p>
   );
 }

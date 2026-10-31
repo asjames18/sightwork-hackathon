@@ -100,6 +100,7 @@ test("the run sends 'City, ST' as region and the plan says which area it priced 
       region: "Sebring, FL",
       laborBasis: "volunteer",
       assumptions: ["Test stub: prices are made up for this check."],
+      pricing: { priced: 6, grounded: 4 },
     },
   };
   await page.route("**/api/transcribe", (r) => r.fulfill({ json: { transcript: "", transcriptTurns: [] } }));
@@ -117,6 +118,7 @@ test("the run sends 'City, ST' as region and the plan says which area it priced 
   const heading = page.getByRole("heading", { name: "Cost range for Sebring, FL" });
   await expect(heading).toBeVisible({ timeout: 30_000 });
   expect(region).toBe("Sebring, FL");
+  await expect(page.getByTestId("cost-live-prices")).toHaveText("4 of 6 material prices looked up live on the web for Sebring, FL; the rest are regional estimates.");
   await page.locator("#cost summary").click();
   await expect(page.getByTestId("area-index")).toContainText("Florida: materials about 0.99x, labor about 0.85x the US average.");
   await expect(page.getByTestId("area-index")).toContainText("Estimate from state averages, not a quote");
