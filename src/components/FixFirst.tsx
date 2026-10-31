@@ -1,7 +1,11 @@
+"use client";
+
 import type { Issue, WorkStep } from "@/lib/types";
 import type { CostShare } from "@/lib/costShares";
 import { fixFirst, fixFirstCostLabel } from "@/lib/client/fixFirst";
 import { problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
+import { subsetProgressLine } from "@/lib/client/stepProgress";
+import { useDoneSteps } from "@/lib/client/useDoneSteps";
 
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -14,17 +18,23 @@ export function FixFirst({
   workOrder,
   stepCosts,
   issueCosts,
+  spaceName,
 }: {
+  /** With the space name, steps ticked off in the work order show as done here too. */
+  spaceName?: string;
   issues: Issue[];
   workOrder: WorkStep[];
   stepCosts: Map<number, CostShare> | null;
   issueCosts: Map<number, CostShare> | null;
 }) {
+  const { done } = useDoneSteps(spaceName === undefined ? null : { spaceName, workOrder });
   const f = fixFirst(issues, workOrder, { steps: stepCosts, issues: issueCosts });
   if (!f) return null;
   const byOrder = new Map(workOrder.map((s) => [s.order, s]));
   const n = f.ranks.length;
   const rest = f.totalSteps - f.steps.length;
+  const progress = subsetProgressLine(f.steps, done);
+  const allDone = progress !== "" && f.steps.every((o) => done.includes(o));
   const facts = [
     f.hours && `${sentence(f.hours)} of work`,
     f.trades.length > 0 && f.trades.join(", "),
@@ -54,18 +64,29 @@ export function FixFirst({
         {f.steps.map((o) => {
           const step = byOrder.get(o);
           const before = f.prerequisites.includes(o) ? waitsOn(o) : [];
+          const isDone = done.includes(o);
           return (
             <li key={o} className="text-sm">
               <a
                 href={`#${stepAnchor(o)}`}
                 className="flex min-h-11 items-center gap-3 rounded-xl bg-ink/[0.04] px-3 py-2 font-semibold underline-offset-2 hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50"
               >
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-ink text-xs text-white" aria-hidden="true">
-                  {o}
+                <span
+                  className={`grid size-7 shrink-0 place-items-center rounded-full text-xs text-white ${isDone ? "bg-safe-dark" : "bg-ink"}`}
+                  aria-hidden="true"
+                >
+                  {isDone ? (
+                    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3.5 8.5l3 3 6-7" />
+                    </svg>
+                  ) : (
+                    o
+                  )}
                 </span>
                 <span className="min-w-0 break-words">
                   <span className="sr-only">Step {o}: </span>
-                  {step?.title ?? `Step ${o}`}
+                  <span className={isDone ? "text-ink/70 line-through decoration-2" : undefined}>{step?.title ?? `Step ${o}`}</span>
+                  {isDone && <span className="sr-only"> (done)</span>}
                   {before.length > 0 && (
                     <span className="block text-xs font-normal text-ink/70">
                       Needed before step{before.length > 1 ? "s" : ""} {before.join(" and ")}
@@ -77,6 +98,11 @@ export function FixFirst({
           );
         })}
       </ol>
+      {progress && (
+        <p className={`mt-3 text-sm font-semibold ${allDone ? "text-safe-dark" : "text-ink/80"}`} data-testid="fix-first-progress" aria-live="polite">
+          {allDone ? "Start here steps are all ticked off. Check the Fix now problems in person." : `Start here: ${progress}`}
+        </p>
+      )}
       {facts.length > 0 && (
         <p className="mt-3 text-sm text-ink/80" data-testid="fix-first-facts">
           {facts.join(" · ")}

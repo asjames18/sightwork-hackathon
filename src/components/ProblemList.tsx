@@ -6,6 +6,8 @@ import { checklistRows } from "@/lib/checklist";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { PrintOpenDetails } from "./PrintOpenDetails";
 import { fixedInLabel, problemAnchor, stepAnchor, stepsFixing } from "@/lib/client/stepLinks";
+import { allStepsDone } from "@/lib/client/stepProgress";
+import { useDoneSteps } from "@/lib/client/useDoneSteps";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -83,7 +85,7 @@ function WhereAndWhat({ area, evidence }: { area?: string; evidence?: string }) 
 }
 
 /** "Fixed in step 3" under a problem, each step number a link down to that step in the work order. */
-function FixedIn({ orders }: { orders: number[] }) {
+function FixedIn({ orders, done = false }: { orders: number[]; done?: boolean }) {
   const label = fixedInLabel(orders);
   if (!label) return null;
   const words = orders.length === 1 ? "Fixed in step" : "Fixed in steps";
@@ -106,6 +108,11 @@ function FixedIn({ orders }: { orders: number[] }) {
           {i === orders.length - 2 && <span aria-hidden>and</span>}
         </span>
       ))}
+      {done && (
+        <span className="ml-1 inline-flex min-h-6 items-center rounded-full bg-safe-dark px-2 text-xs font-semibold text-white" data-testid="fixed-in-done">
+          {orders.length === 1 ? "Step done" : "Steps done"}
+        </span>
+      )}
     </p>
   );
 }
@@ -119,8 +126,11 @@ function IssueCard({
   sample,
   cost,
   fixedIn = [],
+  fixedDone = false,
   titleLevel = 4,
 }: {
+  /** Every step that fixes this problem is ticked off in the work order. */
+  fixedDone?: boolean;
   titleLevel?: 3 | 4;
   /** Orders of the work steps that fix this problem; each becomes a link down to that step. */
   fixedIn?: number[];
@@ -176,7 +186,7 @@ function IssueCard({
         )}
         <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
         <WhereAndWhat area={area} evidence={evidence} />
-        <FixedIn orders={fixedIn} />
+        <FixedIn orders={fixedIn} done={fixedDone} />
         {kind === "not_shown" && verdict?.reason && (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <span className="font-semibold">Not backed by a photo: </span>
@@ -229,6 +239,7 @@ export function ProblemList({
   issueCosts: Map<number, CostShare> | null;
 }) {
   const frames = plan.frames ?? [];
+  const { done } = useDoneSteps(plan);
   const groups = groupByTier(issues);
   const note = coverageNote(plan);
   // Tier headings only help once there is more than one problem; a single card reads fine alone.
@@ -252,7 +263,7 @@ export function ProblemList({
               <p className="-mt-2 mb-3 pl-[1.125rem] text-sm text-ink/65">{TIER_HINT[g.tier]}</p>
               <ol className="flex flex-col gap-3">
                 {g.issues.map((issue) => (
-                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} />
+                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} />
                 ))}
               </ol>
             </section>
@@ -261,7 +272,7 @@ export function ProblemList({
       ) : (
         <ol className="flex flex-col gap-3">
           {issues.map((issue) => (
-            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} />
+            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} />
           ))}
         </ol>
       )}

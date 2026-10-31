@@ -223,7 +223,7 @@ export function PlanView({
         </a>
       )}
 
-      <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} />
+      <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} spaceName={plan.spaceName} />
 
       {!narrated && (
         <p className="mt-4 rounded-xl bg-white p-4 text-sm text-ink/70">

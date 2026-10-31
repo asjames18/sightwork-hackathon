@@ -1,5 +1,6 @@
 import { COST_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
 import { fixFirstPlanLines } from "./fixFirst";
+import { shareProgressLine } from "./stepProgress";
 import { countsShareLine } from "./countMethod";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 import { runCostLine } from "./runCost";
@@ -172,6 +173,8 @@ export interface PlanTextOptions {
   pdfAttached?: boolean;
   /** "Since the last walkthrough" lines (planCompare.compareShareLines), placed after the problems. */
   sinceLines?: readonly string[];
+  /** Work steps already ticked off on this device; adds one progress line after the steps. */
+  doneSteps?: readonly number[];
 }
 
 /**
@@ -228,6 +231,8 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
       const extra = [s.trade ? clean(s.trade) : null, s.hours ? `${span(s.hours)} h` : null].filter(Boolean).join(", ");
       lines.push(`${s.order}. ${clean(s.title)}${extra ? ` (${extra})` : ""}`);
     }
+    const progress = sample ? null : shareProgressLine(steps, opts.doneSteps ?? []);
+    if (progress) lines.push(progress);
   }
 
   if (plan.materials.length > 0) {

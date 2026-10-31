@@ -6,6 +6,7 @@ import type { Example } from "@/lib/examples";
 import { canShareFiles, planToText, sharePlanText, type ShareResult } from "@/lib/client/planText";
 import { compareShareLines } from "@/lib/client/planCompare";
 import { usePlanComparison } from "@/lib/client/usePlanComparison";
+import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { pdfKeyOf, peekPlanPdf, prefersShareSheet, warmPlanPdf } from "@/lib/client/savePlanPdf";
 
 const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
@@ -31,6 +32,9 @@ export function SharePlanButton({ plan, sample = false, example }: { plan: WorkP
   // Real plans only: the text then says what changed since the last walkthrough of this space, like the card.
   const since = usePlanComparison(plan, !sample && !example && !plan.meta?.isExample);
   const sinceLines = since ? compareShareLines(since.comparison, since.when) : undefined;
+  // Steps already ticked off go along as one progress line (real plans only).
+  const { done } = useDoneSteps(plan);
+  const doneSteps = !sample && !example && !plan.meta?.isExample ? done : undefined;
 
   // Same label as Save PDF (comparison included), so both buttons share one built file.
   const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since };
@@ -45,8 +49,8 @@ export function SharePlanButton({ plan, sample = false, example }: { plan: WorkP
     const coarse = prefersShareSheet();
     // Only a PDF that is already built: waiting for one here would let the tap go stale and iOS refuse the share.
     const pdf = coarse ? peekPlanPdf(plan, label) : null;
-    const attach = pdf && canShareFiles(navigator, [pdf.file]) ? { files: [pdf.file], text: planToText(plan, { sample, pdfAttached: true, sinceLines }) } : null;
-    const result = await sharePlanText(`Work plan: ${plan.spaceName}`, planToText(plan, { sample, sinceLines }), navigator, coarse, attach);
+    const attach = pdf && canShareFiles(navigator, [pdf.file]) ? { files: [pdf.file], text: planToText(plan, { sample, pdfAttached: true, sinceLines, doneSteps }) } : null;
+    const result = await sharePlanText(`Work plan: ${plan.spaceName}`, planToText(plan, { sample, sinceLines, doneSteps }), navigator, coarse, attach);
     setBusy(false);
     if (result === "shared") return;
     setStatus(STATUS[result]);

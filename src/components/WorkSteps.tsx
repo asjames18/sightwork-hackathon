@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import type { WorkPlan } from "@/lib/types";
-import { loadDoneSteps, progressLine, saveDoneSteps } from "@/lib/client/stepProgress";
+import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
@@ -24,24 +25,15 @@ export function WorkSteps({
   /** Ranks that have a problem card on the page; a step's "Fixes #N" links up to those cards. */
   problemRanks?: ReadonlySet<number>;
 }) {
-  const [done, setDone] = useState<number[]>([]);
-  const [ready, setReady] = useState(false);
+  const { done, ready, update } = useDoneSteps(plan);
   const total = plan.workOrder.length;
 
-  useEffect(() => {
-    setDone(loadDoneSteps(plan));
-    setReady(true);
-  }, [plan]);
-
   function toggle(order: number, checked: boolean) {
-    const next = checked ? [...done, order] : done.filter((n) => n !== order);
-    setDone(next);
-    saveDoneSteps(plan, next);
+    update(checked ? [...done.filter((n) => n !== order), order] : done.filter((n) => n !== order));
   }
 
   function clearAll() {
-    setDone([]);
-    saveDoneSteps(plan, []);
+    update([]);
   }
 
   const line = progressLine(done.length, total);
