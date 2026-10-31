@@ -3,8 +3,15 @@
  *
  * Every Meta Model API call the pipeline would make is recorded here:
  * model, pipeline step, latency, cost, and the running total against
- * both the $10 spike cap and the $150 Meta credit total. This module
+ * the per-run spike cap and the $150 Meta credit total. This module
  * makes no API calls itself; it only records what the pipeline reports.
+ *
+ * SPIKE_CAP_USD is a per-run runaway guard, not the cumulative Meta
+ * budget: createUsageTracker() is made fresh per request in /api/plan
+ * and /api/transcribe, so the cap applies to one run (a full real run
+ * costs about $0.65-$1.15). The cumulative budget across paid test
+ * runs is tracked separately in the spend log and is NOT this
+ * constant, so raising that budget does not raise this cap.
  *
  * The spike cap is enforced in code: recording a call that would push
  * the spike total over SPIKE_CAP_USD throws, so a run stops instead of
