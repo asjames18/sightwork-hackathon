@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import { loadDoneSteps, progressLine, saveDoneSteps } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
+import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel } from "@/lib/client/crewSummary";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -31,9 +32,50 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
 
   const line = progressLine(done.length, total);
   const pct = total ? Math.round((done.length / total) * 100) : 0;
+  const crew = crewSummary(plan.workOrder);
+  const totalHours = hoursLabel(crew.totalHours, crew.totalPartial);
 
   return (
     <>
+      {showCrewSummary(crew) && (
+        <div className="mb-4 rounded-2xl border border-ink/10 bg-white px-4 py-3 sm:px-5" data-testid="crew-summary">
+          <h3 className="text-base font-bold">Who does the work</h3>
+          <ul className="mt-2 divide-y divide-ink/10">
+            {crew.rows.map((row) => {
+              const hrs = hoursLabel(row.hours, row.hoursPartial);
+              return (
+                <li key={row.label} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-4" data-testid="crew-row">
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span
+                      className={`inline-flex min-h-7 shrink-0 items-center rounded-full px-2.5 text-sm font-medium ${
+                        row.paid ? "border border-ink/20 bg-ink/[0.04] text-ink" : "bg-safe/10 text-safe-dark"
+                      }`}
+                    >
+                      {row.paid ? "Paid" : "Free"}
+                    </span>
+                    <span className="min-w-0 font-semibold break-words">{row.label}</span>
+                  </span>
+                  <span className="text-sm text-ink/75 tabular-nums">
+                    {stepsLabel(row.steps)}
+                    {hrs && <>, {hrs}</>}
+                  </span>
+                </li>
+              );
+            })}
+            {crew.unassigned.length > 0 && (
+              <li className="flex flex-col gap-0.5 py-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-4" data-testid="crew-row">
+                <span className="font-semibold">Not assigned yet</span>
+                <span className="text-sm text-ink/75 tabular-nums">{stepsLabel(crew.unassigned)}</span>
+              </li>
+            )}
+          </ul>
+          {totalHours && (
+            <p className="mt-1 text-sm text-ink/75" data-testid="crew-total">
+              All {total} steps: {totalHours} of work in total, before any waiting between steps.
+            </p>
+          )}
+        </div>
+      )}
       <div className="mb-3 flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 print:hidden">
         <p className="text-sm text-ink/75" aria-live="polite">
           {ready && line ? line : "Tick steps off as you go. Saved on this device."}
@@ -53,7 +95,7 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
         {plan.workOrder.map((step, i) => {
           const last = i === total - 1;
           const isDone = done.includes(step.order);
-          const volunteer = !!step.trade && /volunteer/i.test(step.trade);
+          const volunteer = !!step.trade && isVolunteerTrade(step.trade);
           const chip = "inline-flex min-h-7 items-center rounded-full px-2.5 text-sm font-medium";
           const id = `step-${step.order}-done`;
           return (
