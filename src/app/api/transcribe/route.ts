@@ -14,8 +14,12 @@
  * the same fields as TranscribeInput in src/lib/pipeline/transcribe.ts.
  * Omit audioWavBase64 (or send "") for no narration: no call is made
  * and the response is the empty transcript, without needing a key.
- * Response (JSON): { transcript: string | null, transcriptTurns: [] }
- * in the TranscribeOutput shape, one "[t] text" line per turn.
+ * Response (JSON): the TranscribeOutput shape plus `costUsd` — this
+ * request's tracker total in USD, so a split run's transcribe spend is
+ * visible to the caller instead of living only in the server log (the
+ * plan total counts only its own request's tracker, so a future client
+ * change can carry this into the plan request). The empty-narration
+ * response carries costUsd: 0. One "[t] text" line per turn.
  * Errors are JSON { error } with a plain message; the detail rides
  * on the server log only, like the plan route's failed lines.
  *
@@ -129,7 +133,7 @@ export async function POST(req: Request): Promise<Response> {
   // No narration means no call and no key needed: a keyless deploy
   // answers the empty transcript instead of failing on caller setup.
   if (!input.audioWavBase64) {
-    return new Response(JSON.stringify({ transcript: null, transcriptTurns: [] }), {
+    return new Response(JSON.stringify({ transcript: null, transcriptTurns: [], costUsd: 0 }), {
       headers: JSON_HEADERS,
     });
   }
@@ -173,7 +177,10 @@ export async function POST(req: Request): Promise<Response> {
           .map((m) => `${m.model}: ${m.calls} calls $${m.totalUsd}`)
           .join(", "),
     );
-    return new Response(JSON.stringify(out), { headers: JSON_HEADERS });
+    return new Response(
+      JSON.stringify({ ...out, costUsd: tracker.totals().spikeTotalUsd }),
+      { headers: JSON_HEADERS },
+    );
   } catch (err) {
     console.error(
       `transcribe route: failed after ${tracker.records().length} calls, ` +
