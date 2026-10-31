@@ -15,6 +15,7 @@ import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine,
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
+import { materialsSpend, spendLine } from "./materialsList";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -462,8 +463,16 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
         font(9.5, "normal", MUTED);
         doc.text(pdfSafe(cost), M + W, top + 10.5, { align: "right" });
       }
-      if (m.note) para(clean(m.note), 9, "normal", MUTED, M, W - 200, 0);
+      const refs = m.forIssues?.length ? `For problem${m.forIssues.length === 1 ? "" : "s"} #${m.forIssues.join(", #")}` : "";
+      const sub = [refs, m.note ? clean(m.note) : ""].filter(Boolean).join(". ");
+      if (sub) para(sub, 9, "normal", MUTED, M, W - 200, 0);
       y += 4;
+    }
+    // Same total line as the list on the plan screen (nothing ticked in a saved plan), materials only.
+    const spend = spendLine(materialsSpend(plan), { dash: "-" });
+    if (spend) {
+      y += 6;
+      para(spend, 10, "bold", INK, M, W, 6);
     }
     if (plan.materials.some((m) => m.unitCost)) para(`Prices are estimates. ${COST_LABEL}.`, 8.5, "normal", MUTED, M, W, 2);
   }
