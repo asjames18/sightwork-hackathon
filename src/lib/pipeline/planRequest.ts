@@ -321,7 +321,17 @@ export function validatePlanRequest(body: unknown): string[] {
     if (!Array.isArray(req.transcriptTurns)) {
       problems.push("transcriptTurns must be an array when given");
     } else {
-      if (req.transcript === undefined) {
+      // Parity with runPlan's validator: null means no narration,
+      // so non-empty turns with a null transcript contradict it
+      // just as turns with no transcript at all do — the listening
+      // stage would hand the reason step a null transcript while
+      // the finished plan still carried the turns. An empty turns
+      // array with null stays valid: that is the real
+      // empty-narration case from /api/transcribe.
+      if (
+        req.transcript === undefined ||
+        (req.transcript === null && req.transcriptTurns.length > 0)
+      ) {
         problems.push("transcriptTurns given without transcript");
       }
       req.transcriptTurns.forEach((turn, i) => {
