@@ -93,13 +93,28 @@ export function messageForStatus(status: number): string {
   return GENERIC_FAIL;
 }
 
-/** Reads a JSON {error} (or short plain text) from a non-OK response and logs it. Never throws. */
-async function logServerError(res: Response, what = "plan"): Promise<void> {
+/**
+ * What a failed request's model calls cost, from a JSON body's costUsd (the transcribe route sends it on a
+ * 500 when a billed call failed). 0 for anything else, so it can only ever add a real amount.
+ */
+export function failureCostUsd(v: unknown): number {
+  if (!v || typeof v !== "object") return 0;
+  const usd = (v as { costUsd?: unknown }).costUsd;
+  return typeof usd === "number" && Number.isFinite(usd) && usd > 0 ? usd : 0;
+}
+
+/**
+ * Reads a JSON {error} (or short plain text) from a non-OK response and logs it. Never throws.
+ * Returns the body's costUsd (see failureCostUsd), 0 when there is none.
+ */
+async function logServerError(res: Response, what = "plan"): Promise<number> {
+  let costUsd = 0;
   try {
     const text = (await res.text()).slice(0, 500);
     let detail = text;
     try {
       const v: unknown = JSON.parse(text);
+      costUsd = failureCostUsd(v);
       if (v && typeof v === "object" && typeof (v as { error?: unknown }).error === "string")
         detail = (v as { error: string }).error;
     } catch {
@@ -109,6 +124,7 @@ async function logServerError(res: Response, what = "plan"): Promise<void> {
   } catch {
     /* body unreadable; the status is enough */
   }
+  return costUsd;
 }
 
 /**
@@ -151,9 +167,10 @@ export function withTranscribeCost(plan: WorkPlan, transcribeUsd: number): WorkP
  * Option (b) for the 4.5 MB body cap: when the request carries narration, POST it alone to
  * /api/transcribe first and send the plan request with the transcript instead of the WAV.
  * Returns the request to send, or "unauthorized" on 401. Any other failure keeps the original
- * WAV-carrying request, so narration is never silently dropped (same behavior as before the split).
+ * WAV-carrying request, so narration is never silently dropped (same behavior as before the split),
+ * along with what the failed transcribe request cost when the server says so.
  */
-async function splitNarration(
+export async function splitNarration(
   body: PlanRequest,
   endpoint: string,
   code: string,
@@ -170,8 +187,9 @@ async function splitNarration(
     });
     if (res.status === 401) return "unauthorized";
     if (!res.ok) {
-      await logServerError(res, "transcribe");
-      return keep;
+      // A billed transcribe call that then failed still cost something; keep it in the run's total
+      // while the plan request falls back to carrying the audio.
+      return { body, costUsd: await logServerError(res, "transcribe") };
     }
     const answer = parseTranscribeAnswer(await res.json());
     if (!answer) return keep;
