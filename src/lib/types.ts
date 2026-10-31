@@ -416,7 +416,13 @@ export type PlanJobStatus =
     }
   | { state: "done"; plan: WorkPlan }
   /** The pipeline never fails a run at "reviewing"; the browser can still report it there when the connection drops. */
-  | { state: "failed"; step: RunStep; message: string };
+  | {
+      state: "failed";
+      step: RunStep;
+      message: string;
+      /** What the model calls billed before the failure, in USD, when the server knows it. Omit when unknown. */
+      costUsd?: number;
+    };
 
 // ---------------------------------------------------------------------------
 // Contract checks (no dependencies). Returns a list of problems; [] = valid.
