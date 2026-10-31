@@ -56,7 +56,7 @@
 
 import type { Box, HazardKey } from "../types";
 import type { SegmentationResult } from "./reason";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 
 /** Model ID from prompt 02; confirm it at the first spike. */
 export const SAM_MODEL = "sam-3.1";
@@ -709,12 +709,23 @@ export async function runSegment(
     concept: string,
     frameIndex: number,
   ): Promise<{ concept: string; frameIndex: number; kept: RawInstance[] }> => {
-    const res = await deps.callSegment({
-      model: SAM_MODEL,
-      concept,
-      frameIndex,
-      dataUrl: input.frames[frameIndex].dataUrl,
-    });
+    let res: Awaited<ReturnType<SegmentCaller>>;
+    try {
+      res = await deps.callSegment({
+        model: SAM_MODEL,
+        concept,
+        frameIndex,
+        dataUrl: input.frames[frameIndex].dataUrl,
+      });
+    } catch (err) {
+      // A billed-but-failed SAM call still spent money (e.g. MetaCallError
+      // on a non-JSON response): record it before rethrowing, so the
+      // route total counts it. A tracker throw (spike cap) replaces it
+      // as a spending stop, same pattern as transcribe/reason/cost;
+      // the pool stops on the rethrow, so no later pass runs.
+      recordFailedCall(deps.tracker, SAM_MODEL, "segment", err);
+      throw err;
+    }
     // The tracker enforces the spike cap: a throw here stops the run.
     deps.tracker.record({
       model: SAM_MODEL,
