@@ -12,6 +12,7 @@ import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
@@ -512,6 +513,13 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       "normal",
       MUTED,
     );
+  }
+
+  // --- What this run cost (real runs only, same words as the Powered by Meta panel) ------
+  const runCost = runCostLine(plan, { sample });
+  if (runCost) {
+    y += 6;
+    para(runCost, 9.5, "normal", MUTED, M, W, 2);
   }
 
   // --- Footer on every page ----------------------------------------------------------

@@ -1,5 +1,6 @@
 import { COST_LABEL, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
+import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
 
 /**
@@ -230,6 +231,9 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
     const live = livePricesLine(c);
     if (live) lines.push(live);
   }
+
+  const runCost = runCostLine(plan, { sample });
+  if (runCost) lines.push("", runCost);
 
   const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
   lines.push("", signoff);
