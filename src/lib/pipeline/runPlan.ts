@@ -7,6 +7,9 @@
  *   picturing (renderAfter) -> reviewing (review, optional).
  * Reviewing is review-only and never fails a run: it checks the
  * finished plan against its proof photos and lands on plan.review.
+ * Transcribe is optional the same way: a failed transcribe call
+ * continues without narration and sets meta.skipped.transcribe,
+ * so a flaky ASR call costs the said-vs-seen part, not the plan.
  * The route emits the first "uploading" status itself, right after it
  * parses the body; this runner starts at "listening".
  *
@@ -969,18 +972,22 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // 12:05 PM): masks when the segment step failed or was skipped
   // (segmentation null), afterImage when the render step produced no
   // image, cost when a regioned cost call failed (Grok Bot,
-  // 2026-10-27 2:15 PM; a run with no region sets no cost flag).
+  // 2026-10-27 2:15 PM; a run with no region sets no cost flag),
+  // transcribe when the transcribe call failed and the run went on
+  // without narration (Grok Bot, 2026-10-31 3:20 AM).
   // Callers pass the flags; this helper only assembles them,
   // so no step result is read before it exists.
   const planMeta = (
     masksSkipped: boolean,
     afterImageSkipped: boolean,
     costSkipped = false,
+    transcribeSkipped = false,
   ): NonNullable<WorkPlan["meta"]> => {
-    const skipped: { masks?: boolean; afterImage?: boolean; cost?: boolean } = {};
+    const skipped: { masks?: boolean; afterImage?: boolean; cost?: boolean; transcribe?: boolean } = {};
     if (masksSkipped) skipped.masks = true;
     if (afterImageSkipped) skipped.afterImage = true;
     if (costSkipped) skipped.cost = true;
+    if (transcribeSkipped) skipped.transcribe = true;
     // Which model actually wrote each step, from the usage records
     // the steps already logged (judging ask, 2026-10-30 4:44 PM):
     // the panel stops inferring model ids and shows the real ones.
@@ -1031,6 +1038,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   emit("listening");
   let transcript: string | null;
   let transcriptTurns: NonNullable<WorkPlan["transcriptTurns"]>;
+  let transcribeSkipped = false;
   if (request.transcript !== undefined) {
     transcript = request.transcript;
     transcriptTurns = request.transcriptTurns ?? [];
@@ -1044,7 +1052,22 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       transcriptTurns = transcribed.transcriptTurns;
     } catch (err) {
       if (isAbort(err)) throw err;
-      throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
+      // A cap breach is a spending stop, not a transcribe failure:
+      // stop the run instead of continuing to steps that would
+      // spend another call each, as segment and cost already do.
+      if (isSpikeCapError(err))
+        throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
+      // Transcribe is optional (Grok Bot, 2026-10-31 3:20 AM):
+      // a flaky ASR call costs the said-vs-seen part, not the plan.
+      // The finished plan carries meta.skipped.transcribe, which
+      // the panel's Listen row already renders as off, and the
+      // listening check below says so instead of claiming nobody
+      // spoke. A supplied transcript never reaches this branch, so
+      // a pre-transcribed run is untouched.
+      console.warn(`runPlan: transcribe failed, continuing without narration: ${detailOf(err)}`);
+      transcript = null;
+      transcriptTurns = [];
+      transcribeSkipped = true;
     }
   }
 
@@ -1059,7 +1082,9 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       "listening",
       narrated
         ? { ok: words > 0, note: `Transcript: ${words} ${words === 1 ? "word" : "words"}` }
-        : { ok: true, note: "No narration in this video" },
+        : transcribeSkipped
+          ? { ok: true, note: "Transcription unavailable this run" }
+          : { ok: true, note: "No narration in this video" },
     );
   }
 
@@ -1264,7 +1289,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
         ? { ...cost.costRange, pricing: { priced: cost.pricedMaterials, grounded: cost.groundedPrices } }
         : null,
       heroFrameIndex: reason.heroFrameIndex,
-      meta: planMeta(segmentation === null, false, costSkipped),
+      meta: planMeta(segmentation === null, false, costSkipped, transcribeSkipped),
     };
     const errs = checkWorkPlan(draft);
     // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
@@ -1304,7 +1329,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     afterImageUrl: rendered.afterImageUrl,
     ...(rendered.afterImageUrl ? { afterImageLabel: AFTER_IMAGE_LABEL } : {}),
     heroFrameIndex: rendered.heroFrameIndex ?? reason.heroFrameIndex,
-    meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped),
+    meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped, transcribeSkipped),
   };
   const errs = checkWorkPlan(plan);
   const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
