@@ -8,6 +8,8 @@ import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 import { checkLocation, CITY_MAX, isUsStateCode, isValidCity, loadLocation, saveLocation, US_STATES, type RunLocation } from "@/lib/client/location";
 import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
+import { lightMessage, lightVerdict, type LightVerdict } from "@/lib/client/lightCheck";
+import { sampleVideoLuma } from "@/lib/client/sampleVideoLuma";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
 import { SpacePicker } from "./SpacePicker";
 
@@ -180,6 +182,21 @@ export function UploadStep({
   };
 
   const durationSec = check.kind === "ok" || check.kind === "warn" ? check.durationSec : null;
+  // Light check: once the length is known, measure a few frames on the device and warn (softly)
+  // about a take too dark to show damage, before a real run spends anything on it.
+  const [light, setLight] = useState<{ url: string; verdict: LightVerdict } | null>(null);
+  const previewSrc = preview?.url ?? null;
+  useEffect(() => {
+    if (!previewSrc || durationSec === null) return;
+    const ctl = new AbortController();
+    void sampleVideoLuma(previewSrc, durationSec, ctl.signal)
+      .then((stats) => {
+        if (!ctl.signal.aborted) setLight({ url: previewSrc, verdict: lightVerdict(stats) });
+      })
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [previewSrc, durationSec]);
+  const lightNote = light && light.url === previewSrc && check.kind !== "block" ? lightMessage(light.verdict) : null;
   const canSend = check.kind === "ok" || check.kind === "warn";
   // Polite announcement for the length check; warnings and blocks have their own status/alert below.
   const liveText =
@@ -339,6 +356,11 @@ export function UploadStep({
               }`}
             >
               {check.message}
+            </p>
+          )}
+          {lightNote && (
+            <p role="status" data-testid="light-warning" className="mx-4 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {lightNote}
             </p>
           )}
           <div className="px-4 pb-4">
