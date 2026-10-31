@@ -60,6 +60,8 @@ export interface SparkCallRequest {
   schema: Record<string, unknown>;
   /** Tool list, e.g. [{ type: "web_search" }] for the cost step. */
   tools?: { type: string }[];
+  /** Sampling temperature, sent verbatim when set. Reason/review pass 0.2; other steps omit it. */
+  temperature?: number;
 }
 
 export interface SparkCallResult {
@@ -279,6 +281,7 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
         input: [{ role: "user", content }],
         text: { format: { type: "json_schema", name: "sightwork", schema: req.schema, strict: true } },
         ...(req.tools && req.tools.length > 0 ? { tools: req.tools } : {}),
+        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       };
 
       const started = Date.now();
@@ -349,8 +352,8 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
 
 /** Adapter for the reason step's SparkCaller (frames attached). */
 export function createReasonSparkCaller(client: MetaClient) {
-  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown> }) =>
-    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema });
+  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown>; temperature?: number }) =>
+    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema, temperature: req.temperature });
 }
 
 /** Adapter for the cost step's CostCaller (text-only, web_search tool). */
