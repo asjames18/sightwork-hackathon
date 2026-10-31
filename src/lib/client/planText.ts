@@ -84,6 +84,41 @@ export function watchLine(w: Pick<WatchItem, "title" | "area" | "confidence">): 
   return `${clean(w.title)}${extra ? ` (${extra})` : ""}`;
 }
 
+/** Heading for the said-vs-seen rows, the same words on the plan screen and in the PDF. */
+export const SAID_VS_SEEN_HEADING = "What you said vs. what we saw";
+
+/** One said-vs-seen row in plain words, as the plan screen shows it. */
+export interface SaidVsSeenLine {
+  /** "\u201CThe carpet is torn.\u201D (12 s)", or "Not mentioned". */
+  said: string;
+  /** What the video shows, or "Not visible in the video". */
+  seen: string;
+  /** Seen on video but never said: the screen and the PDF call these out. */
+  unmentioned: boolean;
+  /** Said but not seen: check it in person. */
+  notSeen: boolean;
+}
+
+/**
+ * The plan's said-vs-seen rows in the plan screen's words, for the screen and the PDF. Empty when the walk had
+ * no narration (the screen hides the section then) or the plan has no rows.
+ */
+export function saidVsSeenLines(plan: Pick<WorkPlan, "saidVsSeen" | "transcript" | "transcriptTurns">): SaidVsSeenLine[] {
+  const narrated = Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
+  if (!narrated || !Array.isArray(plan.saidVsSeen)) return [];
+  return plan.saidVsSeen.map((row) => {
+    const quote = row.said && typeof row.said.quote === "string" ? clean(row.said.quote) : "";
+    const at = row.said && Number.isFinite(row.said.atSec) ? ` (${row.said.atSec.toFixed(0)} s)` : "";
+    const summary = row.seen && typeof row.seen.summary === "string" ? clean(row.seen.summary) : "";
+    return {
+      said: quote ? `\u201C${quote}\u201D${at}` : "Not mentioned",
+      seen: summary || "Not visible in the video",
+      unmentioned: row.status === "unmentioned",
+      notSeen: row.status === "mentioned_not_seen" || !summary,
+    };
+  });
+}
+
 /** "3 problems, worst first" / "1 problem" / "No problems found". */
 export function problemSummary(count: number): string {
   if (count === 0) return "No problems found";

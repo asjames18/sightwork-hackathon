@@ -12,7 +12,7 @@ import { ProblemList } from "./ProblemList";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { issueCostShares, stepCostShares } from "@/lib/costShares";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
-import { livePricesLine, planLocation } from "@/lib/client/planText";
+import { livePricesLine, planLocation, SAID_VS_SEEN_HEADING } from "@/lib/client/planText";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -290,7 +290,7 @@ export function PlanView({
       </Section>
 
       {narrated && plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
-        <Section title="What you said vs. what we saw" id="said-vs-saw">
+        <Section title={SAID_VS_SEEN_HEADING} id="said-vs-saw">
           <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
             {plan.saidVsSeen.map((row, i) => (
               <li key={i} className="grid gap-1 p-3 text-sm sm:grid-cols-2 sm:gap-3">

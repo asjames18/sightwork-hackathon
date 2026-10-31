@@ -11,7 +11,7 @@
 import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
-import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 
@@ -334,6 +334,35 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       const sub = [w.detail ? clean(w.detail) : "", w.evidence ? `Photo shows: ${clean(w.evidence)}` : ""].filter(Boolean).join(" ");
       if (sub) para(sub, 9.5, "normal", MUTED, M, W, 6);
       else y += 5;
+    }
+  }
+
+  // --- What you said vs. what we saw ---------------------------------------------------
+  const saidRows = saidVsSeenLines(plan);
+  if (saidRows.length) {
+    heading(SAID_VS_SEEN_HEADING, 50);
+    const half = (W - 16) / 2;
+    font(8, "bold", MUTED);
+    ensure(lineH(8) + 4);
+    doc.text("SAID", M, y + 8);
+    doc.text("SEEN", M + half + 16, y + 8);
+    y += lineH(8) + 4;
+    for (const row of saidRows) {
+      font(10);
+      const left = wrap(row.said, half);
+      font(10, row.unmentioned ? "bold" : "normal");
+      const right = wrap(row.seen, half);
+      const h = Math.max(left.length, right.length) * lineH(10);
+      ensure(h + 10);
+      font(10, "normal", row.said === "Not mentioned" ? MUTED : INK);
+      left.forEach((l, k) => doc.text(l, M, y + 10 + k * lineH(10)));
+      font(10, row.unmentioned ? "bold" : "normal", row.unmentioned ? ACCENT_DARK : row.notSeen ? MUTED : INK);
+      right.forEach((l, k) => doc.text(l, M + half + 16, y + 10 + k * lineH(10)));
+      y += h + 4;
+      doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+      doc.setLineWidth(0.5);
+      doc.line(M, y, M + W, y);
+      y += 6;
     }
   }
 
