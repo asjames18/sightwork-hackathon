@@ -106,7 +106,7 @@ export interface RenderAfterOutput {
 const DEFAULT_SPACE_TYPE = "room";
 
 const KEEP_LIST =
-  "camera angle, framing, room layout, architecture, windows, lighting direction, existing furniture positions, signage text";
+  "camera angle, framing, room layout, architecture, windows, lighting direction, existing furniture positions, signage text, existing logos, emblems, banners and wall art exactly as they are (same shapes, letters and colours; do not redraw, re-letter or move them)";
 
 /** Fixes that show in a photo (prompt 04's visible list, plus covers). */
 const VISIBLE_RE =
@@ -234,7 +234,7 @@ export function buildRenderAfterPrompt(spaceType: string, visibleChanges: string
     `Photo edit of this exact ${spaceType} photo. Show the same room after the work is done.\n` +
     `Keep identical: ${KEEP_LIST}.\n` +
     `Change only:\n${changes}\n` +
-    `Photorealistic, same time of day, same lens. Do not add people, text, logos, or decorations that were not asked for. Do not change anything not listed.`
+    `Photorealistic, same time of day, same lens. Do not add people, text, logos, or decorations that were not asked for. Leave any existing logo or lettering untouched; if it is too small to copy exactly, leave that area of the photo as it is. Do not change anything not listed.`
   );
 }
 
