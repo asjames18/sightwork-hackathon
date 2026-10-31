@@ -331,7 +331,19 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
             body: JSON.stringify(body),
           });
           if (res.ok) {
-            parsed = (await res.json()) as Record<string, unknown>;
+            // A 200 body that is not JSON carries no completed image,
+            // so it cannot be priced (failed images are free) — but
+            // res.json() used to throw a raw SyntaxError here,
+            // surfacing parser internals instead of the caller and
+            // the cause. Throw a named plain error instead; the
+            // catch below still wraps it in ImageCallError when an
+            // earlier candidate was already billed, so that spend
+            // rides on the error for recordFailedCall.
+            try {
+              parsed = (await res.json()) as Record<string, unknown>;
+            } catch {
+              throw new Error("image: response was not JSON");
+            }
             break;
           }
           lastStatus = res.status;
