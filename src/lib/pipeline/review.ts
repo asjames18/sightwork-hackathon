@@ -42,7 +42,7 @@
 
 import { parseReview, type PlanReview } from "../review";
 import type { Issue } from "../types";
-import { recordFailedCall, type UsageTracker } from "./usage";
+import { failedCallModel, recordFailedCall, type UsageTracker } from "./usage";
 
 /** One proof photo handed to the reviewer, in attach order. */
 export interface ReviewFrame {
@@ -301,7 +301,7 @@ export async function runReview(input: ReviewInput, deps: ReviewDeps): Promise<P
       // review, not a spending stop — reviewing is the last step, so
       // there is no later call to protect, and the plan still ships.
       try {
-        recordFailedCall(deps.tracker, SPARK_MODEL, "review", err);
+        recordFailedCall(deps.tracker, failedCallModel(err, SPARK_MODEL), "review", err);
       } catch (recErr) {
         console.warn(`runReview: usage record failed, review not run: ${recErr instanceof Error ? recErr.message : String(recErr)}`);
       }
