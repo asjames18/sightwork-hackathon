@@ -1,5 +1,6 @@
-import { COST_LABEL, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
+import { COST_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
 import { fixFirstPlanLines } from "./fixFirst";
+import { countsShareLine } from "./countMethod";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
@@ -208,6 +209,9 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   }
   const why = coverageLine(plan);
   if (why) lines.push(why);
+  const counts = countsShareLine(plan.inventory ?? [], masksAvailable(plan));
+  // The counts line is extra context: it is the first thing dropped when the text runs long.
+  const countsAt = counts ? lines.push("", counts) - 2 : -1;
   if (!sample && opts.sinceLines && opts.sinceLines.length > 0) lines.push("", ...opts.sinceLines);
   if (watch.length > 0) {
     lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
@@ -244,8 +248,13 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
   lines.push("", signoff);
 
-  const text = lines.join("\n");
+  let text = lines.join("\n");
   if (text.length <= maxChars) return text;
+  if (countsAt >= 0) {
+    lines.splice(countsAt, 2);
+    text = lines.join("\n");
+    if (text.length <= maxChars) return text;
+  }
   // Keep the sign-off: cut the body at a line and say it was shortened.
   const tail = `\n...\n${opts.pdfAttached ? "Shortened for a text. The PDF has everything." : "Shortened for a text."}\n\n${signoff}`;
   const body = lines.slice(0, -2).join("\n");

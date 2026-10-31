@@ -26,3 +26,27 @@ export function countMethodNote(item: InventoryItem, masks: boolean): CountMetho
   if (low) text = text ? `${text}. Low confidence, check by hand` : "Low confidence, check by hand";
   return text ? { text, low } : null;
 }
+
+/** Most counts named in the shared text; the rest become "and N more". */
+export const MAX_SHARE_COUNTS = 5;
+
+/**
+ * One short line for the shared text: what's there and how it was counted, e.g.
+ * "What's there (counted from SAM 3.1 outlines, approximate): 212 chairs, 14-16 lights, 4 exit signs (check by hand)."
+ * Null when the plan has no counts.
+ */
+export function countsShareLine(inventory: InventoryItem[], masks: boolean): string | null {
+  const items = inventory.filter((i) => Number.isInteger(i.count) && i.count >= 0 && i.label?.trim());
+  if (items.length === 0) return null;
+  const how = masks ? "counted from SAM 3.1 outlines, approximate" : "estimated from the frames, approximate";
+  const parts = items.slice(0, MAX_SHARE_COUNTS).map((i) => {
+    const usedSam = masks && (i.method === "sam" || i.method === "sam+model");
+    const n = usedSam && i.range && i.range[0] !== i.range[1] ? `${i.range[0]}-${i.range[1]}` : `${i.count}`;
+    const low = Number.isFinite(i.confidence) && i.confidence < LOW_COUNT_CONFIDENCE;
+    const label = i.label.trim().replace(/\s+/g, " ");
+    const name = /^[A-Z][a-z]/.test(label) ? label[0].toLowerCase() + label.slice(1) : label;
+    return `${n} ${name}${low ? " (check by hand)" : ""}`;
+  });
+  if (items.length > MAX_SHARE_COUNTS) parts.push(`and ${items.length - MAX_SHARE_COUNTS} more`);
+  return `What's there (${how}): ${parts.join(", ")}.`;
+}
