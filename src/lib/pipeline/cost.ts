@@ -45,6 +45,10 @@
  * - Sources keep only http(s) URLs; the field is omitted when none are
  *   left. (The caller passes only web_search results; code cannot
  *   verify provenance beyond the URL shape.)
+ * - Price counts: computeCostRange also returns pricedMaterials and
+ *   groundedPrices (see CostResult), so a later step or the UI can
+ *   report how many prices came back search-grounded. The counts are
+ *   computed, never trusted to the model beyond its grounded flags.
  * - Per-problem and per-step shares (costRange.byIssue / byStep, read
  *   by src/lib/costShares.ts): every material line and every paid
  *   labor line is split equally among the issue ranks it fixes
@@ -111,6 +115,20 @@ export interface CostDeps {
 export interface CostResult {
   costRange: CostRange;
   materials: MaterialItem[];
+  /**
+   * How many materials carry a model price (valid material index, last
+   * price wins on duplicates; ignored out-of-range prices excluded).
+   * Added for the processing screen's planning note (Grok Bot, 2026-10-31
+   * 12:30 AM ask): the UI can show how many prices came back, without
+   * the pipeline overwriting the proof-frame planning check.
+   */
+  pricedMaterials: number;
+  /**
+   * Of pricedMaterials, how many prices the model marked grounded
+   * (search-backed). Ungrounded prices are still counted in
+   * pricedMaterials but flagged in costRange.assumptions.
+   */
+  groundedPrices: number;
 }
 
 /** One per-problem share, keyed by issue rank (client: costShares.ts). */
@@ -462,7 +480,12 @@ export function computeCostRange(
     ...(byIssue.length > 0 ? { byIssue } : {}),
     ...(byStep.length > 0 ? { byStep } : {}),
   };
-  return { costRange, materials: filled };
+  return {
+    costRange,
+    materials: filled,
+    pricedMaterials: byIndex.size,
+    groundedPrices: [...byIndex.values()].filter((u) => u.grounded).length,
+  };
 }
 
 /**
