@@ -243,6 +243,40 @@ export function formatReasonStability(
   return `runPlan: reason stability: ${sam}; reason ${output.issues.length} issues, ${output.watch?.length ?? 0} watch, hero frame ${output.heroFrameIndex}`;
 }
 
+/**
+ * One-line summary of what the reason step's confidence filter did to
+ * the model's raw output. Pure, and it changes no plan output:
+ * runReason logs it only when the filter actually removed or demoted
+ * an issue, so a clean pass stays quiet. The stability line reports
+ * the post-filter counts, which cannot tell "the model returned 1
+ * issue" from "the model returned 5 and the filter dropped 4" — this
+ * line closes that gap for repeat-run diagnosis. `demoted` is the
+ * growth in watch entries over the model's own watch list (the filter
+ * appends demoted issues to it); `dropped` is what is left of the raw
+ * issues after the kept ranks and the demoted ones.
+ */
+export function formatReasonFilter(
+  raw: Pick<ReasonOutput, "issues" | "watch">,
+  filtered: Pick<ReasonOutput, "issues" | "watch">,
+): string {
+  const rawIssues = raw.issues.length;
+  const rawWatch = raw.watch?.length ?? 0;
+  const kept = filtered.issues.length;
+  const totalWatch = filtered.watch?.length ?? 0;
+  const demoted = Math.max(0, totalWatch - rawWatch);
+  const dropped = rawIssues - kept - demoted;
+  return `reason: filter kept ${kept} ranked, ${totalWatch} watch (${rawWatch} from model, ${demoted} demoted), dropped ${dropped} of ${rawIssues} raw issues`;
+}
+
+/** Log the filter line only when the filter removed or demoted an issue. */
+function logReasonFilterIfLossy(raw: ReasonOutput, filtered: ReasonOutput): void {
+  const rawWatch = raw.watch?.length ?? 0;
+  const totalWatch = filtered.watch?.length ?? 0;
+  if (filtered.issues.length < raw.issues.length || totalWatch > rawWatch) {
+    console.log(formatReasonFilter(raw, filtered));
+  }
+}
+
 /** Confidence filter + rank renumber, with rank references remapped.
  * Issues at or above the bar (0.5, or 0.6 when unmentioned) stay
  * ranked. Issues from 0.35 up to the bar move to `watch` instead of
@@ -570,11 +604,16 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
     if (shapeErrs.length > 0) {
       lastErrors = shapeErrs;
     } else {
-      const filtered = filterAndRenumber(res.json as ReasonOutput);
+      const rawOut = res.json as ReasonOutput;
+      const filtered = filterAndRenumber(rawOut);
       const errs = validateReason(input, filtered);
-      if (errs.length === 0) return filtered;
+      if (errs.length === 0) {
+        logReasonFilterIfLossy(rawOut, filtered);
+        return filtered;
+      }
       lastErrors = errs;
       if (best === null || errs.length < best.errs.length) {
+        logReasonFilterIfLossy(rawOut, filtered);
         best = { output: filtered, errs };
       }
     }
