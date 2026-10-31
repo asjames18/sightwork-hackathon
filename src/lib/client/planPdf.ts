@@ -14,6 +14,7 @@ import { planReview, verdictFor } from "@/lib/review";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
+import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -384,6 +385,39 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   // --- Work steps ---------------------------------------------------------------------
   if (steps.length) {
     heading("Do the work in this order", 70);
+    const crew = crewSummary(steps);
+    if (showCrewSummary(crew)) {
+      // Same "Who does the work" lines as the plan screen, so whoever books the trades sees it up front.
+      font(8, "bold", MUTED);
+      ensure(lineH(8) + 4);
+      doc.text("WHO DOES THE WORK", M, y + 8);
+      y += lineH(8) + 4;
+      const rows: { tag: string | null; label: string; info: string }[] = [
+        ...crew.rows.map((r) => {
+          const hrs = hoursLabel(r.hours, r.hoursPartial);
+          return { tag: r.paid ? "Paid" : "Free", label: clean(r.label), info: `${stepsLabel(r.steps)}${hrs ? `, ${hrs}` : ""}` };
+        }),
+        ...(crew.unassigned.length ? [{ tag: null, label: "Not assigned yet", info: stepsLabel(crew.unassigned) }] : []),
+      ];
+      const infoW = 150;
+      for (const r of rows) {
+        font(10.5, "bold");
+        const label = wrap(r.tag ? `${r.tag} \u00B7 ${r.label}` : r.label, W - infoW - 12);
+        const h = label.length * lineH(10.5);
+        ensure(h + 6);
+        label.forEach((l, k) => doc.text(l, M, y + 10.5 + k * lineH(10.5)));
+        font(9.5, "normal", MUTED);
+        doc.text(pdfSafe(r.info), M + W, y + 10.5, { align: "right", maxWidth: infoW });
+        y += h + 3;
+        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+        doc.setLineWidth(0.5);
+        doc.line(M, y, M + W, y);
+        y += 4;
+      }
+      const total = hoursLabel(crew.totalHours, crew.totalPartial);
+      if (total) para(`All ${steps.length} steps: ${total} of work in total, before any waiting between steps.`, 9.5, "normal", MUTED, M, W, 4);
+      y += 8;
+    }
     for (const s of steps) {
       const extra = [
         s.trade ? clean(s.trade) : null,
