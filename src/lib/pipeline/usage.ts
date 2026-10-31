@@ -101,6 +101,16 @@ export function createUsageTracker(opts?: {
 
   return {
     record(input) {
+      // A null, undefined, or non-object input would otherwise throw
+      // a raw TypeError reading .model off it, surfacing internals
+      // instead of the caller and the cause — the same named-error
+      // rule the field checks below already follow. Reject it here,
+      // before any field is read.
+      if (input === null || typeof input !== "object") {
+        throw new Error(
+          `usage: record input must be an object, got ${input === null ? "null" : typeof input}`,
+        );
+      }
       // Normalize before validating: a padded label (" muse-spark ")
       // used to be stored padded, so the spike log showed it as a
       // different model/step than the clean label, while a padded
