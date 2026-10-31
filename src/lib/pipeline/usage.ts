@@ -227,3 +227,19 @@ export function recordFailedCall(
   }
   tracker.record({ model, step, latencyMs, costUsd });
 }
+
+/**
+ * The model a failed call ran on: the error's own model when it names
+ * one (BasetenCallError carries its configured model), else the
+ * caller's fallback (the requested model). Keeps a billed-but-failed
+ * Baseten reason/review call on the Baseten model in per-model totals
+ * instead of misattributing it to muse-spark-1.3, matching the success
+ * path's `res.model ?? SPARK_MODEL`.
+ */
+export function failedCallModel(err: unknown, fallback: string): string {
+  if (err && typeof err === "object") {
+    const model = (err as { model?: unknown }).model;
+    if (typeof model === "string" && model.trim().length > 0) return model;
+  }
+  return fallback;
+}
