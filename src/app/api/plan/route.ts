@@ -35,7 +35,10 @@
  * process.env only (MODEL_API_KEY or META_API_KEY) by the callers.
  * The UI never sees provider text: failures stream as PlanJobStatus
  * failed lines with plain messages, and the detail rides on the
- * server log only. Aborting the request stops the run.
+ * server log only. A failed line carries costUsd when the run already
+ * billed model calls, so the client can keep the run-cost line
+ * accurate; it is omitted when nothing billed or unknown.
+ * Aborting the request stops the run.
  */
 
 import { createBasetenClient, createReasonBasetenCaller } from "../../../lib/meta/baseten";
@@ -313,11 +316,21 @@ export async function POST(req: Request): Promise<Response> {
                 .join(", "),
           );
         }
+        // A failed run may already have billed calls (e.g. a billed
+        // transcribe before a failed reason step): carry that total on
+        // the failed line when it is positive, so the client keeps the
+        // run-cost line instead of dropping the spend. Omit it when
+        // nothing billed, keeping zero-cost failures byte-identical.
+        const failedCostUsd =
+          tracker && tracker.totals().spikeTotalUsd > 0
+            ? tracker.totals().spikeTotalUsd
+            : undefined;
+        const costField = failedCostUsd !== undefined ? { costUsd: failedCostUsd } : {};
         if (isAbort(err)) {
           // Client went away; nothing left to stream.
         } else if (err instanceof PlanStepError) {
           if (err.detail) console.error(`plan route: ${err.step} failed: ${err.detail}`);
-          push({ state: "failed", step: err.step, message: err.message });
+          push({ state: "failed", step: err.step, message: err.message, ...costField });
         } else if (!wired) {
           // Wiring failed (no key, or a caller could not be built).
           console.error(
@@ -327,6 +340,7 @@ export async function POST(req: Request): Promise<Response> {
             state: "failed",
             step: "uploading",
             message: "The plan service isn't set up yet. Try the example plan.",
+            ...costField,
           });
         } else {
           console.error(
@@ -336,6 +350,7 @@ export async function POST(req: Request): Promise<Response> {
             state: "failed",
             step: "planning",
             message: "Building the work plan failed. Try again.",
+            ...costField,
           });
         }
       } finally {
