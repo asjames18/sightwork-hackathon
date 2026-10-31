@@ -18,6 +18,7 @@ import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
 import { materialsSpend, spendLine } from "./materialsList";
+import { fixFirstPlanLines } from "./fixFirst";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -421,6 +422,13 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   // --- Work steps ---------------------------------------------------------------------
   if (steps.length) {
     heading("Do the work in this order", 70);
+    // Same Start here sentence as the card on the plan screen, so the first move is on paper too.
+    const startHere = fixFirstPlanLines(plan);
+    if (startHere.length > 0) {
+      para(startHere[0], 10.5, "bold", INK, M, W, 2);
+      for (const l of startHere.slice(1)) para(l, 9.5, "normal", MUTED, M, W, 2);
+      y += 6;
+    }
     const crew = crewSummary(steps);
     if (showCrewSummary(crew)) {
       // Same "Who does the work" lines as the plan screen, so whoever books the trades sees it up front.

@@ -1,4 +1,5 @@
 import { COST_LABEL, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
+import { fixFirstPlanLines } from "./fixFirst";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
@@ -216,6 +217,8 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
 
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
   if (steps.length > 0) {
+    const startHere = fixFirstPlanLines(plan);
+    if (startHere.length > 0) lines.push("", ...startHere);
     lines.push("", "Do the work in this order:");
     for (const s of steps) {
       const extra = [s.trade ? clean(s.trade) : null, s.hours ? `${span(s.hours)} h` : null].filter(Boolean).join(", ");

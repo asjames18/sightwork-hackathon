@@ -1,6 +1,6 @@
-import type { Issue, WorkStep } from "@/lib/types";
-import type { CostShare } from "@/lib/costShares";
-import { issueTier } from "@/lib/planExtras";
+import type { Issue, WorkPlan, WorkStep } from "@/lib/types";
+import { issueCostShares, stepCostShares, type CostShare } from "@/lib/costShares";
+import { issueTier, rankedIssues } from "@/lib/planExtras";
 import { hoursLabel } from "@/lib/client/crewSummary";
 
 /**
@@ -133,4 +133,24 @@ export function fixFirstLine(f: FixFirst): string {
   if (f.hours) extra.push(`${f.hours} of work`);
   if (f.cost) extra.push(`${fixFirstCostLabel(f.cost)} of the estimate`);
   return `${parts[0]}${extra.length ? `, ${extra.join(" and ")}` : ""}.`;
+}
+
+/** "No step covers problem #3 yet, so plan it by hand." (same words as the card), or null when every Fix now problem has a step. */
+export function fixFirstUnplannedLine(f: FixFirst): string | null {
+  const u = f.unplanned;
+  if (u.length === 0) return null;
+  const refs = u.map((r) => `problem #${r}`);
+  const list = refs.length === 1 ? refs[0] : `${refs.slice(0, -1).join(", ")} and ${refs[refs.length - 1]}`;
+  return `No step covers ${list} yet, so plan ${u.length === 1 ? "it" : "them"} by hand.`;
+}
+
+/**
+ * The Start here lines for "Send to your team" text and Save PDF, from the whole plan, using the same
+ * problems (ranked, not watch items) and cost shares as the card. [] when the card would show nothing.
+ */
+export function fixFirstPlanLines(plan: Pick<WorkPlan, "issues" | "workOrder" | "costRange">): string[] {
+  const f = fixFirst(rankedIssues(plan), plan.workOrder, { steps: stepCostShares(plan), issues: issueCostShares(plan) });
+  if (!f) return [];
+  const unplanned = fixFirstUnplannedLine(f);
+  return unplanned ? [fixFirstLine(f), unplanned] : [fixFirstLine(f)];
 }
