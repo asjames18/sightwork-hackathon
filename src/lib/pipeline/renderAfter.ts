@@ -480,12 +480,25 @@ export async function runRenderAfter(
   const prompt = buildRenderAfterPrompt(spaceType, visibleChanges);
   try {
     const wantTwo = deps.generateTwo === true;
-    const res = await deps.callImage({
-      model: deps.imageModel,
-      prompt,
-      image: heroFrame.url,
-      n: wantTwo ? 2 : 1,
-    });
+    let res: Awaited<ReturnType<ImageCaller>>;
+    try {
+      res = await deps.callImage({
+        model: deps.imageModel,
+        prompt,
+        image: heroFrame.url,
+        n: wantTwo ? 2 : 1,
+      });
+    } catch (err) {
+      // A billed-but-failed image call still spent money (e.g. a
+      // MetaCallError on a non-JSON response): record it before the
+      // outer catch reports model-failure, so the route total counts
+      // it. This closes the image leg of the failed-call series,
+      // matching the judge leg below. A tracker throw (spike cap)
+      // replaces it as a spending stop, and the outer catch then
+      // reports cap-exceeded with no image.
+      recordFailedCall(deps.tracker, deps.imageModel, "renderAfter", err);
+      throw err;
+    }
     deps.tracker.record({
       model: deps.imageModel,
       step: "renderAfter",
