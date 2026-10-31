@@ -193,3 +193,37 @@ export function createUsageTracker(opts?: {
     },
   };
 }
+
+/**
+ * Record the spend of a call that failed after billing, e.g. a Meta
+ * client throw on a non-JSON response (MetaCallError carries costUsd
+ * and latencyMs). Without this, a step that awaits its caller and then
+ * records only on success silently drops the failed call's spend, and
+ * the route total understates the run. Duck-typed, not instanceof: the
+ * pipeline steps take their callers injected, so the error may be any
+ * object carrying the two numbers, and usage must not import the Meta
+ * client. An error without finite, non-negative cost/latency records
+ * nothing. A tracker throw (spike cap) propagates: a cap breach is a
+ * spending stop, and the caller must not continue to later steps.
+ */
+export function recordFailedCall(
+  tracker: UsageTracker,
+  model: string,
+  step: string,
+  err: unknown,
+): void {
+  if (!err || typeof err !== "object") return;
+  const costUsd = (err as { costUsd?: unknown }).costUsd;
+  const latencyMs = (err as { latencyMs?: unknown }).latencyMs;
+  if (
+    typeof costUsd !== "number" ||
+    !Number.isFinite(costUsd) ||
+    costUsd < 0 ||
+    typeof latencyMs !== "number" ||
+    !Number.isFinite(latencyMs) ||
+    latencyMs < 0
+  ) {
+    return;
+  }
+  tracker.record({ model, step, latencyMs, costUsd });
+}
