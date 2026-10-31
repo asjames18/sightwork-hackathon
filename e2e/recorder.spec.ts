@@ -307,3 +307,55 @@ test("Record while Web Audio stays suspended (phones before a tap): no false 'ca
   await expect(cam.getByTestId("mic-quiet")).toHaveCount(0);
   await cam.getByRole("button", { name: "Stop recording" }).click();
 });
+
+/** Swaps the camera for a canvas stream painted near black with a little noise (a dark room). */
+const darkCamera = () => {
+  navigator.mediaDevices.getUserMedia = async () => {
+    const c = document.createElement("canvas");
+    c.width = 640;
+    c.height = 360;
+    const g = c.getContext("2d")!;
+    const paint = () => {
+      g.fillStyle = "rgb(8,8,10)";
+      g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = "rgb(30,30,34)";
+      for (let i = 0; i < 40; i++) g.fillRect(Math.random() * c.width, Math.random() * c.height, 6, 6);
+    };
+    paint();
+    setInterval(paint, 100);
+    return c.captureStream(15);
+  };
+};
+
+test("Record in a dark room: a live 'it's dark here' hint shows while recording; a normal picture shows none", async ({ page }, info) => {
+  // Normal (fake) camera first: no picture hint.
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  let cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await expect(cam).toHaveAttribute("data-phase", "recording");
+  await page.waitForTimeout(4500);
+  await expect(cam.getByTestId("live-hint")).toHaveCount(0);
+  await cam.getByRole("button", { name: "Cancel" }).click();
+
+  // Dark camera: the hint shows after a few seconds of recording, as a polite status line.
+  await page.addInitScript(darkCamera);
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await expect(cam.getByTestId("live-hint")).toHaveCount(0);
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await expect(cam).toHaveAttribute("data-phase", "recording");
+  const hint = cam.getByTestId("live-hint");
+  await expect(hint).toBeVisible({ timeout: 8000 });
+  await expect(hint).toHaveAttribute("data-hint", "dark");
+  await expect(hint).toHaveAttribute("role", "status");
+  await expect(hint).toContainText("It's dark here.");
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "recorder with dark hint");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `live-hint-${info.project.name}.png`) });
+  await cam.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("group", { name: "Camera" })).toHaveCount(0);
+});

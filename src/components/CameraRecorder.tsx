@@ -4,6 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDuration, HARD_MAX_SEC, SOFT_MAX_SEC } from "@/lib/client/duration";
 import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel, type MicMeter } from "@/lib/client/micLevel";
 import { keepScreenOn } from "@/lib/client/wakeLock";
+import { lumaStats } from "@/lib/client/blankTake";
+import { sharpness } from "@/lib/client/frameSampling";
+import {
+  HINT_SAMPLE_MS,
+  INITIAL_LIVE_HINT_STATE,
+  LIVE_HINT_TEXT,
+  hintCanvasSize,
+  nextLiveHintState,
+  type LiveHint,
+} from "@/lib/client/liveCameraHints";
 import {
   averageBitrate,
   baseMime,
@@ -83,6 +93,8 @@ export function CameraRecorder({
   const [level, setLevel] = useState(0);
   const [hasMic, setHasMic] = useState<boolean | null>(null);
   const [tooQuiet, setTooQuiet] = useState(false);
+  // Live picture hint while recording ("too dark", "slow down"), from a small on-device check of the preview.
+  const [liveHint, setLiveHint] = useState<LiveHint | null>(null);
   // Keep the latest callbacks without restarting the camera when the parent re-renders.
   const cb = useRef({ onRecorded, onCancel, onUnavailable });
   useEffect(() => {
@@ -287,6 +299,39 @@ export function CameraRecorder({
     };
   }, [cameraOpen]);
 
+  // Picture check while recording: about twice a second a small copy of the preview is measured on the
+  // device (brightness and sharpness). Nothing is sent anywhere. Any read failure just skips that sample.
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    let state = INITIAL_LIVE_HINT_STATE;
+    const id = setInterval(() => {
+      const v = videoRef.current;
+      const size = v ? hintCanvasSize(v.videoWidth, v.videoHeight) : null;
+      let sample = null;
+      if (v && size && v.readyState >= 2) {
+        try {
+          if (canvas.width !== size.width) canvas.width = size.width;
+          if (canvas.height !== size.height) canvas.height = size.height;
+          ctx.drawImage(v, 0, 0, size.width, size.height);
+          const { data } = ctx.getImageData(0, 0, size.width, size.height);
+          const luma = lumaStats(data, size.width, size.height);
+          if (luma) sample = { mean: luma.mean, sharp: sharpness(data, size.width, size.height) };
+        } catch {
+          sample = null;
+        }
+      }
+      state = nextLiveHintState(state, sample, performance.now() / 1000);
+      setLiveHint(state.shown);
+    }, HINT_SAMPLE_MS);
+    return () => {
+      clearInterval(id);
+      setLiveHint(null);
+    };
+  }, [phase]);
+
   const cancel = useCallback(() => {
     discardRef.current = true;
     stopTick();
@@ -373,6 +418,16 @@ export function CameraRecorder({
         {recording && tooQuiet && (
           <p role="status" className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900" data-testid="mic-quiet">
             We can&apos;t hear you. Say what you see as you walk, like &ldquo;this chair is broken.&rdquo;
+          </p>
+        )}
+        {recording && liveHint && (
+          <p
+            role="status"
+            className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            data-testid="live-hint"
+            data-hint={liveHint}
+          >
+            {LIVE_HINT_TEXT[liveHint]}
           </p>
         )}
         {cameraOpen && hasMic === false && (
