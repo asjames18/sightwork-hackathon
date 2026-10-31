@@ -123,3 +123,27 @@ test("the featured sample shows the richer findings: every problem has a tier, w
     assert.notEqual(areaFor(w), "other", `watch ${w.title} checklist area`);
   }
 });
+
+test("every hand-written sample carries the richer findings, each problem and closer-look find in a known checklist area", async () => {
+  const { areaFor } = await import("@/lib/checklist");
+  const samples = EXAMPLES.filter((e) => e.kind === "sample");
+  assert.ok(samples.length >= 4);
+  for (const e of samples) {
+    const plan = e.plan;
+    for (const issue of plan.issues) {
+      assert.ok(issue.tier, `${e.id} issue ${issue.rank} tier`);
+      assert.ok(issue.area && issue.area.length <= 80, `${e.id} issue ${issue.rank} area`);
+      assert.ok(issue.evidence && issue.evidence.length <= 160, `${e.id} issue ${issue.rank} evidence`);
+      assert.notEqual(areaFor(issue), "other", `${e.id} issue ${issue.rank} checklist area`);
+    }
+    const watch = plan.watch ?? [];
+    assert.ok(watch.length >= 1, `${e.id} has a closer-look find`);
+    for (const w of watch) {
+      assert.ok(plan.frames![w.frameIndex], `${e.id} watch ${w.title} frame`);
+      assert.equal(w.frameTimeSec, plan.frames![w.frameIndex].tSec);
+      assert.ok(w.confidence !== undefined && w.confidence < 0.5, `${e.id} watch ${w.title} below the keep threshold`);
+      assert.ok(w.evidence && w.evidence.length <= 160, `${e.id} watch ${w.title} evidence`);
+      assert.notEqual(areaFor(w), "other", `${e.id} watch ${w.title} checklist area`);
+    }
+  }
+});

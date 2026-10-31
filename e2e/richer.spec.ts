@@ -253,3 +253,30 @@ test("featured kitchen sample (the public default) shows tiers, where and what, 
     await shot(page, "kitchen-sample");
   }
 });
+
+test("classroom, office and warehouse samples show tiers, where and what, and the closer-look find at 375, 768 and 1280", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  const cases = [
+    { ex: "classroom", headings: [/^Fix now/, /^Fix soon/, /^Can wait/], problem: "Ceiling grid open", where: "Ceiling, whole room", watch: "Wall box at the waterline" },
+    { ex: "office", headings: [/^Fix soon/, /^Can wait/], problem: "Floor outlet covers", where: "Carpet in front of the door and the windows", watch: "No blinds on a full wall of glass" },
+    { ex: "warehouse", headings: [/^Fix now/, /^Fix soon/, /^Can wait/], problem: "Materials parked in the main drive aisle", where: "Center drive aisle", watch: "Loose stair units parked between the piles" },
+  ];
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const c of cases) {
+      await page.goto(`/start?view=example&ex=${c.ex}`);
+      const problems = page.locator("#problems");
+      for (const name of c.headings) await expect(problems.getByRole("heading", { level: 3, name })).toBeVisible();
+      const item = problems.getByRole("listitem").filter({ hasText: c.problem }).first();
+      await expect(item.getByText(c.where, { exact: true })).toBeVisible();
+      const watch = page.getByTestId("watch-list");
+      await watch.getByText("Worth a closer look").click();
+      await expect(watch.getByText(c.watch)).toBeVisible();
+      await expectNoSideScroll(page);
+      if (width === 375) await expectNoAxeViolations(page, `${c.ex} sample with the closer-look list open`);
+      if (width === 375) await shot(page, `${c.ex}-sample`);
+    }
+  }
+  expect(errors).toEqual([]);
+});
