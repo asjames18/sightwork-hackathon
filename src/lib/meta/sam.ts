@@ -80,6 +80,24 @@ export const SAM_METADATA = {
   mask_encoding: "one_bit",
 } as const;
 
+/**
+ * A SAM call that was billed but failed after the provider answered:
+ * a 200 with no text output, or output_text whose box tokens do not
+ * parse. Carries the flat per-request cost and latency so the segment
+ * step's recordFailedCall can record the spend instead of dropping it
+ * from the route total, the same shape as BasetenCallError/MetaCallError.
+ */
+export class SamCallError extends Error {
+  readonly costUsd: number;
+  readonly latencyMs: number;
+  constructor(message: string, costUsd: number, latencyMs: number) {
+    super(message);
+    this.name = "SamCallError";
+    this.costUsd = costUsd;
+    this.latencyMs = latencyMs;
+  }
+}
+
 function readEnv(name: string): string | undefined {
   try {
     const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
@@ -299,9 +317,25 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
         const parsed = (await res.json()) as Record<string, unknown>;
         const text = extractText(parsed);
         if (text === null) {
-          throw new Error("sam: response had no text output");
+          // The provider answered 200, so the request was billed even
+          // though there is no text to parse: carry the flat cost so
+          // the segment step records it instead of dropping the spend.
+          throw new SamCallError("sam: response had no text output", requestCost, latencyMs);
         }
-        return { instances: parseSamOutput(text), latencyMs, costUsd: requestCost };
+        let instances: SamInstance[];
+        try {
+          instances = parseSamOutput(text);
+        } catch (err) {
+          // Same billed-but-failed shape: preserve the parse message
+          // verbatim (it already carries the "sam: " prefix) and add
+          // the cost, so recordFailedCall can record the spend.
+          throw new SamCallError(
+            err instanceof Error ? err.message : String(err),
+            requestCost,
+            latencyMs,
+          );
+        }
+        return { instances, latencyMs, costUsd: requestCost };
       }
       lastStatus = res.status;
       lastDetail = await res.text();
