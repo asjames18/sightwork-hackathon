@@ -11,7 +11,7 @@
 import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
-import { issueNote, planLocation, plainReviewLine, problemSummary, shareDate } from "./planText";
+import { issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, shareDate } from "./planText";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -395,6 +395,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     doc.text(pdfSafe(`${usd(c.low)} - ${usd(c.high)}`), M, y + 22);
     y += 30;
     para(c.label ?? COST_LABEL, 10.5, "bold", ACCENT_DARK, M, W, 2);
+    const live = livePricesLine(c);
+    if (live) para(live, 9.5, "normal", MUTED, M, W, 2);
     para(`Region: ${clean(c.region)} \u00B7 Labor: ${c.laborBasis}`, 9.5, "normal", MUTED, M, W, 2);
     for (const a of c.assumptions) para(`\u00B7 ${clean(a)}`, 9.5, "normal", MUTED, M + 6, W - 6, 0);
     if (c.sources?.length) {

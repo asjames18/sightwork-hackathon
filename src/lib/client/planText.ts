@@ -1,4 +1,4 @@
-import { COST_LABEL, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
+import { COST_LABEL, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 
 /**
@@ -20,6 +20,23 @@ const PRIORITY: Record<string, string> = { high: "High priority", medium: "Mediu
 /** "Oct 30, 2026": the day the plan was shared or saved. */
 export function shareDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * One sentence on how many material prices came from a live web search for the plan's place, the same
+ * words on the cost card, in the shared text and in the PDF. Null when the cost step reported no counts
+ * (example plans, older plans) or priced nothing.
+ */
+export function livePricesLine(costRange: { pricing?: unknown; region?: unknown } | null | undefined): string | null {
+  if (!costRange) return null;
+  const p = parsePricingCounts(costRange.pricing);
+  if (!p || p.priced === 0) return null;
+  const region = typeof costRange.region === "string" ? clean(costRange.region) : "";
+  const where = region ? ` for ${region}` : "";
+  const noun = p.priced === 1 ? "material price" : "material prices";
+  if (p.grounded === p.priced) return p.priced === 1 ? `The 1 material price was looked up live on the web${where}.` : `All ${p.priced} ${noun} looked up live on the web${where}.`;
+  if (p.grounded === 0) return `No live prices found, so the ${p.priced === 1 ? "" : `${p.priced} `}${noun} ${p.priced === 1 ? "is a regional estimate" : "are regional estimates"}${where}.`;
+  return `${p.grounded} of ${p.priced} ${noun} looked up live on the web${where}; the rest are regional estimates.`;
 }
 
 /**
@@ -142,6 +159,8 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   if (plan.costRange) {
     const c = plan.costRange;
     lines.push("", `Cost: ${usd(c.low)}-${usd(c.high)} for ${clean(c.region)}. ${c.label ?? COST_LABEL}.`);
+    const live = livePricesLine(c);
+    if (live) lines.push(live);
   }
 
   const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
