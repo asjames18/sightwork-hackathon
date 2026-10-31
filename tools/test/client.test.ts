@@ -177,7 +177,7 @@ describe("API runner (fake fetch, nothing leaves the machine)", () => {
 
 describe("transcribe split (fake fetch, nothing leaves the machine)", () => {
   type Call = { url: string; headers: Record<string, string>; body: Record<string, unknown> };
-  async function runSplit(transcribe: { status?: number; json?: unknown; throws?: boolean }, request?: Partial<PlanRequest>) {
+  async function runSplit(transcribe: { status?: number; json?: unknown; throws?: boolean }, request?: Partial<PlanRequest>, planLine = '{"state":"done","plan":{"issues":[]}}\n') {
     fakeWindow();
     saveTestCode("tester-2");
     saveLocation({ city: "Sebring", state: "FL" });
@@ -189,7 +189,7 @@ describe("transcribe split (fake fetch, nothing leaves the machine)", () => {
         if (transcribe.throws) throw new TypeError("network down");
         return new Response(JSON.stringify(transcribe.json ?? { error: "x" }), { status: transcribe.status ?? 200 });
       }
-      return new Response('{"state":"done","plan":{"issues":[]}}\n', { status: 200 });
+      return new Response(planLine, { status: 200 });
     }) as typeof fetch;
     const statuses: PlanJobStatus[] = [];
     const req: PlanRequest = {
@@ -241,6 +241,27 @@ describe("transcribe split (fake fetch, nothing leaves the machine)", () => {
     assert.deepEqual(calls.map((c) => c.url), ["/api/transcribe"]);
     const last = statuses.at(-1);
     assert.ok(last?.state === "failed" && /tester code/.test(last.message));
+  });
+  test("the split transcribe cost is added to the plan's model-call total", async () => {
+    const plan = '{"state":"done","plan":{"issues":[],"meta":{"costUsd":0.9}}}\n';
+    const { statuses } = await runSplit({ json: { transcript: "[1] leak", transcriptTurns: [{ startSec: 1, text: "leak" }], costUsd: 0.04 } }, undefined, plan);
+    const last = statuses.at(-1);
+    assert.ok(last?.state === "done");
+    assert.equal(last.plan.meta?.costUsd, 0.94);
+    assert.equal(last.plan.meta?.region, "Sebring, FL");
+  });
+  test("a failed transcribe adds nothing; the WAV run's own total stands", async () => {
+    const plan = '{"state":"done","plan":{"issues":[],"meta":{"costUsd":0.9}}}\n';
+    const { statuses } = await runSplit({ status: 500 }, undefined, plan);
+    const last = statuses.at(-1);
+    assert.ok(last?.state === "done");
+    assert.equal(last.plan.meta?.costUsd, 0.9);
+  });
+  test("a plan with no total stays without one, even when transcribe cost something", async () => {
+    const { statuses } = await runSplit({ json: { transcript: "[1] leak", transcriptTurns: [{ startSec: 1, text: "leak" }], costUsd: 0.04 } });
+    const last = statuses.at(-1);
+    assert.ok(last?.state === "done");
+    assert.equal(last.plan.meta?.costUsd, undefined);
   });
   test("no narration: no transcribe call", async () => {
     const { calls } = await runSplit({}, { audioWavBase64: undefined });
