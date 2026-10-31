@@ -39,10 +39,11 @@ describe("cost: price counts", () => {
   });
 
   test("duplicate price counts once, using the last price's grounded flag", () => {
+    // Toronto names no US state, so the ungrounded last price passes through unscaled.
     const r = computeCostRange(
       materials,
       workOrder,
-      "Sebring, FL",
+      "Toronto",
       "volunteer",
       model([
         { materialIndex: 0, unit: "gallon", unitCost: [10, 20], grounded: true },
