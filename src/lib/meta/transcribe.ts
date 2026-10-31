@@ -33,6 +33,14 @@
  *   floor(audioDurationMs/1000)/3600*0.18. There is no usage field,
  *   so the caller computes it (spike: 42 s cost $0.0021). When the
  *   response omits audioDurationMs, the last turn's endMs is used.
+ * - A 200 whose turns do not parse still spent the call (ASR bills by
+ *   audio length): when the response carries a usable audioDurationMs,
+ *   the throw is an AsrCallError carrying that priced cost and latency,
+ *   so the transcribe step's recordFailedCall records it instead of
+ *   dropping it from the route total, the same shape as
+ *   SamCallError/BasetenCallError/MetaCallError/ImageCallError. When
+ *   the response carries no usable duration, the parse failure cannot
+ *   be priced, so it keeps the plain error, verbatim.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
  *   short backoff (250 ms, then 500 ms): the Oct 28 spike showed Meta's
  *   entitlement cache serving 404s intermittently for a model that then
@@ -69,6 +77,27 @@ export interface AsrTranscribeCaller {
     audioWavBase64: string;
     keywordBias: string[];
   }): Promise<{ turns: AsrTurn[]; latencyMs: number; costUsd: number }>;
+}
+
+/**
+ * An ASR call that was billed but failed after the provider answered:
+ * a 200 whose turns do not parse. Carries the priced cost (from the
+ * response's audioDurationMs) and latency so the transcribe step's
+ * recordFailedCall can record the spend instead of dropping it from
+ * the route total, the same shape as
+ * SamCallError/BasetenCallError/MetaCallError/ImageCallError. Only
+ * thrown when the response carries a usable duration; without one
+ * the failure cannot be priced and keeps the plain error.
+ */
+export class AsrCallError extends Error {
+  readonly costUsd: number;
+  readonly latencyMs: number;
+  constructor(message: string, costUsd: number, latencyMs: number) {
+    super(message);
+    this.name = "AsrCallError";
+    this.costUsd = costUsd;
+    this.latencyMs = latencyMs;
+  }
 }
 
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
@@ -238,7 +267,25 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
       if (res.ok) {
         const latencyMs = Date.now() - started;
         const parsed = (await res.json()) as Record<string, unknown>;
-        const turns = mapTurns(parsed.turns);
+        // A 200 whose turns do not parse was still billed (ASR bills
+        // by audio length): when the response carries a usable
+        // duration, carry the priced cost on the throw so the step's
+        // recordFailedCall records it; without a usable duration the
+        // failure cannot be priced, so it keeps the plain error.
+        let turns: AsrTurn[];
+        try {
+          turns = mapTurns(parsed.turns);
+        } catch (err) {
+          const rawDuration = parsed.audioDurationMs;
+          if (typeof rawDuration === "number" && Number.isFinite(rawDuration) && rawDuration >= 0) {
+            throw new AsrCallError(
+              err instanceof Error ? err.message : String(err),
+              computeAsrCostUsd(rawDuration, pricePerHour),
+              latencyMs,
+            );
+          }
+          throw err;
+        }
         const durationMs =
           typeof parsed.audioDurationMs === "number" && Number.isFinite(parsed.audioDurationMs)
             ? parsed.audioDurationMs
