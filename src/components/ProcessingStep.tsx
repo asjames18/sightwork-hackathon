@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RunStep, StepCheck } from "@/lib/types";
-import { currentStepEngines, OPTIONAL_STEPS, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
+import { currentStepEngines, OPTIONAL_STEPS, planningNowLine, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 
@@ -23,7 +23,7 @@ const NOW_LINE: Record<ScreenStep, string> = {
   looking: "Picking frames from your walkthrough to study.",
   counting: "Counting what's there, roughly.",
   comparing: "Checking what you asked for against what's in the room.",
-  planning: "Ranking the problems and putting the work steps in order.",
+  planning: planningNowLine(),
   picturing: "Drawing a picture of the finished space.",
   reviewing: "A separate check is looking for a photo behind every problem. It can't change the plan.",
   done: "Wrapping up your plan.",
@@ -54,6 +54,7 @@ export function ProcessingStep({
   engines,
   skipped,
   checks,
+  region,
 }: {
   steps: ScreenStep[];
   current: number;
@@ -73,8 +74,11 @@ export function ProcessingStep({
   skipped?: readonly ScreenStep[];
   /** Latest check per step (see StepCheck), shown under the step once it has finished. */
   checks?: Partial<Record<RunStep, StepCheck>>;
+  /** "City, ST" this real run is priced for. The Planning row then names the pricing step and its engine. */
+  region?: string | null;
 }) {
-  const ENGINE = engines ?? currentStepEngines();
+  const ENGINE = engines ?? currentStepEngines(region);
+  const place = region?.trim() || null;
   const thumb = useObjectUrl(videoFile);
   const failed = Boolean(failure);
   // When a run stops, move keyboard and screen-reader focus to "Try again" (focus also scrolls it into
@@ -201,7 +205,7 @@ export function ProcessingStep({
                       aria-hidden="true"
                       className="mt-[3px] inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-accent/30 border-t-accent-dark motion-safe:animate-spin"
                     />
-                    {NOW_LINE[s]}
+                    {s === "planning" ? planningNowLine(place) : NOW_LINE[s]}
                   </span>
                 )}
                 {(ENGINE[s] || state === "skipped") && (
@@ -226,7 +230,7 @@ export function ProcessingStep({
           );
         })}
       </ol>
-      {!failed && <WhileYouWait />}
+      {!failed && <WhileYouWait place={place} />}
       </div>
 
       {failure && (
@@ -284,7 +288,8 @@ function CheckNote({ check }: { check: StepCheck }) {
 }
 
 /** What the finished plan holds, beside the step list on desktop so the screen isn't half empty. Only parts
- * every run produces are listed (no cost or after picture, which are optional steps). Phones skip it. */
+ * every run produces are listed, plus the cost range when the run carries a place (no after picture, an
+ * optional step). Phones skip it. */
 const PLAN_PARTS = [
   "Problems ranked by priority, including ones you didn't mention",
   "Rough counts of what's in the room",
@@ -292,7 +297,8 @@ const PLAN_PARTS = [
   "A materials list",
 ] as const;
 
-function WhileYouWait() {
+function WhileYouWait({ place }: { place: string | null }) {
+  const parts = place ? [...PLAN_PARTS, `A rough cost range for ${place}`] : PLAN_PARTS;
   return (
     <aside aria-labelledby="while-you-wait" className="hidden rounded-2xl bg-ink/[.04] p-5 lg:block">
       <h2 id="while-you-wait" className="text-base font-bold">
@@ -300,7 +306,7 @@ function WhileYouWait() {
       </h2>
       <p className="mt-1 text-sm text-ink/70">Your plan will have:</p>
       <ul className="mt-3 space-y-2.5 text-sm text-ink/80">
-        {PLAN_PARTS.map((t) => (
+        {parts.map((t) => (
           <li key={t} className="flex gap-2">
             <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-dark" />
             <span>{t}</span>

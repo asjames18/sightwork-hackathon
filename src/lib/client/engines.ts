@@ -21,8 +21,15 @@ export const OPTIONAL_STEPS: ReadonlySet<ScreenStep> = new Set<ScreenStep>(["loo
 /** Steps that only check the plan and can never stop a run. */
 export const REVIEW_ONLY_STEPS: ReadonlySet<ScreenStep> = new Set<ScreenStep>(["reviewing"]);
 
-/** What does the work at each step, shown under the step label as an agent trace. */
-export function stepEngines(provider: PlanProvider): Record<ScreenStep, string> {
+/** Engine named on the Planning row when the run carries a place: the cost step prices it with web search on the Meta Model API. */
+export const PRICING_ENGINE = "Muse Spark with web search";
+
+/**
+ * What does the work at each step, shown under the step label as an agent trace. When the run carries a
+ * place ("City, ST"), the Planning row's real work is pricing materials and labor for it, which runs on
+ * Muse Spark with web search whatever the plan provider is, so that row names it.
+ */
+export function stepEngines(provider: PlanProvider, region?: string | null): Record<ScreenStep, string> {
   const plan = provider === "baseten" ? "Muse Spark Open (open weights, on Baseten)" : "Muse Spark";
   return {
     uploading: "Key frames and audio, picked on your device",
@@ -30,7 +37,7 @@ export function stepEngines(provider: PlanProvider): Record<ScreenStep, string> 
     looking: "SAM 3.1",
     counting: "SAM 3.1",
     comparing: plan,
-    planning: plan,
+    planning: region?.trim() ? PRICING_ENGINE : plan,
     picturing: "Muse Image",
     reviewing: plan,
     done: "",
@@ -38,7 +45,15 @@ export function stepEngines(provider: PlanProvider): Record<ScreenStep, string> 
 }
 
 /** Engines for this page load, read in the browser. */
-export function currentStepEngines(): Record<ScreenStep, string> {
+export function currentStepEngines(region?: string | null): Record<ScreenStep, string> {
   const search = typeof window === "undefined" ? null : window.location.search;
-  return stepEngines(pickPlanProvider(search, process.env.NEXT_PUBLIC_SIGHTWORK_PLAN_PROVIDER));
+  return stepEngines(pickPlanProvider(search, process.env.NEXT_PUBLIC_SIGHTWORK_PLAN_PROVIDER), region);
+}
+
+/** The "now" line for the Planning row. With a place, say what actually takes the time: live price lookups. */
+export function planningNowLine(region?: string | null): string {
+  const place = region?.trim();
+  return place
+    ? `Looking up material and labor prices for ${place}, then checking the plan. Live price lookups can take up to a minute.`
+    : "Ranking the problems and putting the work steps in order.";
 }

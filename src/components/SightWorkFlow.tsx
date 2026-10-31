@@ -6,6 +6,7 @@ import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { planJobFor, type RunnerKind } from "@/lib/client/selectRunner";
 import { isResumeFailure, isTesterCodeFailure } from "@/lib/client/apiPlanJob";
+import { loadRegion } from "@/lib/client/location";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { addRecentPlan } from "@/lib/client/recentPlans";
@@ -191,6 +192,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           onExample={() => showExample()}
           skipped={skipped}
           checks={checks}
+          region={stage.runner === "api" ? loadRegion() : null}
         />
       )}
       {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} onMakeYourOwn={startOver} />}

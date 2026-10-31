@@ -317,3 +317,15 @@ test("processing: running clock and tab title follow the run, the screen is kept
   await expect(page.getByText(/· 0 s/)).toHaveCount(0);
   await expectNoAxeViolations(page, "failure card with times");
 });
+
+test("a real run with a city names the pricing step: Muse Spark with web search on the Planning row", async ({ page }) => {
+  await stubRealRun(page);
+  await page.addInitScript(() => window.localStorage.setItem("sightwork:test-code", "stub-code"));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "We couldn't finish your plan" })).toBeVisible({ timeout: 30_000 });
+  const planning = page.getByRole("listitem").filter({ hasText: "Planning the work" });
+  await expect(planning).toContainText("via Muse Spark with web search");
+  await expectNoSideScroll(page);
+});
