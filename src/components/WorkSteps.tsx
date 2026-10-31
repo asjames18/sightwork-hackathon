@@ -8,11 +8,22 @@ import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel,
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
 /** Ordered work steps as a checklist: tick steps off as the work happens; progress stays on this device for this plan. */
-export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each step's share of the rough cost, summing to the total (costShares.ts). */ stepCosts?: Map<number, CostShare> | null }) {
+export function WorkSteps({
+  plan,
+  stepCosts = null,
+  problemRanks,
+}: {
+  plan: WorkPlan;
+  /** Each step's share of the rough cost, summing to the total (costShares.ts). */
+  stepCosts?: Map<number, CostShare> | null;
+  /** Ranks that have a problem card on the page; a step's "Fixes #N" links up to those cards. */
+  problemRanks?: ReadonlySet<number>;
+}) {
   const [done, setDone] = useState<number[]>([]);
   const [ready, setReady] = useState(false);
   const total = plan.workOrder.length;
@@ -105,7 +116,7 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
           const chip = "inline-flex min-h-7 items-center rounded-full px-2.5 text-sm font-medium";
           const id = `step-${step.order}-done`;
           return (
-            <li key={step.order} className="relative flex gap-3 py-3">
+            <li key={step.order} id={stepAnchor(step.order)} className="relative flex scroll-mt-32 gap-3 py-3">
               {!last && (
                 <span aria-hidden="true" className="absolute top-12 bottom-0 left-4 w-0.5 -translate-x-1/2 bg-ink/15" />
               )}
@@ -143,7 +154,7 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
                     {step.dependsOn && <li className={`${chip} bg-ink/[0.06] text-ink/80`}>After step {step.dependsOn}</li>}
                     {step.fixes && step.fixes.length > 0 && (
-                      <li className={`${chip} bg-ink/[0.06] text-ink/80`}>Fixes #{step.fixes.join(", #")}</li>
+                      <FixesChip className={`${chip} bg-ink/[0.06] text-ink/80`} fixes={step.fixes} problemRanks={problemRanks} />
                     )}
                     {stepCosts?.get(step.order) && (
                       <li className={`${chip} border border-ink/15 bg-white font-semibold text-ink tabular-nums`} data-testid="step-cost">
@@ -173,6 +184,33 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
         })}
       </ol>
     </>
+  );
+}
+
+/** "Fixes #1, #3": each rank that has a problem card on the page is a link up to it; other ranks stay plain. */
+function FixesChip({ className, fixes, problemRanks }: { className: string; fixes: number[]; problemRanks?: ReadonlySet<number> }) {
+  const { linked, plain } = fixLinks(fixes, problemRanks ?? new Set());
+  const all = [...linked.map((r) => ({ r, link: true })), ...plain.map((r) => ({ r, link: false }))];
+  return (
+    <li className={className} data-testid="step-fixes">
+      Fixes&nbsp;
+      {all.map(({ r, link }, i) => (
+        <span key={r}>
+          {i > 0 && ", "}
+          {link ? (
+            <a
+              href={`#${problemAnchor(r)}`}
+              className="inline-flex min-h-6 min-w-6 items-center justify-center font-semibold text-accent-dark underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+              aria-label={`Go to problem ${r}`}
+            >
+              #{r}
+            </a>
+          ) : (
+            <>#{r}</>
+          )}
+        </span>
+      ))}
+    </li>
   );
 }
 

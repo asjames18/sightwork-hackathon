@@ -5,6 +5,7 @@ import { boxSource, coverageNote, groupByTier, issueExtras, issueTier, TIER_HINT
 import { checklistRows } from "@/lib/checklist";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { PrintOpenDetails } from "./PrintOpenDetails";
+import { fixedInLabel, problemAnchor, stepAnchor, stepsFixing } from "@/lib/client/stepLinks";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -81,6 +82,34 @@ function WhereAndWhat({ area, evidence }: { area?: string; evidence?: string }) 
   );
 }
 
+/** "Fixed in step 3" under a problem, each step number a link down to that step in the work order. */
+function FixedIn({ orders }: { orders: number[] }) {
+  const label = fixedInLabel(orders);
+  if (!label) return null;
+  const words = orders.length === 1 ? "Fixed in step" : "Fixed in steps";
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-sm text-ink/75" data-testid="fixed-in">
+      <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-safe-dark" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 10.5l4 4 8-9" />
+      </svg>
+      <span>{words}</span>
+      {orders.map((n, i) => (
+        <span key={n} className="inline-flex items-center gap-x-1.5">
+          <a
+            href={`#${stepAnchor(n)}`}
+            className="inline-flex min-h-6 min-w-6 items-center justify-center font-semibold text-accent-dark underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+            aria-label={`step ${n}`}
+          >
+            {n}
+          </a>
+          {i < orders.length - 2 && <span aria-hidden className="-ml-1.5">,</span>}
+          {i === orders.length - 2 && <span aria-hidden>and</span>}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function IssueCard({
   issue,
   frames,
@@ -89,9 +118,12 @@ function IssueCard({
   masks,
   sample,
   cost,
+  fixedIn = [],
   titleLevel = 4,
 }: {
   titleLevel?: 3 | 4;
+  /** Orders of the work steps that fix this problem; each becomes a link down to that step. */
+  fixedIn?: number[];
   issue: Issue;
   frames: PlanFrame[];
   narrated: boolean;
@@ -108,7 +140,8 @@ function IssueCard({
   const seen = issue.status !== "mentioned_not_seen";
   return (
     <li
-      className={`min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm break-inside-avoid ${SEVERITY_BORDER[issue.severity]} ${
+      id={problemAnchor(issue.rank)}
+      className={`min-w-0 scroll-mt-32 rounded-2xl border-l-4 bg-white p-4 shadow-sm break-inside-avoid ${SEVERITY_BORDER[issue.severity]} ${
         seen ? "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] md:items-start md:gap-4" : ""
       }`}
     >
@@ -143,6 +176,7 @@ function IssueCard({
         )}
         <p className="mt-1 text-sm text-ink/75">{issue.detail}</p>
         <WhereAndWhat area={area} evidence={evidence} />
+        <FixedIn orders={fixedIn} />
         {kind === "not_shown" && verdict?.reason && (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <span className="font-semibold">Not backed by a photo: </span>
@@ -218,7 +252,7 @@ export function ProblemList({
               <p className="-mt-2 mb-3 pl-[1.125rem] text-sm text-ink/65">{TIER_HINT[g.tier]}</p>
               <ol className="flex flex-col gap-3">
                 {g.issues.map((issue) => (
-                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} />
+                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} />
                 ))}
               </ol>
             </section>
@@ -227,7 +261,7 @@ export function ProblemList({
       ) : (
         <ol className="flex flex-col gap-3">
           {issues.map((issue) => (
-            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} />
+            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} />
           ))}
         </ol>
       )}

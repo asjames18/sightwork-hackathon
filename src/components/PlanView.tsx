@@ -334,7 +334,7 @@ export function PlanView({
 
       <Section title="Do the work in this order" id="steps">
         {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
-        {plan.workOrder.length > 0 && <WorkSteps plan={plan} stepCosts={stepCosts} />}
+        {plan.workOrder.length > 0 && <WorkSteps plan={plan} stepCosts={stepCosts} problemRanks={new Set(issues.map((i) => i.rank))} />}
       </Section>
 
       {/* Materials and cost sit side by side on desktop (lg+) whenever a cost card renders; phones and tablets stack them. */}
