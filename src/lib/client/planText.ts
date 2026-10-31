@@ -1,5 +1,6 @@
 import { COST_LABEL, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
+import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -58,6 +59,29 @@ export function withRunRegion(plan: WorkPlan, region: string | null | undefined)
   const r = typeof region === "string" ? clean(region) : "";
   if (!r || (typeof plan.meta?.region === "string" && plan.meta.region.trim())) return plan;
   return { ...plan, meta: { ...(plan.meta ?? {}), region: r } };
+}
+
+/** Heading and hint for the lower-confidence finds: the same words as the plan screen. */
+export const WATCH_HEADING = "Worth a closer look";
+export const WATCH_HINT = "Lower confidence. Not in the ranked list or the work order; check these in person.";
+/** Most lower-confidence finds listed in the shared text (the PDF lists them all). */
+export const MAX_SHARE_WATCH = 5;
+
+/**
+ * "Why only one problem: Only the stage was filmed." The server's note on why the plan has few problems,
+ * with the same lead-in as the plan screen. Null when there is no note.
+ */
+export function coverageLine(plan: WorkPlan): string | null {
+  const note = coverageNote(plan);
+  if (!note) return null;
+  const n = rankedIssues(plan).length;
+  return `Why ${n === 1 ? "only one problem" : n === 0 ? "no problems" : `only ${n} problems`}: ${clean(note)}`;
+}
+
+/** One lower-confidence find on one line: "Loose floor tile (side aisle, 40% sure)". */
+export function watchLine(w: Pick<WatchItem, "title" | "area" | "confidence">): string {
+  const extra = [w.area ? clean(w.area) : null, w.confidence !== undefined ? `${Math.round(w.confidence * 100)}% sure` : null].filter(Boolean).join(", ");
+  return `${clean(w.title)}${extra ? ` (${extra})` : ""}`;
 }
 
 /** "3 problems, worst first" / "1 problem" / "No problems found". */
@@ -122,7 +146,9 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const narrated = Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
   const sample = opts.sample ?? plan.meta?.isExample === true;
   const location = planLocation(plan);
-  const issues = [...plan.issues].sort((a, b) => a.rank - b.rank);
+  // Ranked problems only, like the plan screen: lower-confidence finds get their own short list below.
+  const issues = rankedIssues(plan).sort((a, b) => a.rank - b.rank);
+  const watch = watchItems(plan);
 
   lines.push(`Work plan: ${clean(plan.spaceName) || "Walkthrough"}`);
   lines.push([location, shareDate(opts.date ?? new Date())].filter(Boolean).join(" · "));
@@ -140,6 +166,13 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
     if (line) lines.push(line);
   } else {
     lines.push("", "Nothing stood out in the frames checked. Walk it in person before you sign off.");
+  }
+  const why = coverageLine(plan);
+  if (why) lines.push(why);
+  if (watch.length > 0) {
+    lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
+    for (const w of watch.slice(0, MAX_SHARE_WATCH)) lines.push(`- ${watchLine(w)}`);
+    if (watch.length > MAX_SHARE_WATCH) lines.push(`- and ${watch.length - MAX_SHARE_WATCH} more`);
   }
 
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);

@@ -11,7 +11,8 @@
 import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
-import { issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, shareDate } from "./planText";
+import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { rankedIssues, watchItems } from "@/lib/planExtras";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -107,7 +108,9 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   const after = images.after ?? null;
   const narrated = Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
   const review = planReview(plan);
-  const issues = [...plan.issues].sort((a, b) => a.rank - b.rank);
+  // Ranked problems only, like the plan screen; lower-confidence finds get their own section.
+  const issues = rankedIssues(plan).sort((a, b) => a.rank - b.rank);
+  const watch = watchItems(plan);
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
   let y = M;
 
@@ -318,6 +321,20 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   }
   const reviewText = plainReviewLine(plan);
   if (reviewText) para(reviewText, 9.5, "normal", MUTED, M, W, 4);
+  const why = coverageLine(plan);
+  if (why) para(why, 9.5, "normal", MUTED, M, W, 4);
+
+  // --- Worth a closer look -----------------------------------------------------------
+  if (watch.length) {
+    heading(`${WATCH_HEADING} (${watch.length})`, 50);
+    para(WATCH_HINT, 9.5, "normal", MUTED, M, W, 6);
+    for (const w of watch) {
+      para(watchLine(w), 11, "bold", INK, M, W, 1);
+      const sub = [w.detail ? clean(w.detail) : "", w.evidence ? `Photo shows: ${clean(w.evidence)}` : ""].filter(Boolean).join(" ");
+      if (sub) para(sub, 9.5, "normal", MUTED, M, W, 6);
+      else y += 5;
+    }
+  }
 
   // --- Counts -----------------------------------------------------------------------
   if (plan.inventory.length) {
