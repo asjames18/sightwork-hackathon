@@ -103,3 +103,29 @@ test("example plans never show the card", async ({ page }) => {
   await page.waitForTimeout(500);
   await expect(page.getByRole("region", { name: "Since your last walkthrough" })).toHaveCount(0);
 });
+
+test("Send to your team carries the same comparison in the text", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await seed(page);
+  await page.getByRole("region", { name: "Your recent plans" }).getByRole("button", { name: /^Sanctuary stage/ }).first().click();
+  await expect(page.getByRole("region", { name: "Since your last walkthrough" })).toBeVisible();
+  await page.getByRole("button", { name: "Send to your team" }).click();
+  await expect(page.getByText("Plan copied. Paste it into a text or email.")).toBeVisible();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text).toMatch(/Since the last walkthrough \([^)]+\): 1 no longer seen, 3 still there, 1 new\./);
+  expect(text).toContain("- No longer seen: Exposed wiring");
+  expect(text).toContain("- New this time: Water stain spreading on ceiling above choir (fix soon)");
+  expect(text).toContain("check the photos before counting one as fixed.");
+});
+
+test("example plans keep the comparison out of the shared text", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await seed(page);
+  await page.goto("/start?view=example");
+  await page.getByRole("button", { name: "Send to your team" }).click();
+  await expect(page.getByText("Plan copied. Paste it into a text or email.")).toBeVisible();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text).not.toContain("Since the last walkthrough");
+});
