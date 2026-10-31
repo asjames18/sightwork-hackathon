@@ -206,6 +206,20 @@ export function pickFallbackHeroFrameIndex(plan: WorkPlan, tried: number): numbe
 }
 
 export function buildVisibleChanges(plan: WorkPlan, hero: number): string[] {
+  // A non-object plan, or a non-array issues/workOrder list, would
+  // otherwise throw a raw TypeError from .filter below, with no step
+  // name — the same named-error rule pickHeroFrameIndex above follows.
+  // Valid plans pass through unchanged: runRenderAfter already
+  // requires both arrays.
+  if (!plan || typeof plan !== "object") {
+    throw new Error("renderAfter: plan must be an object");
+  }
+  if (!Array.isArray(plan.issues)) {
+    throw new Error("renderAfter: plan.issues must be an array");
+  }
+  if (!Array.isArray(plan.workOrder)) {
+    throw new Error("renderAfter: plan.workOrder must be an array");
+  }
   const heroIssues = plan.issues.filter(
     (issue) =>
       issue.frameIndex === hero ||
