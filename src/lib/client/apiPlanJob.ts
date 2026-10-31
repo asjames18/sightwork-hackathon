@@ -111,8 +111,11 @@ async function logServerError(res: Response, what = "plan"): Promise<void> {
   }
 }
 
-/** Shape POST /api/transcribe answers with (TranscribeOutput). */
-type TranscribeAnswer = { transcript: string | null; transcriptTurns: NonNullable<PlanRequest["transcriptTurns"]> };
+/**
+ * Shape POST /api/transcribe answers with (TranscribeOutput), plus costUsd: what that request's model
+ * calls cost. costUsd is 0 when the server sent none or a bad value, so it can only ever add a real amount.
+ */
+type TranscribeAnswer = { transcript: string | null; transcriptTurns: NonNullable<PlanRequest["transcriptTurns"]>; costUsd: number };
 
 function isTurn(v: unknown): boolean {
   if (!v || typeof v !== "object") return false;
@@ -128,7 +131,20 @@ export function parseTranscribeAnswer(v: unknown): TranscribeAnswer | null {
   const turns = o.transcriptTurns === undefined ? [] : o.transcriptTurns;
   if (!Array.isArray(turns) || !turns.every(isTurn)) return null;
   const transcript = typeof o.transcript === "string" && o.transcript.trim() ? o.transcript : null;
-  return { transcript, transcriptTurns: transcript ? (turns as TranscribeAnswer["transcriptTurns"]) : [] };
+  const costUsd = typeof o.costUsd === "number" && Number.isFinite(o.costUsd) && o.costUsd > 0 ? o.costUsd : 0;
+  return { transcript, transcriptTurns: transcript ? (turns as TranscribeAnswer["transcriptTurns"]) : [], costUsd };
+}
+
+/**
+ * Adds the split transcribe request's cost to the plan's own model-call total, so the run-cost line covers
+ * the whole run. Only when the plan carries a usable total: a plan without one stays without one (adding
+ * just the transcribe part would show a much smaller number than the run really cost).
+ */
+export function withTranscribeCost(plan: WorkPlan, transcribeUsd: number): WorkPlan {
+  const usd = plan.meta?.costUsd;
+  if (!(transcribeUsd > 0) || !Number.isFinite(transcribeUsd)) return plan;
+  if (typeof usd !== "number" || !Number.isFinite(usd) || usd < 0) return plan;
+  return { ...plan, meta: { ...plan.meta, costUsd: Math.round((usd + transcribeUsd) * 1e6) / 1e6 } };
 }
 
 /**
@@ -142,8 +158,9 @@ async function splitNarration(
   endpoint: string,
   code: string,
   signal: AbortSignal,
-): Promise<PlanRequest | "unauthorized"> {
-  if (!body.audioWavBase64 || body.transcript !== undefined) return body;
+): Promise<{ body: PlanRequest; costUsd: number } | "unauthorized"> {
+  const keep = { body, costUsd: 0 };
+  if (!body.audioWavBase64 || body.transcript !== undefined) return keep;
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -154,15 +171,15 @@ async function splitNarration(
     if (res.status === 401) return "unauthorized";
     if (!res.ok) {
       await logServerError(res, "transcribe");
-      return body;
+      return keep;
     }
     const answer = parseTranscribeAnswer(await res.json());
-    if (!answer) return body;
+    if (!answer) return keep;
     const { audioWavBase64: _wav, ...rest } = body;
     void _wav;
-    return { ...rest, transcript: answer.transcript, transcriptTurns: answer.transcriptTurns };
+    return { body: { ...rest, transcript: answer.transcript, transcriptTurns: answer.transcriptTurns }, costUsd: answer.costUsd };
   } catch {
-    return body;
+    return keep;
   }
 }
 
@@ -214,6 +231,8 @@ export function createApiPlanJob(
     }
     if (signal.aborted) return;
 
+    // What the split /api/transcribe request cost; added to the plan's total when it comes back.
+    let transcribeUsd = 0;
     if (transcribeEndpoint) {
       const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal);
       if (signal.aborted) return;
@@ -221,7 +240,8 @@ export function createApiPlanJob(
         fail(WRONG_CODE_MESSAGE);
         return;
       }
-      body = split;
+      body = split.body;
+      transcribeUsd = split.costUsd;
     }
 
     let res: Response;
@@ -251,8 +271,9 @@ export function createApiPlanJob(
       const s = parseStatusLine(line);
       if (!s || finished) return;
       if (s.state !== "running") finished = true;
-      // The plan keeps the City, ST it was run for, even when the cost step failed and costRange is null.
-      report(s.state === "done" ? { ...s, plan: withRunRegion(s.plan, body.region) } : s);
+      // The plan keeps the City, ST it was run for, even when the cost step failed and costRange is null,
+      // and its model-call total includes the split transcribe request.
+      report(s.state === "done" ? { ...s, plan: withTranscribeCost(withRunRegion(s.plan, body.region), transcribeUsd) } : s);
     };
 
     try {
