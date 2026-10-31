@@ -11,8 +11,9 @@ export interface ChecklistArea {
   /** checklistKey / hazard keys that belong here. */
   keys: readonly string[];
   /**
-   * Listed only when something landed here. For areas the plan step's sweep doesn't name for every space yet,
-   * so the summary never says SightWork checked an area it wasn't asked to check.
+   * Listed only when something landed here. For any future area the plan step's sweep doesn't name for every
+   * space yet, so the summary never says SightWork checked an area it wasn't asked to check. (Plumbing joined the
+   * general sweep, so it is listed on every checklist plan.)
    */
   onlyWhenFound?: boolean;
 }
@@ -31,7 +32,7 @@ export const CHECKLIST_AREAS: readonly ChecklistArea[] = [
   { id: "clean", label: "Cleanliness", keys: ["cleanliness"] },
   { id: "access", label: "Accessibility", keys: ["ada_path"] },
   { id: "hvac", label: "Heating and vents", keys: ["hvac"] },
-  { id: "plumbing", label: "Plumbing and water", keys: ["plumbing"], onlyWhenFound: true },
+  { id: "plumbing", label: "Plumbing and water", keys: ["plumbing"] },
 ];
 
 const KEY_TO_AREA = new Map(CHECKLIST_AREAS.flatMap((a) => a.keys.map((k) => [k, a.id] as const)));

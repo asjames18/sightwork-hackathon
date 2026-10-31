@@ -76,10 +76,16 @@ test("Listen row says it was off this run when transcribe was skipped, not 'No s
   assert.equal(quiet?.status, "not_needed");
 });
 
-test("plumbing area shows only when something landed there, so the summary never claims an unswept area", async () => {
+test("plumbing is part of the general sweep, so every checklist plan lists it, clear or not", async () => {
   const { checklistRows } = await import("@/lib/checklist");
-  assert.equal(checklistRows([], []).some((r) => r.id === "plumbing"), false);
+  assert.deepEqual(checklistRows([], []).find((r) => r.id === "plumbing"), { id: "plumbing", label: "Plumbing and water", found: 0, watch: 0 });
   const withLeak = checklistRows([{ checklistKey: "plumbing" }], []);
   assert.deepEqual(withLeak.find((r) => r.id === "plumbing"), { id: "plumbing", label: "Plumbing and water", found: 1, watch: 0 });
   assert.equal(checklistRows([], [{ checklistKey: "plumbing" }]).find((r) => r.id === "plumbing")?.watch, 1);
+});
+
+test("an area marked onlyWhenFound is still hidden until something lands there", async () => {
+  const { CHECKLIST_AREAS, checklistRows } = await import("@/lib/checklist");
+  const listed = checklistRows([], []).map((r) => r.id);
+  for (const a of CHECKLIST_AREAS) assert.equal(listed.includes(a.id), !a.onlyWhenFound, a.id);
 });

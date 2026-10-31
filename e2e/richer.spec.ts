@@ -160,6 +160,7 @@ test("richer plan: tiers, where and what, partly backed, SAM outline, cost share
   await expect(checklist.getByRole("listitem").filter({ hasText: "AV and cables" })).toContainText("1 problem");
   await expect(checklist.getByRole("listitem").filter({ hasText: "Exits and fire safety" })).toContainText("1 problem · 1 to check");
   await expect(checklist.getByRole("list", { name: "Areas with nothing flagged" }).getByRole("listitem").filter({ hasText: "Heating and vents" })).toBeVisible();
+  await expect(checklist.getByRole("list", { name: "Areas with nothing flagged" }).getByRole("listitem").filter({ hasText: "Plumbing and water" })).toBeVisible();
   await expect(checklist.getByRole("list", { name: "Areas with findings" }).getByRole("listitem")).toHaveCount(4);
   await shot(page, "checklist", checklist);
   await shot(page, "steps-with-costs", page.locator("#steps"));
