@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import type { Example } from "@/lib/examples";
+import { usePlanComparison } from "@/lib/client/usePlanComparison";
 import {
   deliverPlanPdf,
   downloadBlob,
   getPlanPdf,
+  pdfKeyOf,
   peekPlanPdf,
   prefersShareSheet,
   warmPlanPdf,
@@ -34,8 +36,10 @@ export function SavePdfButton({ plan, example, sample }: { plan: WorkPlan; examp
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null };
-  const labelKey = `${sample}|${example?.id ?? ""}`;
+  // Real plans only: the PDF then has the same "Since your last walkthrough" section as the screen.
+  const since = usePlanComparison(plan, !sample && !example && !plan.meta?.isExample);
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since };
+  const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
 
   // A new plan drops a file waiting for a second tap.
   useEffect(() => {

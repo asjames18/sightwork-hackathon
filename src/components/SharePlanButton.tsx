@@ -6,7 +6,7 @@ import type { Example } from "@/lib/examples";
 import { canShareFiles, planToText, sharePlanText, type ShareResult } from "@/lib/client/planText";
 import { compareShareLines } from "@/lib/client/planCompare";
 import { usePlanComparison } from "@/lib/client/usePlanComparison";
-import { peekPlanPdf, prefersShareSheet, warmPlanPdf } from "@/lib/client/savePlanPdf";
+import { pdfKeyOf, peekPlanPdf, prefersShareSheet, warmPlanPdf } from "@/lib/client/savePlanPdf";
 
 const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
   copied: "Plan copied. Paste it into a text or email.",
@@ -32,9 +32,11 @@ export function SharePlanButton({ plan, sample = false, example }: { plan: WorkP
   const since = usePlanComparison(plan, !sample && !example && !plan.meta?.isExample);
   const sinceLines = since ? compareShareLines(since.comparison, since.when) : undefined;
 
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null };
+  // Same label as Save PDF (comparison included), so both buttons share one built file.
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since };
+  const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => warmPlanPdf(plan, label), [plan, sample, example?.id]);
+  useEffect(() => warmPlanPdf(plan, label), [plan, labelKey]);
 
   async function onShare() {
     if (busy) return;

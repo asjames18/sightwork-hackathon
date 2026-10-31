@@ -11,6 +11,7 @@
 import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
+import { compareSummary, type CompareRow, type PlanComparison } from "./planCompare";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
@@ -42,6 +43,8 @@ export interface PlanPdfOptions {
   images?: PlanPdfImages;
   /** Zip the page streams (smaller file). Tests turn it off to read the text. */
   compress?: boolean;
+  /** Real plans only: the comparison with the previous saved walkthrough of this space and place, and its date. */
+  since?: { comparison: PlanComparison; when?: string | null } | null;
 }
 
 export const PDF_SAMPLE_LABEL = "Example plan with sample data, not a real run";
@@ -90,6 +93,7 @@ const MUTED: Rgb = [92, 96, 102];
 const LINE: Rgb = [224, 222, 216];
 const ACCENT: Rgb = [232, 89, 12];
 const ACCENT_DARK: Rgb = [194, 65, 12];
+const PDF_TIER: Record<CompareRow["tier"], string> = { urgent: "fix now", soon: "fix soon", later: "can wait" };
 const SEVERITY: Record<string, Rgb> = { high: [220, 38, 38], medium: [245, 158, 11], low: [180, 182, 186] };
 const AMBER_BG: Rgb = [254, 243, 199];
 const AMBER_INK: Rgb = [120, 53, 15];
@@ -367,6 +371,36 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       doc.line(M, y, M + W, y);
       y += 6;
     }
+  }
+
+  // --- Since the last walkthrough ----------------------------------------------------
+  // Same groups and caution as the card on the plan screen. Never on samples or example plans.
+  const since = sample || opts.example ? null : opts.since?.comparison ?? null;
+  if (since && since.gone.length + since.stillThere.length + since.newOnes.length > 0) {
+    const when = opts.since?.when ? clean(opts.since.when) : "";
+    heading("Since your last walkthrough", 60);
+    para(`${compareSummary(since)}, compared with the walkthrough of this space${when ? ` on ${when}` : ""}.`, 10, "normal", MUTED, M, W, 6);
+    const groups: [string, CompareRow[], Rgb][] = [
+      ["No longer seen", since.gone, [4, 120, 87]],
+      ["Still there", since.stillThere, [146, 64, 14]],
+      ["New this time", since.newOnes, [7, 89, 133]],
+    ];
+    for (const [title, rows, tone] of groups) {
+      if (!rows.length) continue;
+      ensure(lineH(11) + lineH(10.5) + 6);
+      para(`${title} (${rows.length})`, 11, "bold", tone, M, W, 2);
+      for (const r of rows) para(`- ${clean(r.title)} (${PDF_TIER[r.tier]})`, 10.5, "normal", INK, M + 8, W - 8, 1);
+      y += 6;
+    }
+    para(
+      "Problems are matched by what they are and where they are, so check the photos before you count one as fixed. A problem can also drop out because the camera didn't pass it this time.",
+      9,
+      "normal",
+      MUTED,
+      M,
+      W,
+      4,
+    );
   }
 
   // --- Counts -----------------------------------------------------------------------
