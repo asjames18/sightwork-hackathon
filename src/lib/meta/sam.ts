@@ -82,10 +82,11 @@ export const SAM_METADATA = {
 
 /**
  * A SAM call that was billed but failed after the provider answered:
- * a 200 with no text output, or output_text whose box tokens do not
- * parse. Carries the flat per-request cost and latency so the segment
- * step's recordFailedCall can record the spend instead of dropping it
- * from the route total, the same shape as BasetenCallError/MetaCallError.
+ * a 200 with no text output, output_text whose box tokens do not
+ * parse, or a 200 body that is not JSON at all. Carries the flat
+ * per-request cost and latency so the segment step's recordFailedCall
+ * can record the spend instead of dropping it from the route total,
+ * the same shape as BasetenCallError/MetaCallError.
  */
 export class SamCallError extends Error {
   readonly costUsd: number;
@@ -314,7 +315,18 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
       });
       if (res.ok) {
         const latencyMs = Date.now() - started;
-        const parsed = (await res.json()) as Record<string, unknown>;
+        // A 200 body that is not JSON was billed at the flat
+        // per-request rate like any other 200, but res.json() used
+        // to throw a raw SyntaxError here, so the segment step's
+        // recordFailedCall saw no costUsd and the spend was dropped
+        // from the route total. Carry it like the no-text and
+        // bad-token branches below.
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = (await res.json()) as Record<string, unknown>;
+        } catch {
+          throw new SamCallError("sam: response was not JSON", requestCost, latencyMs);
+        }
         const text = extractText(parsed);
         if (text === null) {
           // The provider answered 200, so the request was billed even
