@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { test, expect, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
 
 // /api stays blocked (helpers.ts) and console errors fail the test; the stored sanctuary run needs no model.
@@ -43,10 +44,42 @@ test("each crew row sends just that crew's steps and materials", async ({ page, 
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text).toMatch(/^Electrician \/ AV tech: your part of the work plan for /);
     expect(text).toContain("Step 1. ");
+    expect(text).toMatch(/\n {3}When: (Mon|Tue|Wed|Thu|Fri), \w{3} \d{1,2}, \d{1,2}(:\d{2})? (AM|PM) to /);
     expect(text).toContain("this list is step 1 only.");
     expect(text).toContain("Made with SightWork");
     await expectNoSideScroll(page);
     await page.evaluate(() => window.scrollTo(0, 0));
     await expectNoAxeViolations(page, `crew send ${width}`);
+  }
+});
+
+test("each crew row downloads a calendar of just that crew's steps, at the full calendar's times", async ({ page }) => {
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/start?view=example&ex=sanctuary");
+    const card = page.locator("#steps").getByTestId("crew-summary");
+    await card.scrollIntoViewIfNeeded();
+    await expect(card.getByTestId("crew-calendar")).toHaveCount(4);
+    const btn = card.getByRole("button", { name: "Calendar file of Electrician / AV tech's steps" });
+    const box = await btn.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    const [crewDl] = await Promise.all([page.waitForEvent("download"), btn.click()]);
+    expect(crewDl.suggestedFilename()).toMatch(/^sightwork-electrician-av-tech-steps-\d{4}-\d{2}-\d{2}\.ics$/);
+    const crewIcs = (await readFile((await crewDl.path())!, "utf8")).replace(/\r\n /g, "");
+    expect(crewIcs).toMatch(/X-WR-CALNAME:SightWork: .*\\, Electrician \/ AV tech\r\n/);
+    expect(crewIcs).toMatch(/SUMMARY:Step 1: /);
+    expect(crewIcs).not.toMatch(/SUMMARY:Step 3: /);
+    await expect(card.getByText("Saved. Send the file to them.")).toBeVisible();
+
+    const [fullDl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("step-calendar").getByRole("button", { name: "Add to calendar" }).click()]);
+    const fullIcs = (await readFile((await fullDl.path())!, "utf8")).replace(/\r\n /g, "");
+    const start = (ics: string) => ics.match(/step-1-1@[\s\S]*?DTSTART:(\d{8}T\d{6})/)?.[1];
+    expect(start(crewIcs)).toBeTruthy();
+    expect(start(crewIcs)).toBe(start(fullIcs));
+
+    await card.scrollIntoViewIfNeeded();
+    await expectNoSideScroll(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectNoAxeViolations(page, `crew calendar ${width}`);
   }
 });

@@ -10,7 +10,7 @@ import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
-import { calendarFileName, calendarSummary, planCalendar } from "@/lib/client/stepCalendar";
+import { calendarFileName, calendarSummary, crewCalendarFileName, planCalendar } from "@/lib/client/stepCalendar";
 import { downloadBlob } from "@/lib/client/savePlanPdf";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -69,6 +69,7 @@ export function WorkSteps({
                       {hrs && <>, {hrs}</>}
                     </span>
                     <CrewSendButton plan={plan} crew={row} />
+                    <CrewCalendarButton plan={plan} crew={row} />
                   </span>
                 </li>
               );
@@ -267,7 +268,7 @@ function CrewSendButton({ plan, crew }: { plan: WorkPlan; crew: CrewRow }) {
     if (busy) return;
     setBusy(true);
     setStatus("");
-    const result = await sharePlanText(crewHandoutTitle(plan, crew), crewHandoutText(plan, crew), navigator as ShareNavigator, prefersShareSheet());
+    const result = await sharePlanText(crewHandoutTitle(plan, crew), crewHandoutText(plan, crew, { scheduleFrom: new Date() }), navigator as ShareNavigator, prefersShareSheet());
     setBusy(false);
     if (result === "shared") return;
     setStatus(CREW_STATUS[result]);
@@ -290,6 +291,40 @@ function CrewSendButton({ plan, crew }: { plan: WorkPlan; crew: CrewRow }) {
           <path d="M4 11v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-5" />
         </svg>
         Send
+      </button>
+      <span role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </span>
+    </span>
+  );
+}
+
+/** One crew's steps as their own .ics, at the same times as the full "Add to calendar" file. */
+function CrewCalendarButton({ plan, crew }: { plan: WorkPlan; crew: CrewRow }) {
+  const [status, setStatus] = useState("");
+
+  function onAdd() {
+    const now = new Date();
+    const name = crewCalendarFileName(crew.label, now);
+    const ics = planCalendar(plan, now, { only: crew.steps, label: crew.label });
+    const ok = downloadBlob(new Blob([ics], { type: "text/calendar;charset=utf-8" }), name);
+    setStatus(ok ? "Saved. Send the file to them." : "Couldn't save a calendar file.");
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2 print:hidden">
+      <button
+        type="button"
+        onClick={onAdd}
+        aria-label={`Calendar file of ${crew.label}'s steps`}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/20 bg-white px-3 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+        data-testid="crew-calendar"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4.5" width="14" height="12.5" rx="2" />
+          <path d="M3 8.5h14M7 2.5v4M13 2.5v4" />
+        </svg>
+        Calendar
       </button>
       <span role="status" aria-live="polite" className="text-sm text-ink/70">
         {status}
