@@ -6,6 +6,7 @@ import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdi
 import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
 import { walkTextLines } from "./walkTimeline";
+import { calendarSummary } from "./stepCalendar";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -237,6 +238,9 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
       const extra = [s.trade ? clean(s.trade) : null, s.hours ? `${span(s.hours)} h` : null].filter(Boolean).join(", ");
       lines.push(`${s.order}. ${clean(s.title)}${extra ? ` (${extra})` : ""}`);
     }
+    // Same schedule as the Add to calendar file (weekdays 9 to 5 from the next workday).
+    const schedule = calendarSummary(steps, opts.date ?? new Date());
+    if (schedule) lines.push(`Schedule: ${schedule}`);
     const progress = sample ? null : shareProgressLine(steps, opts.doneSteps ?? []);
     if (progress) lines.push(progress);
   }
