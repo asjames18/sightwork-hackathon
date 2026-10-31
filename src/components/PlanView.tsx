@@ -1,4 +1,5 @@
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
+import { noNarrationNote, noNarrationTag } from "@/lib/client/narrationNote";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
@@ -47,7 +48,7 @@ export function planMetaParts(plan: WorkPlan): string[] | null {
   if (secs) parts.push(`${Math.round(Number(secs[1]))} s`);
   const n = frameCount ? Number(frameCount[1]) : (plan.frames?.length ?? 0);
   if (n > 0) parts.push(`${n} ${n === 1 ? "frame" : "frames"}`);
-  parts.push(isNarrated(plan) ? "narrated" : "no narration");
+  parts.push(isNarrated(plan) ? "narrated" : noNarrationTag(plan));
   return parts;
 }
 
@@ -220,8 +221,7 @@ export function PlanView({
 
       {!narrated && (
         <p className="mt-4 rounded-xl bg-white p-4 text-sm text-ink/70">
-          No narration in this video, so everything here comes from what the camera saw. Talk through what you&apos;re worried
-          about next time and SightWork will compare what you said with what it sees.
+          {noNarrationNote(plan).lead} {noNarrationNote(plan).hint}
         </p>
       )}
 

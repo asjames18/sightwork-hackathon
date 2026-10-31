@@ -13,6 +13,7 @@ import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/ty
 import { planReview, verdictFor } from "@/lib/review";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
+import { noNarrationNote } from "./narrationNote";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -232,7 +233,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   });
   y += 70;
   if (narrated && plan.transcriptSummary) para(`What you asked for: ${clean(plan.transcriptSummary)}`, 10.5, "normal", INK, M, W, 6);
-  if (!narrated) para("No narration in this video, so everything here comes from what the camera saw.", 9.5, "normal", MUTED, M, W, 6);
+  if (!narrated) para(noNarrationNote(plan).lead, 9.5, "normal", MUTED, M, W, 6);
 
   // --- After picture --------------------------------------------------------------
   if (after) {
