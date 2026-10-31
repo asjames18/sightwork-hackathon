@@ -129,3 +129,21 @@ test("example plans keep the comparison out of the shared text", async ({ page, 
   const text = await page.evaluate(() => navigator.clipboard.readText());
   expect(text).not.toContain("Since the last walkthrough");
 });
+
+test("Save PDF carries the same comparison as the card", async ({ page, isMobile }) => {
+  test.skip(Boolean(isMobile), "desktop download");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await seed(page);
+  await page.getByRole("region", { name: "Your recent plans" }).getByRole("button", { name: /^Sanctuary stage/ }).first().click();
+  await expect(page.getByRole("region", { name: "Since your last walkthrough" })).toBeVisible();
+  const download = page.waitForEvent("download", { timeout: 20_000 });
+  await page.getByRole("button", { name: "Save PDF" }).click();
+  const file = await (await download).path();
+  const { execFileSync } = await import("node:child_process");
+  const text = execFileSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" }).replace(/\s+/g, " ");
+  expect(text).toContain("Since your last walkthrough");
+  expect(text).toMatch(/1 no longer seen, 3 still there, 1 new, compared with the walkthrough of this space on /);
+  expect(text).toContain("No longer seen (1)");
+  expect(text).toContain("Water stain spreading on ceiling above choir (fix soon)");
+  expect(text).toContain("check the photos before you count one as fixed");
+});
