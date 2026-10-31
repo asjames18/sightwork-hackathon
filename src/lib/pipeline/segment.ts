@@ -642,6 +642,19 @@ export async function runWithConcurrency<T>(
   if (!Number.isInteger(limit) || limit < 1) {
     throw new Error(`segment: concurrency must be a whole number >= 1, got ${limit}`);
   }
+  // The pool reads tasks.length and calls each entry, so a non-array
+  // or a non-function entry would otherwise surface as a raw
+  // TypeError from inside a worker, hiding the caller and the cause
+  // behind the same named-error rule the limit check above follows.
+  // Reject both up front, before any worker starts.
+  if (!Array.isArray(tasks)) {
+    throw new Error(`segment: tasks must be an array of functions, got ${tasks === null ? "null" : typeof tasks}`);
+  }
+  for (let i = 0; i < tasks.length; i++) {
+    if (typeof tasks[i] !== "function") {
+      throw new Error(`segment: task ${i} must be a function, got ${typeof tasks[i]}`);
+    }
+  }
   const results: T[] = new Array(tasks.length);
   let next = 0;
   let failed = false;
