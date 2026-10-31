@@ -17,6 +17,12 @@ const GENERIC_FAIL = "Something went wrong while making the plan. Try again, or 
 const READ_FAIL = "We couldn't read that video. Try a different file, or open the example plan.";
 const CONNECTION_FAIL = "The connection dropped before the plan finished. Try again.";
 
+/**
+ * The narration couldn't go on its own to /api/transcribe, and carrying it in the plan request would put
+ * that request over the host's body cap (a platform 413 that reads as "too large"). Trying again usually works.
+ */
+export const NARRATION_SEND_FAIL = "We couldn't send what you said in the video. Try again in a moment.";
+
 function isRunStep(v: unknown): v is RunStep {
   return typeof v === "string" && (RUN_STEPS as string[]).includes(v);
 }
@@ -233,6 +239,8 @@ export function createApiPlanJob(
   buildRequest: BuildPlanRequest,
   endpoint = "/api/plan",
   transcribeEndpoint: string | null = "/api/transcribe",
+  /** Host body cap for the plan request; a WAV-carrying fallback over it stops with NARRATION_SEND_FAIL. */
+  maxBodyBytes?: number,
 ): PlanJobRunner {
   return async ({ file, onStatus, signal }) => {
     let lastStep: RunStep = "uploading";
@@ -284,6 +292,11 @@ export function createApiPlanJob(
       }
       body = split.body;
       transcribeUsd = split.costUsd;
+    }
+    // Frames sized for a split run (see narrationSentSeparately) plus the WAV would not fit; say so plainly.
+    if (body.audioWavBase64 && maxBodyBytes && JSON.stringify(body).length > maxBodyBytes) {
+      fail(NARRATION_SEND_FAIL);
+      return;
     }
 
     let res: Response;
