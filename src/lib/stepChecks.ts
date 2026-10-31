@@ -4,7 +4,7 @@
  * Pure (plan types only), so the pipeline can import the same rules it streams, and the preview runner can
  * show the same notes for the plan it ends on.
  */
-import { masksAvailable, type RunStep, type StepCheck, type WorkPlan } from "./types";
+import { masksAvailable, parsePricingCounts, type RunStep, type StepCheck, type WorkPlan } from "./types";
 import { reviewTally } from "./review";
 
 /** Longest note the screen shows. */
@@ -34,6 +34,16 @@ export function transcriptWords(plan: Pick<WorkPlan, "transcript" | "transcriptT
 export function uploadCheck(frameCount: number, sharpSwaps = 0): StepCheck {
   if (frameCount <= 0) return { ok: false, note: "No frames came through" };
   return { ok: true, note: `${plural(frameCount, "frame")}${sharpSwaps > 0 ? `, ${sharpSwaps} swapped for a sharper one` : ""}` };
+}
+
+/**
+ * "4 of 6 prices looked up live" when the cost step reports its price counts; null when it
+ * didn't (older plans, example plans, no cost range) or priced nothing.
+ */
+export function pricingNote(plan: Pick<WorkPlan, "costRange">): string | null {
+  const p = plan.costRange ? parsePricingCounts(plan.costRange.pricing) : null;
+  if (!p || p.priced === 0) return null;
+  return `${p.grounded} of ${plural(p.priced, "price")} looked up live`;
 }
 
 /**
@@ -71,6 +81,12 @@ export function stepChecksForPlan(plan: WorkPlan, opts: { sharpSwaps?: number } 
       : withProof === n
         ? { ok: true, note: `Plan: ${plural(n, "problem")}, each with a proof frame` }
         : { ok: false, note: `Plan: ${withProof} of ${plural(n, "problem")} have a proof frame` };
+
+  const prices = pricingNote(plan);
+  if (prices && out.planning) {
+    const joined = `${out.planning.note}; ${prices}`;
+    if (joined.length <= MAX_CHECK_NOTE) out.planning = { ...out.planning, note: joined };
+  }
 
   if (plan.afterImageUrl) out.picturing = { ok: true, note: "After picture made" };
 

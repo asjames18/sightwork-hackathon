@@ -254,6 +254,22 @@ export interface CostRange {
   assumptions: string[];
   /** Real, citable sources only. Omit when ungrounded. */
   sources?: { title: string; url: string }[];
+  /**
+   * How many materials got a price, and how many of those prices came from a live web search
+   * (the model's own grounded flag) rather than a regional estimate. Omitted on older plans.
+   */
+  pricing?: { priced: number; grounded: number };
+}
+
+/** Checks untrusted price counts; null unless both are whole numbers with 0 <= grounded <= priced. */
+export function parsePricingCounts(v: unknown): { priced: number; grounded: number } | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const priced = o.priced, grounded = o.grounded;
+  if (typeof priced !== "number" || typeof grounded !== "number") return null;
+  if (!Number.isInteger(priced) || !Number.isInteger(grounded)) return null;
+  if (grounded < 0 || priced < grounded) return null;
+  return { priced, grounded };
 }
 
 /** One row of the said-vs-seen comparison shown to the user. */
@@ -444,6 +460,7 @@ export function checkWorkPlan(plan: WorkPlan): string[] {
     if (!(c.low >= 0 && c.low <= c.high)) errs.push("costRange.low must be 0..high");
     if (c.label !== COST_LABEL) errs.push(`costRange.label must be "${COST_LABEL}"`);
     if (!c.region.trim()) errs.push("costRange.region is required");
+    if (c.pricing !== undefined && !parsePricingCounts(c.pricing)) errs.push("costRange.pricing must be whole numbers with grounded <= priced");
   }
 
   if (plan.heroFrameIndex !== undefined && !inFrames(plan.heroFrameIndex)) errs.push("heroFrameIndex out of range");
