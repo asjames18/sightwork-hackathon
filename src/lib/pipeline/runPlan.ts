@@ -1390,8 +1390,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       console.warn(`runPlan: review failed unexpectedly, continuing without review: ${detailOf(err)}`);
       review = { ran: false, items: [] };
     }
+    // The final plan's meta was computed before reviewing (above), so
+    // recompute it here: otherwise the review call's spend and model
+    // would be missing from meta.costUsd / meta.models on every
+    // reviewed run, and the run-cost line would undercount.
     return {
       ...plan,
+      meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped, transcribeSkipped),
       review: review.ran ? { ...review, source: "model" as const } : review,
     };
   }
