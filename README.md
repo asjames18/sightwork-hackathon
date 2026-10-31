@@ -1,5 +1,7 @@
 # SightWork
 
+[![CI](https://github.com/asjames18/sightwork-hackathon/actions/workflows/ci.yml/badge.svg)](https://github.com/asjames18/sightwork-hackathon/actions/workflows/ci.yml)
+
 **Built by Antonio James** for the Meta AI Developer Hackathon (Oct 26 – Nov 4, 2026), Startup track.
 
 SightWork turns a 60–90 second phone walkthrough of a property into a work plan you can act on.
@@ -12,7 +14,7 @@ You film one walkthrough. SightWork returns:
 - **Proof frames:** the video frame behind each finding.
 - **Materials:** what the work will need.
 - **Order of work:** the steps, in the order they should happen.
-- **Cost range:** a rough estimate of what the work will cost.
+- **Cost range:** a rough estimate of what the work will cost in your city and state, with material prices looked up live on the web and a line saying how many were.
 - **After image:** an AI-generated picture of the finished space.
 
 ## How it works
@@ -24,8 +26,8 @@ SightWork is a multi-step agent where every model is a Meta model. Each step has
 | 1. Listen | **Muse Voice Transcribe** | Meta Model API | Narration to timestamped text, so SightWork knows what was said. |
 | 2. Look and count | **SAM 3.1** | Meta Model API | Outlines and counts what's in the room, frame by frame. |
 | 3. Compare and plan | **Muse Spark Open** (default) or **Muse Spark** | Meta open weights on Baseten, or Meta Model API | Sweeps the space zone by zone against a categorized checklist (life safety, electrical, AV, lighting, seating, flooring, walls, accessibility and more, plus extra checks for the space type picked), checks what was said against what was seen, ranks the problems (including ones nobody mentioned) with a proof frame each, then writes the materials and the ordered work steps. |
-| 4. Price | **Muse Spark** with web search | Meta Model API | A rough local cost range, when a location is given. |
-| 5. Picture | **Muse Image** | Meta Model API | An AI concept of the finished space. |
+| 4. Price | **Muse Spark** with web search | Meta Model API | A rough cost range for the city and state: looks up material prices and the local labor rate on the web (searches batched, not one per item), and reports how many prices came from live search. The range itself is computed in code from those prices, so the math is reproducible. |
+| 5. Picture | **Muse Image** | Meta Model API | An AI concept of the finished space, edited from the plan's hero frame, or the next frame that shows a ranked problem when the hero frame shows none. Existing logos, emblems, banners and wall art are kept exactly as they are. |
 | 6. Review | same plan model, review only | as step 3 | Checks every problem against its proof photo and marks any it can't back as Unverified. Never edits the plan. |
 
 ```mermaid
@@ -43,7 +45,9 @@ flowchart LR
   R --> W
 ```
 
-SAM 3.1, Muse Image and the cost step are optional: when one is unavailable, the plan still comes back complete and says what was skipped. Every plan ends with a **Powered by Meta AI** panel listing each step, the Meta model behind it, where it ran, and whether it ran for that plan (hand-written samples say no model ran). The processing screen names the model under each step while it runs. A full run takes about 2 to 3 minutes and has cost $0.38 to $0.72 in model calls on real walkthroughs.
+SAM 3.1, Muse Image and the cost step are optional: when one is unavailable, the plan still comes back complete and says what was skipped. Every plan ends with a **Powered by Meta AI** panel listing each step, the Meta model behind it, where it ran, and whether it ran for that plan (hand-written samples say no model ran). The processing screen names the model under each step while it runs. A full run takes about 2 to 3 minutes and has cost $0.38 to $1.11 in model calls on real walkthroughs, most of it SAM 3.1 outlining about 300 frame and object pairs.
+
+The plan and review calls run at temperature 0.2, so two runs on the same video stay closer together. When web search puts a sentence of prose ahead of the answer, the caller still finds the JSON answer in the response instead of failing the step.
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How the build maps to the judging criteria: [docs/JUDGING.md](docs/JUDGING.md).
 
@@ -64,6 +68,8 @@ To check the TypeScript types without starting the app, run `npm run typecheck`.
 To run the local checks, run `npm test` (Node 22.18 or newer, no extra packages). They cover the example plans (every image exists at the size the page reserves, every reference points at a real frame or problem, samples are labeled and credited), the upload screen's length check, the API runner's stream handling against a fake server, and the tester-code gate. Nothing in them calls a model or the network.
 
 To run the browser checks, run `npm run e2e` (Playwright; run `npx playwright install chromium` once, or set `E2E_CHROME_PATH` to an installed Chrome). It builds the app, starts it locally with the example runner and every model key blanked, and walks landing → /start → example plan → upload a small test video → processing → plan, plus the 5-second minimum, the tester-code gate (in the browser and on the server), plan-screen keyboard use (section chips, before/after slider keys), Save PDF (a real PDF file: share sheet on a phone, download on a computer) and the print view, Open my last plan, the step check notes and the review line with an Unverified badge (on a stubbed run), the 404 page and /credits, the in-page recorder on Chromium's fake camera (a 1080p take at the 8 Mbps setting, cancel and blocked-camera fallbacks, WebM length), at 390 px and 1440 px with an axe accessibility scan on each screen. Every browser request to `/api` is blocked and fails the test, so it never calls a model. Set `E2E_SKIP_BUILD=1` to reuse the last build, or `E2E_BASE_URL` to test a server that's already running. It isn't part of `npm run build` or `npm test`.
+
+GitHub Actions runs the typecheck, the unit tests and a production build with no keys on every push and pull request to `main` (see the badge at the top).
 
 ### Preview with example data (no API calls, no keys)
 The example plans open without any keys. A video you record or choose is always sent as a real run (see "Real runs"), so your own walkthrough is never answered with an example plan. To walk the whole flow with example data instead, add `?runner=mock`; `?fail=` and `?mock=` below also use the example run. These links jump straight to a screen (older `/?view=` style links still work and redirect to `/start` with the query kept):
@@ -98,12 +104,13 @@ A brief gateway error from the plan model (502, 503 or 504) is retried up to thr
 
 Each request logs one usage line on the server with its model calls and cost: one from the transcribe route and one from the plan route. For a narrated run, add the two together to get the run's total.
 
-While a plan runs, the processing screen shows each step with the model behind it, a running clock beside "Step N of M", and how long each finished step took. The phone screen stays on until the run ends, and the browser tab title shows the current step.
+While a plan runs, the processing screen shows each step with the model behind it, a running clock beside "Step N of M", and how long each finished step took. With a city and state, the Planning row says Muse Spark is pricing materials and labor for that place with web search. A time line under the clock comes from measured real runs: "Usually 2 to 3 minutes" (about 3 with live prices for the place), then "Taking a little longer than usual" past 3.5 minutes and a near-limit note past 4.5 minutes, since the server stops a run at 5. The phone screen stays on until the run ends, and the browser tab title shows the current step.
 
 Each finished step can carry a short check note under it ("Checked: …", or "Flagged: …" when something looked off, such as a count with no outline or a problem without a proof frame), and the last step is **Reviewing**. The reviewer is review-only: a separate pass looks at each problem next to its proof photos and marks any it can't back with a photo as **Unverified**, with a one-line reason. It never rewrites the plan. The plan then shows "Reviewed by a separate check: N of M problems backed by a photo." above the problems, and an Unverified badge on each problem it couldn't back; that carries into Save PDF and the shared text. If the review doesn't run, the plan says so instead of implying everything was checked. The example plans carry a review worked out ahead of time from their own proof photos (no model runs), and say that. On real runs the check notes and the review appear once the server sends them; without them the plan shows neither.
 
 On the plan screen:
 - **Problems are grouped by how soon to act:** Fix now (safety), Fix soon (damage that grows, things that don't work) and Can wait (cosmetic), worst first inside each group. Each problem can show where it is, what its photo literally shows, and its share of the cost range.
+- **The cost card says where its prices came from:** for example "All 3 material prices looked up live on the web for Atlanta, GA." or "5 of 7 … the rest are regional estimates." The same line goes into Save PDF and the shared text. Example plans and older plans don't show it.
 - **Worth a closer look** (collapsed) lists the lower-confidence finds with their photos. When a plan has fewer than three problems, a short note says why (for example, only the stage was filmed).
 - **Send to your team** shares the plan as plain text: the phone's share sheet on touch devices, the clipboard elsewhere. The text follows the screen (problems worst first, work steps in order, materials, and the cost range with its "rough estimate, not a quote" label).
 - **Work steps are a checklist.** Tick each step as it's done; ticks are saved on this device for that plan, so a crew lead can come back to it later. "Clear ticks" resets them.
