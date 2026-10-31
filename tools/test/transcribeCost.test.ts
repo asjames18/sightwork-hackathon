@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { parseTranscribeAnswer, withTranscribeCost } from "@/lib/client/apiPlanJob";
+import { failureCostUsd, parseTranscribeAnswer, splitNarration, withTranscribeCost } from "@/lib/client/apiPlanJob";
+import type { PlanRequest } from "@/lib/types";
 import type { WorkPlan } from "@/lib/types";
 
 const plan = (meta?: WorkPlan["meta"]) => ({ issues: [], ...(meta ? { meta } : {}) }) as unknown as WorkPlan;
@@ -35,5 +36,61 @@ describe("withTranscribeCost", () => {
   test("no transcribe cost returns the same plan", () => {
     const p = plan({ costUsd: 0.4 });
     for (const t of [0, -0.1, Number.NaN, Number.POSITIVE_INFINITY]) assert.equal(withTranscribeCost(p, t), p);
+  });
+});
+
+describe("failed transcribe request cost", () => {
+  test("failureCostUsd reads a real costUsd and nothing else", () => {
+    assert.equal(failureCostUsd({ error: "x", costUsd: 0.0021 }), 0.0021);
+    for (const v of [null, "text", 5, {}, { costUsd: 0 }, { costUsd: -1 }, { costUsd: Number.NaN }, { costUsd: "0.1" }])
+      assert.equal(failureCostUsd(v), 0, JSON.stringify(v));
+  });
+
+  const body = { audioWavBase64: "UklGRg==", frames: [] } as unknown as PlanRequest;
+  const withFetch = async (res: () => Response, run: () => Promise<void>) => {
+    const real = globalThis.fetch;
+    const warn = console.warn;
+    globalThis.fetch = (async () => res()) as typeof fetch;
+    console.warn = () => {};
+    try {
+      await run();
+    } finally {
+      globalThis.fetch = real;
+      console.warn = warn;
+    }
+  };
+
+  test("a 500 that carries costUsd keeps the audio request and returns that cost", async () => {
+    await withFetch(
+      () => new Response(JSON.stringify({ error: "Transcription failed", costUsd: 0.0021 }), { status: 500 }),
+      async () => {
+        const out = await splitNarration(body, "/api/transcribe", "code", new AbortController().signal);
+        assert.notEqual(out, "unauthorized");
+        if (out === "unauthorized") return;
+        assert.equal(out.body, body);
+        assert.equal(out.costUsd, 0.0021);
+      },
+    );
+  });
+
+  test("a 500 with no cost, a bad cost or a plain-text body adds nothing", async () => {
+    for (const text of [JSON.stringify({ error: "x" }), JSON.stringify({ error: "x", costUsd: 0 }), "Internal Server Error"]) {
+      await withFetch(
+        () => new Response(text, { status: 500 }),
+        async () => {
+          const out = await splitNarration(body, "/api/transcribe", "code", new AbortController().signal);
+          if (out === "unauthorized") return assert.fail("unexpected 401");
+          assert.equal(out.body, body);
+          assert.equal(out.costUsd, 0, text);
+        },
+      );
+    }
+  });
+
+  test("a 401 is still unauthorized", async () => {
+    await withFetch(
+      () => new Response(JSON.stringify({ error: "no", costUsd: 0.5 }), { status: 401 }),
+      async () => assert.equal(await splitNarration(body, "/api/transcribe", "code", new AbortController().signal), "unauthorized"),
+    );
   });
 });
