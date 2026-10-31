@@ -10,6 +10,8 @@ import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
+import { calendarFileName, calendarSummary, planCalendar } from "@/lib/client/stepCalendar";
+import { downloadBlob } from "@/lib/client/savePlanPdf";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -175,7 +177,51 @@ export function WorkSteps({
           );
         })}
       </ol>
+      <CalendarButton plan={plan} />
     </>
+  );
+}
+
+/** "Add to calendar": downloads the steps as a .ics file, back to back on weekdays 9 to 5 from the next workday. */
+function CalendarButton({ plan }: { plan: WorkPlan }) {
+  const [summary, setSummary] = useState("");
+  const [status, setStatus] = useState("");
+  // The start day depends on today, so it is worked out after mount (no server/client mismatch).
+  useEffect(() => setSummary(calendarSummary(plan.workOrder)), [plan]);
+
+  function onAdd() {
+    const now = new Date();
+    const name = calendarFileName(now);
+    const ok = downloadBlob(new Blob([planCalendar(plan, now)], { type: "text/calendar;charset=utf-8" }), name);
+    setStatus(ok ? `Saved ${name}. Open it to add the steps to your calendar.` : "Couldn't save a calendar file in this browser.");
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-ink/10 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 print:hidden" data-testid="step-calendar">
+      <div className="min-w-0">
+        <p className="font-semibold">Put the steps on a calendar</p>
+        <p className="text-sm text-ink/75" data-testid="step-calendar-summary">
+          {summary || "Back to back on weekdays, 9 to 5, from the next workday."}
+        </p>
+      </div>
+      <div className="flex flex-col gap-1 sm:items-end">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-full border border-ink/20 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark sm:self-end"
+          data-testid="step-calendar-add"
+        >
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4.5" width="14" height="12.5" rx="2" />
+            <path d="M3 8.5h14M7 2.5v4M13 2.5v4M10 11v4M8 13h4" />
+          </svg>
+          Add to calendar
+        </button>
+        <span role="status" aria-live="polite" className="text-sm text-ink/70">
+          {status}
+        </span>
+      </div>
+    </div>
   );
 }
 
