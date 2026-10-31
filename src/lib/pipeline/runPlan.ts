@@ -1258,7 +1258,9 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       transcriptTurns,
       transcriptSummary: reason.transcriptSummary,
       saidVsSeen: reason.saidVsSeen,
-      costRange: cost ? cost.costRange : null,
+      costRange: cost
+        ? { ...cost.costRange, pricing: { priced: cost.pricedMaterials, grounded: cost.groundedPrices } }
+        : null,
       heroFrameIndex: reason.heroFrameIndex,
       meta: planMeta(segmentation === null, false, costSkipped),
     };
