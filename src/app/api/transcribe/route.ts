@@ -196,6 +196,18 @@ export async function POST(req: Request): Promise<Response> {
           .join(", "),
     );
     console.error(`transcribe route: ${err instanceof Error ? err.message : String(err)}`);
-    return errorResponse("We couldn't transcribe that narration. Try again.", 500);
+    // Parity with the success path (and the 7:45 AM costUsd change):
+    // a billed ASR failure is already recorded on the tracker by the
+    // transcribe step's recordFailedCall, so the 500 carries the same
+    // costUsd instead of leaving the split caller to find the spend
+    // only in the server log. An unpriceable failure still reports
+    // costUsd: 0, matching the empty-narration answer.
+    return new Response(
+      JSON.stringify({
+        error: "We couldn't transcribe that narration. Try again.",
+        costUsd: tracker.totals().spikeTotalUsd,
+      }),
+      { status: 500, headers: JSON_HEADERS },
+    );
   }
 }
