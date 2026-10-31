@@ -70,6 +70,8 @@ export interface BasetenCallRequest {
   images?: string[];
   /** JSON schema, appended to the prompt (not enforced server-side). */
   schema: Record<string, unknown>;
+  /** Sampling temperature, sent verbatim when set. Reason/review pass 0.2; other steps omit it. */
+  temperature?: number;
 }
 
 export interface BasetenCallResult {
@@ -268,6 +270,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       const body: Record<string, unknown> = {
         model,
         messages: [{ role: "user", content }],
+        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       };
 
       const started = Date.now();
@@ -354,6 +357,6 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
 
 /** Adapter for the reason step's SparkCaller (frames attached). */
 export function createReasonBasetenCaller(client: BasetenClient) {
-  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown> }) =>
-    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema });
+  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown>; temperature?: number }) =>
+    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema, temperature: req.temperature });
 }
