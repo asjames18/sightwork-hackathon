@@ -229,6 +229,11 @@ export async function splitNarration(
   code: string,
   signal: AbortSignal,
   chunkMaxSec: number = NARRATION_CHUNK_MAX_SEC,
+  /**
+   * Called once before any narration is sent: with no part when it goes in one piece, then with
+   * { at, of } before each chunk of a long narration (silent chunks are counted but not sent).
+   */
+  onSending?: (part?: { at: number; of: number }) => void,
 ): Promise<{ body: PlanRequest; costUsd: number } | "unauthorized"> {
   const keep = { body, costUsd: 0 };
   if (!body.audioWavBase64 || body.transcript !== undefined) return keep;
@@ -239,18 +244,20 @@ export async function splitNarration(
   };
   const chunks = splitNarrationWav(body.audioWavBase64, chunkMaxSec);
   if (!chunks) {
+    onSending?.();
     const one = await postTranscribe(endpoint, body.audioWavBase64, body.spaceType, code, signal);
     if (one.ok) return withTranscript(one.answer, one.answer.costUsd);
     return one.unauthorized ? "unauthorized" : { body, costUsd: one.costUsd };
   }
   let costUsd = 0;
   const parts: ChunkTranscript[] = [];
-  for (const chunk of chunks) {
+  for (const [i, chunk] of chunks.entries()) {
     if (chunk.silent) {
       parts.push({ offsetSec: chunk.startSec, transcript: null, transcriptTurns: [] });
       continue;
     }
     let got: TranscribeTry | null = null;
+    if (!signal.aborted) onSending?.({ at: i + 1, of: chunks.length });
     for (let attempt = 0; attempt < 2; attempt++) {
       if (signal.aborted) return { body, costUsd };
       got = await postTranscribe(endpoint, chunk.wavBase64, body.spaceType, code, signal);
@@ -322,7 +329,10 @@ export function createApiPlanJob(
 
     // The split /api/transcribe request's cost (transcribeUsd above) is added to the plan's total when it comes back.
     if (transcribeEndpoint) {
-      const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal, narrationChunkSec);
+      // The processing screen moves to "Listening" while the narration is read, with "part 2 of 4" on long takes.
+      const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal, narrationChunkSec, (part) =>
+        report(part ? { state: "running", step: "listening", part } : { state: "running", step: "listening" }),
+      );
       if (signal.aborted) return;
       if (split === "unauthorized") {
         fail(WRONG_CODE_MESSAGE);
