@@ -32,14 +32,17 @@
  *
  * Every call is recorded on the usage tracker (step "review"), so
  * the spike cap and the $150 credit total see it, exactly like the
- * other steps. A run with no issues spends no call (nothing to
+ * other steps. A billed-but-failed call is recorded too, before the
+ * step returns REVIEW_NOT_RUN, so the route total counts its spend;
+ * a tracker throw there is still just a failed review, not a stop.
+ * A run with no issues spends no call (nothing to
  * check); a run with issues but no usable proof photos also spends
  * none (there is nothing for the reviewer to look at).
  */
 
 import { parseReview, type PlanReview } from "../review";
 import type { Issue } from "../types";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 
 /** One proof photo handed to the reviewer, in attach order. */
 export interface ReviewFrame {
@@ -292,6 +295,16 @@ export async function runReview(input: ReviewInput, deps: ReviewDeps): Promise<P
     try {
       res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema: deps.schema, temperature: SPARK_TEMPERATURE });
     } catch (err) {
+      // A billed-but-failed call still spent money (e.g. MetaCallError
+      // on a non-JSON response): record it before returning, so the
+      // route total counts it. A tracker throw here is a failed
+      // review, not a spending stop — reviewing is the last step, so
+      // there is no later call to protect, and the plan still ships.
+      try {
+        recordFailedCall(deps.tracker, SPARK_MODEL, "review", err);
+      } catch (recErr) {
+        console.warn(`runReview: usage record failed, review not run: ${recErr instanceof Error ? recErr.message : String(recErr)}`);
+      }
       console.warn(`runReview: call failed, review not run: ${err instanceof Error ? err.message : String(err)}`);
       return { ...REVIEW_NOT_RUN };
     }
