@@ -104,11 +104,14 @@ export interface BasetenClient {
 export class BasetenCallError extends Error {
   readonly costUsd: number;
   readonly latencyMs: number;
-  constructor(message: string, costUsd: number, latencyMs: number) {
+  /** Model that ran the call, when the caller knew it (the configured model). */
+  readonly model?: string;
+  constructor(message: string, costUsd: number, latencyMs: number, model?: string) {
     super(message);
     this.name = "BasetenCallError";
     this.costUsd = costUsd;
     this.latencyMs = latencyMs;
+    if (typeof model === "string" && model.trim().length > 0) this.model = model;
   }
 }
 
@@ -350,7 +353,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       const costUsd = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
       const choices = parsed.choices;
       if (!Array.isArray(choices) || choices.length === 0) {
-        throw new BasetenCallError("baseten: response had no choices", costUsd, latencyMs);
+        throw new BasetenCallError("baseten: response had no choices", costUsd, latencyMs, model);
       }
       // A null or non-object first choice used to throw a raw
       // TypeError here ("cannot read message of null") instead of
@@ -369,7 +372,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       // message.content is the answer, and only that is parsed.
       const text = message?.content;
       if (typeof text !== "string") {
-        throw new BasetenCallError("baseten: response message had no text content", costUsd, latencyMs);
+        throw new BasetenCallError("baseten: response message had no text content", costUsd, latencyMs, model);
       }
       let json: unknown;
       try {
@@ -379,6 +382,7 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
           `baseten: response text was not JSON: ${text.slice(0, 200)}`,
           costUsd,
           latencyMs,
+          model,
         );
       }
       return { json, latencyMs, costUsd, model };
