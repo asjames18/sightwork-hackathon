@@ -49,6 +49,21 @@ export function createRateLimiter(limit: number, windowMs: number): RateLimiter 
   const buckets = new Map<string, { count: number; resetAt: number }>();
   return {
     check(key: string, nowMs: number = Date.now()): RateLimitResult {
+      // A blank or non-string key would otherwise share one bucket
+      // across every caller that passed it (the same failure mode as
+      // the "unknown" fallback, but silent), and a non-finite clock
+      // would mint a bucket that never expires and answer a NaN
+      // retryAfterSec. Reject both here with a named error, the same
+      // named-error rule the createRateLimiter config checks above
+      // already follow. Valid route callers are unchanged: clientIp
+      // always returns a non-empty string and the default clock is
+      // Date.now().
+      if (typeof key !== "string" || key.trim().length === 0) {
+        throw new Error(`rateLimit: key must be a non-empty string, got ${JSON.stringify(key)}`);
+      }
+      if (!Number.isFinite(nowMs)) {
+        throw new Error(`rateLimit: nowMs must be a finite number, got ${nowMs}`);
+      }
       // Prune expired buckets on each check so the map cannot grow
       // without bound from one-off IPs.
       for (const [k, b] of buckets) {
