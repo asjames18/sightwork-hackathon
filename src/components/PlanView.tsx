@@ -15,6 +15,7 @@ import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { issueCostShares, stepCostShares } from "@/lib/costShares";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
 import { livePricesLine, planLocation, SAID_VS_SEEN_HEADING } from "@/lib/client/planText";
+import { countMethodNote } from "@/lib/client/countMethod";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -327,6 +328,14 @@ export function PlanView({
               {item.zone && !item.label.toLowerCase().includes(item.zone.toLowerCase()) && (
                 <p className="text-sm text-ink/70">{item.zone}</p>
               )}
+              {(() => {
+                const note = countMethodNote(item, masks);
+                return note ? (
+                  <p data-testid="count-method" className={`mt-1 text-xs ${note.low ? "font-semibold text-amber-900" : "text-ink/70"}`}>
+                    {note.text}
+                  </p>
+                ) : null;
+              })()}
             </li>
           ))}
         </ul>
