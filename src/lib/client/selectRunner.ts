@@ -23,11 +23,14 @@ export function pickRunnerKind(search: string | null, envValue: string | undefin
  * the run starts; nothing picked sends neither, and the server keeps its own "room" and "Walkthrough".
  * The request budget comes from NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES (unset keeps 9 MB).
  */
+const maxRequestBytes = requestBudgetBytes(process.env.NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES);
+// The narration goes to /api/transcribe on its own (createApiPlanJob's default split), so the frames get
+// the plan request's whole budget instead of what the WAV leaves.
 const apiPlanJob = createApiPlanJob(
-  createBuildPlanRequest({
-    maxRequestBytes: requestBudgetBytes(process.env.NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES),
-    runContext: savedSpaceRequestFields,
-  }),
+  createBuildPlanRequest({ maxRequestBytes, narrationSentSeparately: true, runContext: savedSpaceRequestFields }),
+  "/api/plan",
+  "/api/transcribe",
+  maxRequestBytes + 128 * 1024,
 );
 
 /**

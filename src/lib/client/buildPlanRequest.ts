@@ -37,6 +37,13 @@ export interface BuildOptions {
    */
   maxRequestBytes?: number;
   /**
+   * The runner posts the narration to /api/transcribe on its own and sends the plan request with the
+   * transcript instead of the WAV (createApiPlanJob's split). Then the WAV doesn't share the plan
+   * request's budget with the frames: it only has to fit a request of its own. Default false (the WAV
+   * rides in the plan request, so frames get what's left).
+   */
+  narrationSentSeparately?: boolean;
+  /**
    * Group the take into zones and send each frame's zoneId (proposal B). Default true. Off, or when
    * the browser can't read pixels back, frames go without zoneId and the pipeline sees one zone.
    */
@@ -67,6 +74,7 @@ const DEFAULTS = {
   longSide: 1024,
   audioSampleRate: 16000,
   maxRequestBytes: 9 * 1024 * 1024,
+  narrationSentSeparately: false,
   zones: true,
   sharpFrames: true,
   denseFrames: true,
@@ -87,6 +95,27 @@ export function requestBudgetBytes(raw: string | undefined): number {
   if (!/^\d+$/.test(text)) return DEFAULTS.maxRequestBytes;
   const n = Number(text);
   return n >= MIN_REQUEST_BYTES && n <= MAX_REQUEST_BYTES ? n : DEFAULTS.maxRequestBytes;
+}
+
+/** Room left in a request for JSON field names and framing around the frames or the WAV. */
+export const REQUEST_OVERHEAD_BYTES = 64 * 1024;
+
+/** Smallest share of the budget a frame may get; below this the take is too long to send. */
+export const MIN_FRAME_BYTES = 20 * 1024;
+
+export const TOO_LONG_MESSAGE = "That video is too long to send. Try a walkthrough of 90 seconds or less.";
+
+/**
+ * Bytes the frames may use in the plan request. When the narration goes to /api/transcribe in its own
+ * request, the WAV isn't in the plan request, so it doesn't come out of the frames' share (before
+ * 2026-10-31 it always did: on a 4.3 MB budget every narrated take over about 80 s was refused as
+ * "too long", though it fit once split). Null when the take can't be sent: the frames' share is under
+ * MIN_FRAME_BYTES each, or the WAV alone doesn't fit a request of its own.
+ */
+export function frameBudgetBytes(maxRequestBytes: number, audioChars: number, frameCount: number, narrationSentSeparately: boolean): number | null {
+  if (narrationSentSeparately && audioChars + REQUEST_OVERHEAD_BYTES > maxRequestBytes) return null;
+  const budget = maxRequestBytes - (narrationSentSeparately ? 0 : audioChars) - REQUEST_OVERHEAD_BYTES;
+  return budget < frameCount * MIN_FRAME_BYTES ? null : budget;
 }
 
 /** Sample rates the transcribe step accepts. */
@@ -339,9 +368,8 @@ export function createBuildPlanRequest(options: BuildOptions = {}): BuildPlanReq
       const legacyTimes = pickFrameTimes(durationSec, o.maxFrames, o.intervalSec);
       if (legacyTimes.length === 0)
         throw new BuildRequestError("This video has no length we can read. Try recording it again.");
-      const frameBudget = o.maxRequestBytes - (audioWavBase64?.length ?? 0) - 64 * 1024;
-      if (frameBudget < legacyTimes.length * 20 * 1024)
-        throw new BuildRequestError("That video is too long to send. Try a walkthrough of 90 seconds or less.");
+      const frameBudget = frameBudgetBytes(o.maxRequestBytes, audioWavBase64?.length ?? 0, legacyTimes.length, o.narrationSentSeparately);
+      if (frameBudget === null) throw new BuildRequestError(TOO_LONG_MESSAGE);
       const dense = o.denseFrames ? planDenseTicks(durationSec, { frameBudgetBytes: frameBudget, legacyCount: legacyTimes.length, maxFrames: o.maxFrames }) : null;
       const times = dense?.times ?? legacyTimes;
       const sceneSlots = dense && o.zones ? dense.sceneSlots : 0;
