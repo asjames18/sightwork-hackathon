@@ -9,7 +9,7 @@
  * "not a quote" label. Every page's footer repeats the sample label on example plans.
  */
 import type { jsPDF as JsPdfDoc } from "jspdf";
-import { AFTER_IMAGE_LABEL, COST_LABEL, type Box, type WorkPlan } from "@/lib/types";
+import { AFTER_IMAGE_LABEL, COST_LABEL, masksAvailable, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
 import { compareSummary, type CompareRow, type PlanComparison } from "./planCompare";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
@@ -19,6 +19,7 @@ import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
 import { materialsSpend, spendLine } from "./materialsList";
 import { fixFirstPlanLines } from "./fixFirst";
+import { countMethodNote } from "./countMethod";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -121,6 +122,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   const issues = rankedIssues(plan).sort((a, b) => a.rank - b.rank);
   const watch = watchItems(plan);
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
+  const masks = masksAvailable(plan);
   let y = M;
 
   doc.setProperties({ title: pdfSafe(`Work plan: ${clean(plan.spaceName)}`), subject: "SightWork work plan", creator: "SightWork" });
@@ -416,7 +418,27 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       font(10.5);
       doc.text(pdfSafe(`${clean(item.label)}${zone}`), M + 52, y + 12, { maxWidth: W - 52 });
       y += lineH(12) + 2;
+      // Same line as the tile on the plan screen: how the count was made, and a hand-check flag when it's a guess.
+      const note = countMethodNote(item, masks);
+      if (note) {
+        font(9, note.low ? "bold" : "normal", note.low ? AMBER_INK : MUTED);
+        for (const l of wrap(note.text, W - 52)) {
+          ensure(lineH(9));
+          doc.text(l, M + 52, y + 9);
+          y += lineH(9);
+        }
+        y += 4;
+      }
     }
+    para(
+      masks ? "Counted from the video, from what the camera saw." : "Estimated from the frames, from what the camera saw. Exact counts come with outlines.",
+      9,
+      "normal",
+      MUTED,
+      M,
+      W,
+      4,
+    );
   }
 
   // --- Work steps ---------------------------------------------------------------------
