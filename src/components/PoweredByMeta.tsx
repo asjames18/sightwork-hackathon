@@ -1,5 +1,6 @@
 import type { WorkPlan } from "@/lib/types";
 import { creditsSummary, metaCredits, type CreditStatus } from "@/lib/metaCredits";
+import { runCostLine } from "@/lib/client/runCost";
 
 const STATUS_LABEL: Record<CreditStatus, string> = {
   ran: "Ran",
@@ -50,6 +51,7 @@ function IdWithBreaks({ id }: { id: string }) {
  */
 export function PoweredByMeta({ plan, sample }: { plan: WorkPlan; sample?: boolean }) {
   const credits = metaCredits(plan, { sample });
+  const costLine = runCostLine(plan, { sample });
   return (
     <section aria-labelledby="powered-heading" className="mt-12 rounded-2xl border border-ink/10 bg-white p-5 sm:p-6 md:mt-16 print:break-inside-avoid">
       <div className="flex items-center gap-2 text-[#0866ff]">
@@ -61,6 +63,11 @@ export function PoweredByMeta({ plan, sample }: { plan: WorkPlan; sample?: boole
       <p className="mt-2 text-base font-semibold" data-testid="credits-summary">
         {creditsSummary(credits)}
       </p>
+      {costLine ? (
+        <p className="mt-1 text-sm text-ink/70" data-testid="run-cost">
+          {costLine}
+        </p>
+      ) : null}
       <ol className="mt-4 divide-y divide-ink/10">
         {credits.map((c) => (
           <li key={c.step} className="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
