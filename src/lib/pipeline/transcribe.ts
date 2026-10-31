@@ -12,7 +12,9 @@
  * (later: src/lib/meta), so the step is testable on mock data and the
  * spike can swap callers without touching this logic. Every would-be
  * call is recorded on the usage tracker from ./usage.ts, so the $10
- * spike cap is enforced in code.
+ * spike cap is enforced in code. A billed-but-failed ASR or cleanup
+ * call is recorded the same way before rethrowing, so the route total
+ * counts it even though runPlan continues without narration.
  *
  * ASR settings (prompt 01, enforced by the caller, not here):
  * - model muse-voice-transcribe-1.0; confirm the ID at the first spike
@@ -30,7 +32,7 @@
  */
 
 import type { TranscriptTurn } from "../types";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 
 /** Model ID from prompt 01; confirm it at the first spike. */
 export const TRANSCRIBE_MODEL = "muse-voice-transcribe-1.0";
@@ -411,12 +413,23 @@ export async function runTranscribe(
     }
   }
 
-  const res = await deps.callTranscribe({
-    model: TRANSCRIBE_MODEL,
-    mode: "standard",
-    audioWavBase64: input.audioWavBase64,
-    keywordBias: deps.keywordBias ?? DEFAULT_KEYWORD_BIAS,
-  });
+  let res: Awaited<ReturnType<TranscribeCaller>>;
+  try {
+    res = await deps.callTranscribe({
+      model: TRANSCRIBE_MODEL,
+      mode: "standard",
+      audioWavBase64: input.audioWavBase64,
+      keywordBias: deps.keywordBias ?? DEFAULT_KEYWORD_BIAS,
+    });
+  } catch (err) {
+    // A billed-but-failed ASR call still spent money (e.g. MetaCallError
+    // on a non-JSON response): record it before rethrowing, so the
+    // route total counts it. runPlan continues without narration on
+    // the rethrow, and a tracker throw (spike cap) replaces it as a
+    // spending stop, same pattern as reason/cost.
+    recordFailedCall(deps.tracker, TRANSCRIBE_MODEL, "transcribe", err);
+    throw err;
+  }
   // The tracker enforces the spike cap: a throw here stops the run.
   deps.tracker.record({
     model: TRANSCRIBE_MODEL,
@@ -437,7 +450,18 @@ export async function runTranscribe(
       .replaceAll("{{raw_turns}}", rawText)
       .replaceAll("{{space_type}}", input.spaceType && input.spaceType.trim() ? input.spaceType : "room")
       .replaceAll("{{keyword_bias}}", (deps.keywordBias ?? DEFAULT_KEYWORD_BIAS).join(", "));
-    const cleaned = await deps.callCleanup({ model: CLEANUP_MODEL, prompt });
+    let cleaned: Awaited<ReturnType<CleanupCaller>>;
+    try {
+      cleaned = await deps.callCleanup({ model: CLEANUP_MODEL, prompt });
+    } catch (err) {
+      // Same as the ASR call above: a billed-but-failed cleanup call
+      // is recorded before rethrowing, so the route total counts it;
+      // runPlan still continues without narration, as on any other
+      // cleanup throw. A tracker throw (spike cap) replaces it as a
+      // spending stop.
+      recordFailedCall(deps.tracker, CLEANUP_MODEL, "transcribe-cleanup", err);
+      throw err;
+    }
     deps.tracker.record({
       model: CLEANUP_MODEL,
       step: "transcribe-cleanup",
