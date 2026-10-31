@@ -20,7 +20,9 @@
  *
  * Post-processing (all in the prompt file, enforced here, not trusted
  * to the model):
- * - drop issues with confidence < 0.5; an unmentioned issue needs >= 0.6
+ * - drop issues with confidence < 0.5; an unmentioned issue needs >= 0.6;
+ *   issues from 0.35 up to the bar move to `watch` instead of dropping,
+ *   and a null coverageNote is normalized to omitted
  * - re-number ranks 1..n with no gaps, remapping every rank reference
  *   (materials forIssues, workOrder fixes, saidVsSeen issueRank)
  * - drop saidVsSeen rows for dropped issues
@@ -42,6 +44,7 @@ import {
   type Issue,
   type MaterialItem,
   type SaidVsSeenEntry,
+  type WatchIssue,
   type WorkPlan,
   type WorkStep,
 } from "../types";
@@ -93,6 +96,20 @@ export interface ReasonOutput {
   generatedFrom: string;
   inventory: InventoryItem[];
   issues: Issue[];
+  /**
+   * Lower-confidence finds (0.35 up to the ranked bar), kept apart so
+   * the ranked list stays clean. filterAndRenumber adds issues the
+   * model ranked below the bar here, and passes through any the model
+   * already filed in watch. Never priced or reviewed.
+   */
+  watch?: WatchIssue[];
+  /**
+   * Why the plan has few problems, when the model found fewer than 3.
+   * The model sends null when there are 3+ issues; filterAndRenumber
+   * normalizes that null to omitted before any contract check, so the
+   * plan type (coverageNote?: string) never sees a null.
+   */
+  coverageNote?: string | null;
   materials: MaterialItem[];
   workOrder: WorkStep[];
   transcriptSummary: string | null;
@@ -202,16 +219,42 @@ export function dropTotalInventoryRows(inventory: InventoryItem[]): InventoryIte
   });
 }
 
-/** Confidence filter + rank renumber, with rank references remapped. */
+/** Confidence filter + rank renumber, with rank references remapped.
+ * Issues at or above the bar (0.5, or 0.6 when unmentioned) stay
+ * ranked. Issues from 0.35 up to the bar move to `watch` instead of
+ * being dropped silently: a watch entry keeps the title, detail,
+ * confidence, primary frame, area, evidence, checklistKey and proof
+ * frames, but no rank, so nothing prices or reviews it. Anything
+ * below 0.35 is dropped. A null coverageNote is normalized to
+ * omitted (types.ts declares coverageNote?: string, and the client
+ * already treats null as absent). Rank references in materials,
+ * workOrder and saidVsSeen are remapped to kept ranks only, so a
+ * reference to a demoted or dropped issue disappears rather than
+ * pointing at the wrong problem. */
 export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
   const kept: Issue[] = [];
+  const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
   for (const issue of output.issues) {
     const confidence = issue.confidence ?? 0;
     const floor = issue.unmentioned ? 0.6 : 0.5;
-    if (confidence < floor) continue;
-    remap.set(issue.rank, kept.length + 1);
-    kept.push({ ...issue, rank: kept.length + 1 });
+    if (confidence >= floor) {
+      remap.set(issue.rank, kept.length + 1);
+      kept.push({ ...issue, rank: kept.length + 1 });
+    } else if (confidence >= 0.35) {
+      const entry: WatchIssue = {
+        title: issue.title,
+        detail: issue.detail,
+        frameIndex: issue.frameIndex,
+        frameTimeSec: issue.frameTimeSec,
+      };
+      if (issue.confidence !== undefined) entry.confidence = issue.confidence;
+      if (issue.area !== undefined) entry.area = issue.area;
+      if (issue.evidence !== undefined) entry.evidence = issue.evidence;
+      if (issue.checklistKey !== undefined) entry.checklistKey = issue.checklistKey;
+      if (issue.proofFrames !== undefined) entry.proofFrames = issue.proofFrames;
+      watch.push(entry);
+    }
   }
   const remapList = (ranks: number[] | undefined): number[] | undefined =>
     ranks === undefined
@@ -221,6 +264,8 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
     ...output,
     inventory: dropTotalInventoryRows(output.inventory),
     issues: kept,
+    watch: watch.length > 0 ? watch : undefined,
+    coverageNote: output.coverageNote ?? undefined,
     materials: output.materials.map((m) => ({ ...m, forIssues: remapList(m.forIssues) })),
     workOrder: output.workOrder.map((s) => ({ ...s, fixes: remapList(s.fixes) })),
     saidVsSeen: output.saidVsSeen
@@ -251,6 +296,24 @@ export function validateReason(input: ReasonInput, output: ReasonOutput): string
         errs.push(`issues[${i}].proofFrames[${j}].tSec does not match frames[${f.frameIndex}].tSec`);
     });
   });
+  // Watch finds follow the same frame rules as issues (types.ts):
+  // the primary frame must exist and its time must match.
+  output.watch?.forEach((w, i) => {
+    const frame = input.frames[w.frameIndex];
+    if (!frame) {
+      errs.push(`watch[${i}].frameIndex ${w.frameIndex} out of range`);
+    } else if (w.frameTimeSec !== frame.tSec) {
+      errs.push(
+        `watch[${i}].frameTimeSec ${w.frameTimeSec} does not match frames[${w.frameIndex}].tSec ${frame.tSec}`,
+      );
+    }
+    w.proofFrames?.forEach((f, j) => {
+      const pf = input.frames[f.frameIndex];
+      if (!pf) errs.push(`watch[${i}].proofFrames[${j}].frameIndex out of range`);
+      else if (f.tSec !== pf.tSec)
+        errs.push(`watch[${i}].proofFrames[${j}].tSec does not match frames[${f.frameIndex}].tSec`);
+    });
+  });
   if (output.heroFrameIndex < 0 || output.heroFrameIndex >= input.frames.length) {
     errs.push(`heroFrameIndex ${output.heroFrameIndex} out of range`);
   }
@@ -261,6 +324,8 @@ export function validateReason(input: ReasonInput, output: ReasonOutput): string
     generatedFrom: output.generatedFrom,
     inventory: output.inventory,
     issues: output.issues,
+    watch: output.watch,
+    coverageNote: output.coverageNote ?? undefined,
     materials: output.materials,
     workOrder: output.workOrder,
     afterImageUrl: null,
@@ -496,5 +561,6 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   if (best !== null) return { ...best.output, warnings: best.errs };
   throw new Error(`reason: no schema-valid result after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
+
 
 
