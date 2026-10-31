@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import { loadDoneSteps, progressLine, saveDoneSteps } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
-import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel } from "@/lib/client/crewSummary";
+import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
+import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
+import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -55,9 +58,12 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
                     </span>
                     <span className="min-w-0 font-semibold break-words">{row.label}</span>
                   </span>
-                  <span className="text-sm text-ink/75 tabular-nums">
-                    {stepsLabel(row.steps)}
-                    {hrs && <>, {hrs}</>}
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:justify-end">
+                    <span className="text-sm text-ink/75 tabular-nums">
+                      {stepsLabel(row.steps)}
+                      {hrs && <>, {hrs}</>}
+                    </span>
+                    <CrewSendButton plan={plan} crew={row} />
                   </span>
                 </li>
               );
@@ -167,5 +173,51 @@ export function WorkSteps({ plan, stepCosts = null }: { plan: WorkPlan; /** Each
         })}
       </ol>
     </>
+  );
+}
+
+const CREW_STATUS = { copied: "Copied. Paste it into a text.", cancelled: "", failed: "Couldn't share from this browser." } as const;
+
+/** Sends one crew just their steps and materials: the phone's share sheet when there is one, else the clipboard. */
+function CrewSendButton({ plan, crew }: { plan: WorkPlan; crew: CrewRow }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  async function onSend() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(crewHandoutTitle(plan, crew), crewHandoutText(plan, crew), navigator as ShareNavigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(CREW_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        aria-label={`Send ${crew.label} their steps`}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/20 bg-white px-3 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+        data-testid="crew-send"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 13V3M6 7l4-4 4 4" />
+          <path d="M4 11v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-5" />
+        </svg>
+        Send
+      </button>
+      <span role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </span>
+    </span>
   );
 }
