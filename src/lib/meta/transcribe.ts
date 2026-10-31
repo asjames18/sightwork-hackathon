@@ -41,6 +41,11 @@
  *   SamCallError/BasetenCallError/MetaCallError/ImageCallError. When
  *   the response carries no usable duration, the parse failure cannot
  *   be priced, so it keeps the plain error, verbatim.
+ * - A 200 body that is not JSON likewise cannot be priced (the
+ *   duration lives inside the body that failed to parse), so it
+ *   throws a plain named Error("asr: response was not JSON") instead
+ *   of res.json()'s raw SyntaxError, and recordFailedCall records
+ *   nothing; no spend is invented.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
  *   short backoff (250 ms, then 500 ms): the Oct 28 spike showed Meta's
  *   entitlement cache serving 404s intermittently for a model that then
@@ -266,7 +271,20 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
       });
       if (res.ok) {
         const latencyMs = Date.now() - started;
-        const parsed = (await res.json()) as Record<string, unknown>;
+        // A 200 body that is not JSON carries no duration to price
+        // (ASR bills by audio length, and the duration lives inside
+        // the body that failed to parse), so it cannot be priced and
+        // keeps a plain named error — res.json() used to throw a raw
+        // SyntaxError here, surfacing parser internals instead of the
+        // caller and the cause. The step's recordFailedCall records
+        // nothing for a plain error, as for any unpriceable failure,
+        // and no spend is invented.
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = (await res.json()) as Record<string, unknown>;
+        } catch {
+          throw new Error("asr: response was not JSON");
+        }
         // A 200 whose turns do not parse was still billed (ASR bills
         // by audio length): when the response carries a usable
         // duration, carry the priced cost on the throw so the step's
