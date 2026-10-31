@@ -44,6 +44,14 @@ test("turns without a transcript fail, and a null transcript with no turns passe
   assert.deepEqual(validatePlanRequest(req({ transcript: null, transcriptTurns: [] })), []);
 });
 
+test("non-empty turns with a null transcript fail, matching runPlan's validator", () => {
+  assert.ok(
+    validatePlanRequest(
+      req({ transcript: null, transcriptTurns: [{ startSec: 0, endSec: 2, text: "x" }] }),
+    ).includes("transcriptTurns given without transcript"),
+  );
+});
+
 test("a blank transcript string fails", () => {
   assert.deepEqual(validatePlanRequest(req({ transcript: "   " })), ["transcript must not be blank when given"]);
 });
