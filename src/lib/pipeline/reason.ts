@@ -124,6 +124,8 @@ export interface SparkCaller {
     prompt: string;
     images: string[];
     schema: Record<string, unknown>;
+    /** Sampling temperature, forwarded verbatim when set. */
+    temperature?: number;
   }): Promise<{
     json: unknown;
     latencyMs: number;
@@ -143,6 +145,8 @@ export interface ReasonDeps {
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
+/** Deterministic structured output for the reason call (Grok Bot 2026-10-30 7:52 PM GO). */
+const SPARK_TEMPERATURE = 0.2;
 
 /** Max decoded bytes per reason frame, same shape as the Spark caller's 5 MB image cap. */
 const MAX_REASON_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -533,7 +537,7 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   let best: { output: ReasonOutput; errs: string[] } | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema });
+    const res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE });
     // The tracker enforces the spike cap: a throw here stops the run.
     // Record the model the caller actually used: the Baseten adapter
     // reports its configured model, so the route's done log line names
