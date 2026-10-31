@@ -304,7 +304,11 @@ export function pickReasonFrames(
  * as in filterAndRenumber), a stray proof frame is dropped, and a
  * said-vs-seen seen frame outside the subset is dropped to null.
  * An unmentioned issue left with no proof frames is dropped too,
- * or the plan contract would fail it for having none. The hero
+ * or the plan contract would fail it for having none. A watch entry
+ * whose primary frame is outside the subset is dropped the same way
+ * (watch carries no rank, so no renumbering applies), and a stray
+ * watch proof frame is dropped; a watch entry keeps its frameTimeSec
+ * and any surviving proof frames. The hero
  * frame is the one index that cannot be dropped: when it falls
  * outside the subset, it falls back to the first subset frame and
  * the fallback is logged server-side, so the render step still has
@@ -338,6 +342,18 @@ export function remapReasonOutput(output: ReasonOutput, subset: number[]): Reaso
     ranks === undefined
       ? undefined
       : ranks.filter((r) => rankRemap.has(r)).map((r) => rankRemap.get(r) as number);
+  const keptWatch: NonNullable<typeof output.watch>[number][] = [];
+  for (const entry of output.watch ?? []) {
+    const frameIndex = toOriginal(entry.frameIndex);
+    if (frameIndex === null) continue;
+    const proofFrames = entry.proofFrames
+      ?.map((pf) => {
+        const mapped = toOriginal(pf.frameIndex);
+        return mapped === null ? null : { ...pf, frameIndex: mapped };
+      })
+      .filter((pf): pf is NonNullable<typeof pf> => pf !== null);
+    keptWatch.push({ ...entry, frameIndex, proofFrames });
+  }
   const hero = toOriginal(output.heroFrameIndex);
   if (hero === null) {
     console.warn(
@@ -347,6 +363,7 @@ export function remapReasonOutput(output: ReasonOutput, subset: number[]): Reaso
   return {
     ...output,
     issues: keptIssues.map((issue) => ({ ...issue, rank: rankRemap.get(issue.rank) as number })),
+    watch: keptWatch.length > 0 ? keptWatch : undefined,
     materials: output.materials.map((m) => ({ ...m, forIssues: remapRanks(m.forIssues) })),
     workOrder: output.workOrder.map((s) => ({ ...s, fixes: remapRanks(s.fixes) })),
     saidVsSeen: output.saidVsSeen
@@ -1199,6 +1216,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       generatedFrom: reason.generatedFrom,
       inventory: reason.inventory,
       issues: reason.issues,
+      watch: reason.watch,
+      coverageNote: reason.coverageNote,
       materials: reason.materials,
       workOrder: reason.workOrder,
       region: request.region,
