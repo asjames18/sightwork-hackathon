@@ -1,6 +1,7 @@
 import { mockPlanJob, type PlanJobRunner } from "./planJob";
 import { createApiPlanJob } from "./apiPlanJob";
 import { createBuildPlanRequest, requestBudgetBytes } from "./buildPlanRequest";
+import { narrationChunkMaxSec } from "./narrationChunks";
 import { savedSpaceRequestFields } from "./spaceType";
 
 export type RunnerKind = "mock" | "api";
@@ -31,6 +32,8 @@ const apiPlanJob = createApiPlanJob(
   "/api/plan",
   "/api/transcribe",
   maxRequestBytes + 128 * 1024,
+  // Long takes' narration goes in chunks that each fit a request of this budget (narrationChunks.ts).
+  narrationChunkMaxSec(maxRequestBytes),
 );
 
 /**

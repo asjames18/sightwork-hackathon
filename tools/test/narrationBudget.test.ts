@@ -26,10 +26,13 @@ describe("frame budget with narration (2026-10-31: 90 s iPhone take refused as t
     }
   });
 
-  test("split narration: the WAV must still fit a request of its own", () => {
-    assert.equal(frameBudgetBytes(VERCEL_BUDGET, wavChars(110), pickFrameTimes(110).length, true), null);
-    assert.equal(frameBudgetBytes(VERCEL_BUDGET, VERCEL_BUDGET - REQUEST_OVERHEAD_BYTES + 1, 10, true), null);
-    assert.notEqual(frameBudgetBytes(VERCEL_BUDGET, VERCEL_BUDGET - REQUEST_OVERHEAD_BYTES, 10, true), null);
+  test("split narration: long narration goes in chunks, so its size no longer blocks the take (up to the 5 min Extra large cap)", () => {
+    for (const sec of [110, 120, 180, 300]) {
+      const budget = frameBudgetBytes(VERCEL_BUDGET, wavChars(sec), pickFrameTimes(sec).length, true);
+      assert.equal(budget, VERCEL_BUDGET - REQUEST_OVERHEAD_BYTES, String(sec));
+    }
+    // Carrying the WAV in the plan request still leaves the frames only what it doesn't use.
+    assert.equal(frameBudgetBytes(VERCEL_BUDGET, wavChars(110), pickFrameTimes(110).length, false), null);
   });
 
   test("no narration: unchanged either way", () => {

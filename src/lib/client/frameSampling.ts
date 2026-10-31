@@ -4,7 +4,8 @@
  *
  * planSampleWindows is wired through denseSampling.ts (richer findings, Oct 30): takes up to 45 s get
  * ~1.25 s windows, the middle candidate as the tick and the others as soft-tick neighbours. Longer takes
- * still sample with pickFrameTimes, and duration.ts keeps its 95 s warning / 150 s block. Pure logic, no
+ * still sample with pickFrameTimes (at most 48 frames over any room size's cap; duration.ts has the
+ * per-size length rules). Pure logic, no
  * DOM, no network.
  */
 

@@ -17,7 +17,9 @@ import {
   recordingFileName,
   secondsLeft,
 } from "@/lib/client/recorder";
-import { HARD_MAX_SEC, SOFT_MAX_SEC } from "@/lib/client/duration";
+import { durationRulesFor } from "@/lib/client/duration";
+
+const { warnAfterSec: SOFT_MAX_SEC, hardMaxSec: HARD_MAX_SEC } = durationRulesFor("medium");
 
 describe("recording format", () => {
   test("MP4 (H.264) first for iOS Safari, then WebM VP9, VP8", () => {
@@ -94,7 +96,7 @@ describe("take length", () => {
     assert.equal(elapsedState(SOFT_MAX_SEC + 0.1), "long");
     assert.equal(elapsedState(HARD_MAX_SEC - 0.01), "long");
     assert.equal(elapsedState(HARD_MAX_SEC), "max");
-    assert.equal(secondsLeft(140.2), 10);
+    assert.equal(secondsLeft(110.2), 10);
     assert.equal(secondsLeft(200), 0);
   });
   test("average bitrate", () => {

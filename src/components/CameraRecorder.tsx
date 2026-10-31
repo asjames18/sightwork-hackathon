@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatDuration, HARD_MAX_SEC, SOFT_MAX_SEC } from "@/lib/client/duration";
+import { aimRangeSpoken, durationRulesFor, formatDuration, type DurationRules } from "@/lib/client/duration";
 import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel, type MicMeter } from "@/lib/client/micLevel";
 import { keepScreenOn } from "@/lib/client/wakeLock";
 import { lumaStats } from "@/lib/client/blankTake";
@@ -58,7 +58,7 @@ type Phase = "starting" | "ready" | "recording" | "finishing";
 
 /**
  * In-page camera: back camera at 1080p30 (ideal, so the closest mode the phone has), live preview,
- * start/stop with a timer that stops itself at the 2½-minute hard limit, recorded with MediaRecorder at
+ * start/stop with a timer that stops itself at the chosen room size's cap (duration.ts), recorded with MediaRecorder at
  * about 8 Mbps so the take isn't squeezed. The finished take comes back as a File, the same as a
  * picked video. Every camera and mic track is stopped on stop, cancel and unmount.
  */
@@ -66,7 +66,10 @@ export function CameraRecorder({
   onRecorded,
   onCancel,
   onUnavailable,
+  rules = durationRulesFor(),
 }: {
+  /** Length rules for the room size picked on the upload screen: wrap-up hint, countdown and automatic stop. */
+  rules?: DurationRules;
   onRecorded: (file: File, info: RecordingInfo) => void;
   onCancel: () => void;
   /** The camera couldn't open (no support, blocked, missing, busy); the message says why in plain words. */
@@ -97,6 +100,11 @@ export function CameraRecorder({
   const [liveHint, setLiveHint] = useState<LiveHint | null>(null);
   // Keep the latest callbacks without restarting the camera when the parent re-renders.
   const cb = useRef({ onRecorded, onCancel, onUnavailable });
+  // Read by the running timer, so the stop point is the size picked when recording started.
+  const rulesRef = useRef(rules);
+  useEffect(() => {
+    rulesRef.current = rules;
+  }, [rules]);
   useEffect(() => {
     cb.current = { onRecorded, onCancel, onUnavailable };
   });
@@ -239,7 +247,7 @@ export function CameraRecorder({
     tickRef.current = setInterval(() => {
       const sec = (performance.now() - startedAtRef.current) / 1000;
       setElapsed(sec);
-      if (elapsedState(sec) === "max") stop();
+      if (elapsedState(sec, rulesRef.current) === "max") stop();
     }, 250);
   }, [settings, stop, stopTracks]);
 
@@ -342,7 +350,7 @@ export function CameraRecorder({
   }, [stopTick, stopTracks]);
 
   const resolution = describeResolution(settings);
-  const state = elapsedState(elapsed);
+  const state = elapsedState(elapsed, rules);
   const recording = phase === "recording";
 
   return (
@@ -412,7 +420,7 @@ export function CameraRecorder({
         </p>
         {recording && state === "long" && (
           <p role="status" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Past {formatDuration(SOFT_MAX_SEC)}: wrap up soon. Recording stops by itself in {secondsLeft(elapsed)} s.
+            Past {formatDuration(rules.warnAfterSec)}: wrap up soon. Recording stops by itself in {secondsLeft(elapsed, rules)} s.
           </p>
         )}
         {recording && tooQuiet && (
@@ -436,7 +444,7 @@ export function CameraRecorder({
           </p>
         )}
         {recording && state === "short" && (
-          <p className="mt-2 text-sm text-ink/70">Walk the whole space, about 60 to 90 seconds.</p>
+          <p className="mt-2 text-sm text-ink/70">Walk the whole space, about {aimRangeSpoken(rules)}.</p>
         )}
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           {recording || phase === "finishing" ? (
@@ -467,7 +475,7 @@ export function CameraRecorder({
           </button>
         </div>
         <p className="mt-2 text-center text-xs text-ink/65">
-          Stops by itself at {formatDuration(HARD_MAX_SEC)}. Hold the phone steady and talk as you walk.
+          {rules.label} space: stops by itself at {formatDuration(rules.hardMaxSec)}. Hold the phone steady and talk as you walk.
         </p>
       </div>
     </div>

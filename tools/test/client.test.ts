@@ -20,13 +20,13 @@ describe("video length check", () => {
   test("blocks unreadable, too short and too long clips", () => {
     for (const d of [NaN, 0, -1, Infinity]) assert.equal(checkDuration(d).kind, "block");
     assert.equal(checkDuration(4.9).kind, "block");
-    assert.equal(checkDuration(150.1).kind, "block");
+    assert.equal(checkDuration(120.1).kind, "block"); // Medium (default) cap
   });
   test("warns past 95 s, ok from 5 to 95 s", () => {
     assert.deepEqual(checkDuration(5), { kind: "ok", durationSec: 5 });
     assert.deepEqual(checkDuration(95), { kind: "ok", durationSec: 95 });
     assert.equal(checkDuration(95.5).kind, "warn");
-    assert.equal(checkDuration(150).kind, "warn");
+    assert.equal(checkDuration(120).kind, "warn");
   });
   test("formats m:ss", () => {
     assert.equal(formatDuration(0), "0:00");
