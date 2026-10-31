@@ -5,6 +5,7 @@ import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, ste
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 import { runTimeHint } from "@/lib/client/runTimeHint";
 import { failedRunCostLine } from "@/lib/client/runCost";
+import { narrationPartLine } from "@/lib/client/narrationChunks";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -58,6 +59,7 @@ export function ProcessingStep({
   checks,
   region,
   realRun = false,
+  narrationPart = null,
 }: {
   steps: ScreenStep[];
   current: number;
@@ -81,6 +83,8 @@ export function ProcessingStep({
   region?: string | null;
   /** A real run on the live pipeline: the time line uses measured run times instead of "a few minutes". */
   realRun?: boolean;
+  /** Which piece of a long narration is being read right now (shown on the Listening row only). */
+  narrationPart?: { at: number; of: number } | null;
 }) {
   const ENGINE = engines ?? currentStepEngines(region);
   const place = region?.trim() || null;
@@ -101,7 +105,8 @@ export function ProcessingStep({
   // screen reader re-read every changed row (icons, state words, the "now" line) and, on failure, the
   // error twice (the alert card is its own live region).
   const nowStep = work[Math.min(current, work.length - 1)];
-  const announce = failed || !nowStep ? "" : `Step ${position} of ${total}: ${LABELS[nowStep]}.`;
+  const partLine = nowStep === "listening" ? narrationPartLine(narrationPart) : null;
+  const announce = failed || !nowStep ? "" : `Step ${position} of ${total}: ${LABELS[nowStep]}.${partLine ? ` ${partLine}` : ""}`;
   const { clock, elapsedMs } = useStepClock(current, failed);
   const hint = runTimeHint(elapsedMs, { real: realRun, region });
   // Keep the phone screen on while the plan runs: auto-lock can suspend the tab and drop the request.
@@ -211,7 +216,7 @@ export function ProcessingStep({
                       aria-hidden="true"
                       className="mt-[3px] inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-accent/30 border-t-accent-dark motion-safe:animate-spin"
                     />
-                    {s === "planning" ? planningNowLine(place) : NOW_LINE[s]}
+                    {s === "planning" ? planningNowLine(place) : s === "listening" && partLine ? partLine : NOW_LINE[s]}
                   </span>
                 )}
                 {(ENGINE[s] || state === "skipped") && (

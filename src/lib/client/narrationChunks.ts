@@ -214,3 +214,13 @@ export function stitchChunkTranscripts(parts: ChunkTranscript[]): { transcript: 
   const transcript = lines.length ? lines.join("\n") : null;
   return { transcript, transcriptTurns: transcript ? turns : [] };
 }
+
+/**
+ * The processing screen's line while a long narration is sent in pieces ("part 2 of 4"), or null when
+ * there is no usable part (one piece, or a malformed count).
+ */
+export function narrationPartLine(part: { at: number; of: number } | null | undefined): string | null {
+  if (!part || !Number.isInteger(part.at) || !Number.isInteger(part.of)) return null;
+  if (part.of < 2 || part.at < 1 || part.at > part.of) return null;
+  return `Your narration is long, so it goes in ${part.of} parts. Reading part ${part.at} of ${part.of}.`;
+}

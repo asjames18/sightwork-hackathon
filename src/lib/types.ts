@@ -413,6 +413,11 @@ export type PlanJobStatus =
        * is checked and before the next step starts. Omit until then.
        */
       check?: StepCheck;
+      /**
+       * Client-only, never sent by the server: which piece of a long narration the browser is sending to
+       * /api/transcribe right now (part `at` of `of`, 1-based). Omit when the narration goes in one piece.
+       */
+      part?: { at: number; of: number };
     }
   | { state: "done"; plan: WorkPlan }
   /** The pipeline never fails a run at "reviewing"; the browser can still report it there when the connection drops. */
