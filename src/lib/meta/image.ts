@@ -34,6 +34,11 @@
  *   and the renderAfter step picks the first good candidate when the
  *   judge path cannot run. n is capped at 4 per call, so one bad
  *   request cannot loop paid generations past the spike cap's reach.
+ *   If a later candidate's request fails after an earlier candidate
+ *   was billed, the throw is an ImageCallError carrying that billed
+ *   cost and latency, so the step's recordFailedCall records it
+ *   instead of dropping it from the route total; a failure before
+ *   any billing throws the plain error, verbatim, as before.
  * - Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing, per the step's rule.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
@@ -74,6 +79,28 @@ export interface ImageCaller {
 
 /** Muse Image model ID, confirmed in the spike note's docs pass. */
 export const IMAGE_MODEL = "muse-image-1.0";
+
+/**
+ * An Image call that was billed but failed partway through a
+ * multi-candidate request: an earlier candidate completed (so its
+ * $0.01 is already spent) and a later candidate's request then
+ * failed. Carries the billed cost and latency so the renderAfter
+ * step's recordFailedCall can record the spend instead of dropping
+ * it from the route total, the same shape as
+ * SamCallError/BasetenCallError/MetaCallError. Only thrown when at
+ * least one image was already billed; a failure before any billing
+ * keeps the plain error, verbatim, as before.
+ */
+export class ImageCallError extends Error {
+  readonly costUsd: number;
+  readonly latencyMs: number;
+  constructor(message: string, costUsd: number, latencyMs: number) {
+    super(message);
+    this.name = "ImageCallError";
+    this.costUsd = costUsd;
+    this.latencyMs = latencyMs;
+  }
+}
 
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_IMAGE_COST_USD = 0.01;
@@ -296,27 +323,41 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
       let parsed: Record<string, unknown> | null = null;
       let lastStatus = 0;
       let lastDetail = "";
-      for (let attempt = 0; attempt < MAX_IMAGE_ATTEMPTS; attempt++) {
-        const res = await fetchImpl(`${baseUrl}/responses`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (res.ok) {
-          parsed = (await res.json()) as Record<string, unknown>;
-          break;
+      try {
+        for (let attempt = 0; attempt < MAX_IMAGE_ATTEMPTS; attempt++) {
+          const res = await fetchImpl(`${baseUrl}/responses`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (res.ok) {
+            parsed = (await res.json()) as Record<string, unknown>;
+            break;
+          }
+          lastStatus = res.status;
+          lastDetail = await res.text();
+          // Only a 404 naming model_not_found is transient (spike, Oct 28:
+          // unbilled, then 200 for the same model). Anything else throws at
+          // once, as before, and so does a 404 that survives all attempts.
+          const transient = res.status === 404 && lastDetail.includes("model_not_found");
+          if (!transient || attempt === MAX_IMAGE_ATTEMPTS - 1) break;
+          await sleepImpl(IMAGE_RETRY_DELAYS_MS[attempt] ?? 500);
         }
-        lastStatus = res.status;
-        lastDetail = await res.text();
-        // Only a 404 naming model_not_found is transient (spike, Oct 28:
-        // unbilled, then 200 for the same model). Anything else throws at
-        // once, as before, and so does a 404 that survives all attempts.
-        const transient = res.status === 404 && lastDetail.includes("model_not_found");
-        if (!transient || attempt === MAX_IMAGE_ATTEMPTS - 1) break;
-        await sleepImpl(IMAGE_RETRY_DELAYS_MS[attempt] ?? 500);
+      } catch (err) {
+        // A fetch throw mid-request must not drop an earlier
+        // candidate's billed spend: carry it, message verbatim.
+        if (costUsd > 0 && err instanceof Error) {
+          throw new ImageCallError(err.message, costUsd, latencyMs);
+        }
+        throw err;
       }
       latencyMs += Date.now() - started;
       if (parsed === null) {
+        // Same rule for a failed HTTP status: an earlier billed
+        // candidate's spend rides on the error for recordFailedCall.
+        if (costUsd > 0) {
+          throw new ImageCallError(`image: ${lastStatus} ${lastDetail}`, costUsd, latencyMs);
+        }
         throw new Error(`image: ${lastStatus} ${lastDetail}`);
       }
       const found = parseImageResults(parsed, outputFormat);
