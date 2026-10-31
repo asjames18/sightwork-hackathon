@@ -30,7 +30,9 @@ import { findResponseJson } from "../responseJson";
  *   rates below, which the spike wiring may override via opts. When the
  *   web_search tool is used, one search query is charged by default
  *   ($2.50 per 1,000 queries); the wiring may override that too once
- *   the provider reports a real search count.
+ *   the provider reports a real search count. Cost is priced before
+ *   the response text is parsed, so a parse failure still carries its
+ *   spend on a MetaCallError for the step to record.
  */
 
 export interface MetaUsage {
@@ -75,6 +77,27 @@ export interface SparkCallResult {
 export interface MetaClient {
   /** One Responses API call. Returns parsed JSON, latency, and cost. */
   callSpark(req: SparkCallRequest): Promise<SparkCallResult>;
+}
+
+/**
+ * A Spark call that reached the provider and was billed, but whose
+ * response text could not be parsed as JSON. Carries the call's
+ * costUsd and latencyMs so the pipeline step can record the spend on
+ * the usage tracker before failing the run — otherwise a failed parse
+ * spends without any usage record and the route total under-reports
+ * (the cost step's "not JSON" failure on the Oct 30 capped run did
+ * exactly that). The message is identical to the plain parse errors
+ * it replaces, so existing error handling matches unchanged.
+ */
+export class MetaCallError extends Error {
+  readonly costUsd: number;
+  readonly latencyMs: number;
+  constructor(message: string, costUsd: number, latencyMs: number) {
+    super(message);
+    this.name = "MetaCallError";
+    this.costUsd = costUsd;
+    this.latencyMs = latencyMs;
+  }
 }
 
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
@@ -295,10 +318,12 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
         throw new Error(`meta: ${lastStatus} ${lastDetail}`);
       }
       const latencyMs = Date.now() - started;
-      const found = findResponseJson(parsed);
-      if (!found.ok && found.text === null) throw new Error("meta: response had no text output");
-      if (!found.ok) throw new Error(`meta: response text was not JSON: ${(found.text ?? "").slice(0, 200)}`);
-      const json: unknown = found.json;
+      // Usage is priced BEFORE the parse, so a response whose text is
+      // not JSON still carries its spend: the parse failures below are
+      // MetaCallErrors with costUsd/latencyMs, for the step to record
+      // on the usage tracker before failing the run. (A response with
+      // both garbage text and bad token counts now throws the usage
+      // error first instead of the parse error; both fail the run.)
       const usage = (parsed.usage ?? {}) as MetaUsage;
       // A bad provider token count would otherwise flow into the
       // cost math unchecked and only surface later, mid-run, when
@@ -323,7 +348,11 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
       const outputTokens = usage.output_tokens ?? 0;
       const tokenCost = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
       const searchCost = (req.tools ?? []).some((t) => t.type === "web_search") ? webSearchCost : 0;
-      return { json, latencyMs, costUsd: tokenCost + searchCost };
+      const costUsd = tokenCost + searchCost;
+      const found = findResponseJson(parsed);
+      if (!found.ok && found.text === null) throw new MetaCallError("meta: response had no text output", costUsd, latencyMs);
+      if (!found.ok) throw new MetaCallError(`meta: response text was not JSON: ${(found.text ?? "").slice(0, 200)}`, costUsd, latencyMs);
+      return { json: found.json, latencyMs, costUsd };
     },
   };
 }
