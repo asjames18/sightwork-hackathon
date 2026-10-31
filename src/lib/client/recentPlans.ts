@@ -113,9 +113,15 @@ export function subscribeRecentPlans(onChange: () => void): () => void {
   };
 }
 
-/** Stable per run: the same plan saved twice (a reload) replaces its row instead of adding one. */
+/**
+ * Stable per run: the same plan saved twice (a reload) replaces its row instead of adding one. Every
+ * problem title and the run's cost go in, so a second walkthrough of the same room (often the same top
+ * problem and count) gets its own row and can be compared with the first.
+ */
 export function recentPlanId(plan: WorkPlan): string {
-  const basis = `${plan.spaceName ?? ""}|${plan.generatedFrom ?? ""}|${plan.issues?.length ?? 0}|${plan.issues?.[0]?.title ?? ""}|${plan.meta?.region ?? ""}`;
+  const titles = Array.isArray(plan.issues) ? plan.issues.map((i) => i?.title ?? "").join("~") : "";
+  const cost = typeof plan.meta?.costUsd === "number" ? String(plan.meta.costUsd) : "";
+  const basis = `${plan.spaceName ?? ""}|${plan.generatedFrom ?? ""}|${plan.issues?.length ?? 0}|${titles}|${plan.meta?.region ?? ""}|${cost}`;
   let h = 5381;
   for (let i = 0; i < basis.length; i++) h = ((h << 5) + h + basis.charCodeAt(i)) >>> 0;
   return `p${h.toString(36)}`;

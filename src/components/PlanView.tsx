@@ -4,6 +4,7 @@ import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { WorkSteps } from "./WorkSteps";
+import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import type { Example } from "@/lib/examples";
@@ -196,6 +197,7 @@ export function PlanView({
       )}
 
       <SharePlanButton plan={plan} sample={sample} example={example} />
+      {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
       {plan.issues.length > 0 && (
         <a
