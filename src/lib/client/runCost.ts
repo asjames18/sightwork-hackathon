@@ -18,3 +18,12 @@ export function runCostLine(plan: WorkPlan, opts: { sample?: boolean } = {}): st
   if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) return null;
   return `The AI model calls for this plan cost ${formatRunCost(usd)}.`;
 }
+
+/**
+ * One plain line for what a run that stopped had already cost, from the failed line's costUsd (server total
+ * plus any split transcribe request). null when nothing was billed or the amount is unknown.
+ */
+export function failedRunCostLine(usd: number | undefined): string | null {
+  if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) return null;
+  return `The AI model calls before it stopped cost ${formatRunCost(usd)}.`;
+}

@@ -4,6 +4,7 @@ import { currentStepEngines, OPTIONAL_STEPS, planningNowLine, REVIEW_ONLY_STEPS,
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 import { runTimeHint } from "@/lib/client/runTimeHint";
+import { failedRunCostLine } from "@/lib/client/runCost";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -40,7 +41,7 @@ const STATE_TEXT = {
 } as const;
 
 /** A step that stopped the run. `message` is shown as-is, so keep it plain and free of provider details. */
-export type StepFailure = { message: string };
+export type StepFailure = { message: string; /** What the run billed before it stopped, when known. */ costUsd?: number };
 
 export function ProcessingStep({
   steps,
@@ -242,6 +243,9 @@ export function ProcessingStep({
         <div role="alert" className="mt-6 rounded-2xl border border-red-600/30 bg-white p-4">
           <p className="font-semibold text-red-700">Stopped at: {LABELS[steps[current]] ?? "a step"}</p>
           <p className="mt-1 text-sm text-ink/70">{failure.message}</p>
+          {failedRunCostLine(failure.costUsd) && (
+            <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd)}</p>
+          )}
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             {onEnterCode ? (
               <button

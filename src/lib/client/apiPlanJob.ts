@@ -42,8 +42,16 @@ export function parseStatusLine(line: string): PlanJobStatus | null {
     const check = parseStepCheck(o.check);
     return { state: "running", step: o.step, ...(skipped.length ? { skipped } : {}), ...(check ? { check } : {}) };
   }
-  if (o.state === "failed" && isRunStep(o.step))
-    return { state: "failed", step: o.step, message: typeof o.message === "string" && o.message ? o.message : GENERIC_FAIL };
+  if (o.state === "failed" && isRunStep(o.step)) {
+    // What the run billed before it stopped, kept only when it's a real amount (see failureCostUsd).
+    const costUsd = failureCostUsd(o);
+    return {
+      state: "failed",
+      step: o.step,
+      message: typeof o.message === "string" && o.message ? o.message : GENERIC_FAIL,
+      ...(costUsd > 0 ? { costUsd } : {}),
+    };
+  }
   if (o.state === "done" && o.plan && typeof o.plan === "object") {
     const plan = o.plan as WorkPlan;
     // The review is advisory: a malformed one is dropped (the plan shows without it), never trusted as-is.
@@ -164,6 +172,20 @@ export function withTranscribeCost(plan: WorkPlan, transcribeUsd: number): WorkP
 }
 
 /**
+ * Adds the split transcribe request's cost to a failed line, so "what this run cost" covers the whole run
+ * even when it stopped. A line with no amount gets the transcribe cost alone (that much was surely billed);
+ * nothing billed leaves the line without costUsd.
+ */
+export function withFailureCost(s: Extract<PlanJobStatus, { state: "failed" }>, extraUsd: number): Extract<PlanJobStatus, { state: "failed" }> {
+  const base = failureCostUsd(s);
+  const extra = Number.isFinite(extraUsd) && extraUsd > 0 ? extraUsd : 0;
+  const { costUsd: _c, ...rest } = s;
+  void _c;
+  const total = Math.round((base + extra) * 1e6) / 1e6;
+  return total > 0 ? { ...rest, costUsd: total } : rest;
+}
+
+/**
  * Option (b) for the 4.5 MB body cap: when the request carries narration, POST it alone to
  * /api/transcribe first and send the plan request with the transcript instead of the WAV.
  * Returns the request to send, or "unauthorized" on 401. Any other failure keeps the original
@@ -219,7 +241,10 @@ export function createApiPlanJob(
       if (s.state !== "done") lastStep = s.step;
       onStatus(s);
     };
-    const fail = (message: string) => report({ state: "failed", step: lastStep, message });
+    // What the split transcribe request cost, carried on any failure after it so the Stopped screen can say
+    // what the run billed.
+    let transcribeUsd = 0;
+    const fail = (message: string) => report(withFailureCost({ state: "failed", step: lastStep, message }, transcribeUsd));
 
     report({ state: "running", step: "uploading" });
 
@@ -249,8 +274,7 @@ export function createApiPlanJob(
     }
     if (signal.aborted) return;
 
-    // What the split /api/transcribe request cost; added to the plan's total when it comes back.
-    let transcribeUsd = 0;
+    // The split /api/transcribe request's cost (transcribeUsd above) is added to the plan's total when it comes back.
     if (transcribeEndpoint) {
       const split = await splitNarration(body, transcribeEndpoint, loadTestCode(), signal);
       if (signal.aborted) return;
@@ -291,7 +315,13 @@ export function createApiPlanJob(
       if (s.state !== "running") finished = true;
       // The plan keeps the City, ST it was run for, even when the cost step failed and costRange is null,
       // and its model-call total includes the split transcribe request.
-      report(s.state === "done" ? { ...s, plan: withTranscribeCost(withRunRegion(s.plan, body.region), transcribeUsd) } : s);
+      report(
+        s.state === "done"
+          ? { ...s, plan: withTranscribeCost(withRunRegion(s.plan, body.region), transcribeUsd) }
+          : s.state === "failed"
+            ? withFailureCost(s, transcribeUsd)
+            : s,
+      );
     };
 
     try {
