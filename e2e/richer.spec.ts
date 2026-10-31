@@ -221,7 +221,8 @@ test("no problems, only closer-look finds: the empty state and the list together
 });
 
 test("today's plans render as before: tiers from severity, no closer-look list, no checklist, no cost shares", async ({ page }) => {
-  await page.goto("/start?view=example");
+  // The real Oct 29 run predates the richer fields (the featured kitchen sample now carries them).
+  await page.goto("/start?view=example&ex=sanctuary");
   const problems = page.locator("#problems");
   await expect(problems.getByRole("heading", { name: /^Fix now/ })).toBeVisible();
   await expect(page.getByTestId("watch-list")).toHaveCount(0);
@@ -229,5 +230,26 @@ test("today's plans render as before: tiers from severity, no closer-look list, 
   await expect(page.getByTestId("issue-cost")).toHaveCount(0);
   await expect(page.getByText("Partly backed", { exact: true })).toHaveCount(0);
   await expectNoSideScroll(page);
-  await expectNoAxeViolations(page, "featured example after the richer-findings change");
+  await expectNoAxeViolations(page, "real run without the richer fields");
+});
+
+test("featured kitchen sample (the public default) shows tiers, where and what, the closer-look list and the checklist at 375, 768 and 1280", async ({ page }) => {
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/start?view=example&ex=kitchen");
+    const problems = page.locator("#problems");
+    for (const name of [/^Fix now/, /^Fix soon/, /^Can wait/]) await expect(problems.getByRole("heading", { level: 3, name })).toBeVisible();
+    const leak = problems.getByRole("listitem").filter({ hasText: "Shutoff valve under the sink is leaking" }).first();
+    await expect(leak.getByText("Under the sink", { exact: true })).toBeVisible();
+    const watch = page.getByTestId("watch-list");
+    await watch.getByText("Worth a closer look").click();
+    await expect(watch.getByText("Ladder and boards left standing in the walkway")).toBeVisible();
+    await expect(watch.getByText("Loose wire on the floor by the fireplace")).toBeVisible();
+    const checklist = page.getByTestId("checklist");
+    await expect(checklist.getByRole("listitem").filter({ hasText: "Plumbing and water" })).toContainText("2 problems");
+    await expect(checklist.getByRole("listitem").filter({ hasText: "Walls, paint and ceiling" })).toContainText("4 problems");
+    await expectNoSideScroll(page);
+    if (width === 375) await expectNoAxeViolations(page, "kitchen sample with the closer-look list open");
+    await shot(page, "kitchen-sample");
+  }
 });

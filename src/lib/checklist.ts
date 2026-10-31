@@ -10,6 +10,11 @@ export interface ChecklistArea {
   label: string;
   /** checklistKey / hazard keys that belong here. */
   keys: readonly string[];
+  /**
+   * Listed only when something landed here. For areas the plan step's sweep doesn't name for every space yet,
+   * so the summary never says SightWork checked an area it wasn't asked to check.
+   */
+  onlyWhenFound?: boolean;
 }
 
 export const CHECKLIST_AREAS: readonly ChecklistArea[] = [
@@ -26,6 +31,7 @@ export const CHECKLIST_AREAS: readonly ChecklistArea[] = [
   { id: "clean", label: "Cleanliness", keys: ["cleanliness"] },
   { id: "access", label: "Accessibility", keys: ["ada_path"] },
   { id: "hvac", label: "Heating and vents", keys: ["hvac"] },
+  { id: "plumbing", label: "Plumbing and water", keys: ["plumbing"], onlyWhenFound: true },
 ];
 
 const KEY_TO_AREA = new Map(CHECKLIST_AREAS.flatMap((a) => a.keys.map((k) => [k, a.id] as const)));
@@ -48,7 +54,8 @@ export interface ChecklistRow {
 /** One row per area, in checklist order, plus "Other" when anything landed there. */
 export function checklistRows(issues: (Pick<Issue, "hazard"> & { checklistKey?: unknown })[], watch: { checklistKey?: unknown }[] = []): ChecklistRow[] {
   const count = (list: { hazard?: Issue["hazard"]; checklistKey?: unknown }[], id: string) => list.filter((i) => areaFor(i) === id).length;
-  const rows: ChecklistRow[] = CHECKLIST_AREAS.map((a) => ({ id: a.id, label: a.label, found: count(issues, a.id), watch: count(watch, a.id) }));
+  const rows: ChecklistRow[] = CHECKLIST_AREAS.map((a) => ({ id: a.id, label: a.label, found: count(issues, a.id), watch: count(watch, a.id) }))
+    .filter((r, i) => !CHECKLIST_AREAS[i].onlyWhenFound || r.found || r.watch);
   const other = { id: "other", label: "Other", found: count(issues, "other"), watch: count(watch, "other") };
   return other.found || other.watch ? [...rows, other] : rows;
 }

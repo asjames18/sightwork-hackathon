@@ -101,3 +101,25 @@ test("card thumbnails on /start exist and stay small (under 100 KB each)", async
     assert.ok(statSync(file).size < 100 * 1024, `${e.id}: ${e.thumb} is ${Math.round(statSync(file).size / 1024)} KB`);
   }
 });
+
+test("the featured sample shows the richer findings: every problem has a tier, where and what the photo shows, and a checklist area; closer-look finds point at real frames", async () => {
+  const { areaFor } = await import("@/lib/checklist");
+  const plan = FEATURED_EXAMPLE.plan;
+  const tiers = new Set<string>();
+  for (const issue of plan.issues) {
+    assert.ok(issue.tier, `issue ${issue.rank} tier`);
+    tiers.add(issue.tier!);
+    assert.ok(issue.area && issue.area.length <= 80, `issue ${issue.rank} area`);
+    assert.ok(issue.evidence && issue.evidence.length <= 160, `issue ${issue.rank} evidence`);
+    assert.notEqual(areaFor(issue), "other", `issue ${issue.rank} checklist area`);
+  }
+  assert.deepEqual([...tiers].sort(), ["later", "soon", "urgent"]);
+  const watch = plan.watch ?? [];
+  assert.ok(watch.length >= 1, "has closer-look finds");
+  for (const w of watch) {
+    assert.ok(plan.frames![w.frameIndex], `watch ${w.title} frame`);
+    assert.equal(w.frameTimeSec, plan.frames![w.frameIndex].tSec);
+    assert.ok(w.confidence !== undefined && w.confidence < 0.5, `watch ${w.title} is below the keep threshold`);
+    assert.notEqual(areaFor(w), "other", `watch ${w.title} checklist area`);
+  }
+});

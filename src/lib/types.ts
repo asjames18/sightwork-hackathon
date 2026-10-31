@@ -192,6 +192,7 @@ export const CHECKLIST_KEYS = [
   "lighting", "damaged_seating", "flooring",
   "walls", "water_stain", "ceiling", "doors_windows",
   "clutter", "signage", "cleanliness", "ada_path", "hvac",
+  "plumbing",
 ] as const;
 export type ChecklistKey = (typeof CHECKLIST_KEYS)[number];
 

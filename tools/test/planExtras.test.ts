@@ -70,11 +70,12 @@ describe("checklist", () => {
     assert.equal(areaFor({ checklistKey: "Lighting" }), "lighting");
     assert.equal(areaFor({ checklistKey: "unicorns" }), "other");
     const rows = checklistRows([issue(1, "high", { checklistKey: "trip_cable" }), issue(2, "low", { checklistKey: "flooring" }), issue(3, "low", { checklistKey: "zzz" })], [{ checklistKey: "walls" }]);
-    assert.equal(rows.length, CHECKLIST_AREAS.length + 1);
+    const always = CHECKLIST_AREAS.filter((a) => !a.onlyWhenFound).length;
+    assert.equal(rows.length, always + 1);
     assert.equal(rows.find((r) => r.id === "av")!.found, 1);
     assert.equal(rows.find((r) => r.id === "walls")!.watch, 1);
     assert.equal(rows.at(-1)!.id, "other");
-    assert.equal(checklistRows([]).length, CHECKLIST_AREAS.length);
+    assert.equal(checklistRows([]).length, always);
   });
   test("every checklist key belongs to one area only", () => {
     const keys = CHECKLIST_AREAS.flatMap((a) => a.keys);
