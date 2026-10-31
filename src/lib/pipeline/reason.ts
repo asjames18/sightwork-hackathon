@@ -223,6 +223,26 @@ export function dropTotalInventoryRows(inventory: InventoryItem[]): InventoryIte
   });
 }
 
+/**
+ * One-line server-side stability fingerprint for a reason result.
+ * Pure, and it changes no plan output: runPlan logs it after the
+ * reason step so the next capped run can tell whether a repeat-run
+ * swing came from SAM (flagged frames / counts changed) or from the
+ * reason model (same SAM input, different issue count). A low issue
+ * count is never padded here: finds below the ranked bar already
+ * surface as `watch`, so forcing a floor would invent problems.
+ */
+export function formatReasonStability(
+  segmentation: SegmentationResult | null,
+  output: Pick<ReasonOutput, "issues" | "watch" | "heroFrameIndex">,
+): string {
+  const sam =
+    segmentation === null
+      ? "sam skipped"
+      : `sam flagged ${segmentation.flaggedFrames.length} frames, counts ${segmentation.counts.map((c) => `${c.label}=${c.count}`).join(", ") || "none"}`;
+  return `runPlan: reason stability: ${sam}; reason ${output.issues.length} issues, ${output.watch?.length ?? 0} watch, hero frame ${output.heroFrameIndex}`;
+}
+
 /** Confidence filter + rank renumber, with rank references remapped.
  * Issues at or above the bar (0.5, or 0.6 when unmentioned) stay
  * ranked. Issues from 0.35 up to the bar move to `watch` instead of
