@@ -48,7 +48,7 @@ import {
   type WorkPlan,
   type WorkStep,
 } from "../types";
-import { recordFailedCall, type UsageTracker } from "./usage";
+import { failedCallModel, recordFailedCall, type UsageTracker } from "./usage";
 
 /** SAM segmentation result, per prompt 02. Counts are summed across zones (each zone's best frame), floored at the whole-video single-frame max; with no zones the take is one zone, so the count is the old single-frame max. */
 export interface SegmentationResult {
@@ -600,7 +600,7 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
     try {
       res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE });
     } catch (err) {
-      recordFailedCall(deps.tracker, SPARK_MODEL, "reason", err);
+      recordFailedCall(deps.tracker, failedCallModel(err, SPARK_MODEL), "reason", err);
       throw err;
     }
     // The tracker enforces the spike cap: a throw here stops the run.
