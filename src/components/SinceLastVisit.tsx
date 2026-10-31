@@ -1,16 +1,8 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
 import type { WorkPlan } from "@/lib/types";
-import {
-  listRecentPlans,
-  listRecentPlansOnServer,
-  openRecentPlan,
-  recentPlanId,
-  recentWhen,
-  subscribeRecentPlans,
-} from "@/lib/client/recentPlans";
-import { comparePlans, compareSummary, previousEntry, type CompareRow, type PlanComparison } from "@/lib/client/planCompare";
+import { compareSummary, type CompareRow } from "@/lib/client/planCompare";
+import { usePlanComparison } from "@/lib/client/usePlanComparison";
 
 const TIER_LABEL: Record<CompareRow["tier"], string> = { urgent: "Fix now", soon: "Fix soon", later: "Can wait" };
 
@@ -38,25 +30,10 @@ function Group({ title, rows, tone, testId }: { title: string; rows: CompareRow[
  * device. Shows nothing on samples, when there's no earlier run, or when its saved copy can't be read.
  */
 export function SinceLastVisit({ plan }: { plan: WorkPlan }) {
-  const list = useSyncExternalStore(subscribeRecentPlans, listRecentPlans, listRecentPlansOnServer);
-  const prev = previousEntry(plan, list, recentPlanId(plan));
-  const prevId = prev?.id ?? null;
-  const [loaded, setLoaded] = useState<{ id: string; result: PlanComparison | null } | null>(null);
-
-  useEffect(() => {
-    if (!prevId) return;
-    let live = true;
-    void openRecentPlan(prevId).then((saved) => {
-      if (live) setLoaded({ id: prevId, result: saved ? comparePlans(plan, saved.plan) : null });
-    });
-    return () => {
-      live = false;
-    };
-  }, [prevId, plan]);
-
-  if (!prev || !loaded || loaded.id !== prev.id || !loaded.result) return null;
-  const c = loaded.result;
-  const when = recentWhen(prev.savedAt);
+  const loaded = usePlanComparison(plan);
+  if (!loaded) return null;
+  const c = loaded.comparison;
+  const when = loaded.when;
   return (
     <section
       aria-labelledby="since-last-heading"

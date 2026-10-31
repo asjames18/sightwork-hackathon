@@ -168,6 +168,8 @@ export interface PlanTextOptions {
   date?: Date;
   /** The PDF goes with the text on the same share, so the last line points at it. */
   pdfAttached?: boolean;
+  /** "Since the last walkthrough" lines (planCompare.compareShareLines), placed after the problems. */
+  sinceLines?: readonly string[];
 }
 
 /**
@@ -205,6 +207,7 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   }
   const why = coverageLine(plan);
   if (why) lines.push(why);
+  if (!sample && opts.sinceLines && opts.sinceLines.length > 0) lines.push("", ...opts.sinceLines);
   if (watch.length > 0) {
     lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
     for (const w of watch.slice(0, MAX_SHARE_WATCH)) lines.push(`- ${watchLine(w)}`);

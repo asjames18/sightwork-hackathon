@@ -122,3 +122,33 @@ export function compareSummary(c: PlanComparison): string {
   if (c.newOnes.length) parts.push(`${c.newOnes.length} new`);
   return parts.length ? parts.join(", ") : "No problems in either walkthrough";
 }
+
+const SHARE_TIER: Record<CompareRow["tier"], string> = { urgent: "fix now", soon: "fix soon", later: "can wait" };
+/** Titles listed per group in the shared text before "and N more". */
+export const MAX_SHARE_COMPARE = 3;
+
+function shareGroup(label: string, rows: CompareRow[]): string | null {
+  if (rows.length === 0) return null;
+  const shown = rows.slice(0, MAX_SHARE_COMPARE).map((r) => `${r.title.replace(/\s+/g, " ").trim()} (${SHARE_TIER[r.tier]})`);
+  const more = rows.length > MAX_SHARE_COMPARE ? `; and ${rows.length - MAX_SHARE_COMPARE} more` : "";
+  return `- ${label}: ${shown.join("; ")}${more}`;
+}
+
+/**
+ * The comparison as plain-text lines for "Send to your team": a heading with the summary and the earlier
+ * date, one line per group (a few titles each), and the same "check the photos" caution as the screen.
+ * Empty when neither walkthrough has a ranked problem, so the text doesn't grow a section that says nothing.
+ */
+export function compareShareLines(c: PlanComparison, when?: string | null): string[] {
+  if (c.gone.length + c.stillThere.length + c.newOnes.length === 0) return [];
+  const lines = [`Since the last walkthrough${when ? ` (${when})` : ""}: ${compareSummary(c)}.`];
+  for (const g of [
+    shareGroup("No longer seen", c.gone),
+    shareGroup("Still there", c.stillThere),
+    shareGroup("New this time", c.newOnes),
+  ]) {
+    if (g) lines.push(g);
+  }
+  lines.push("Matched by what and where, so check the photos before counting one as fixed.");
+  return lines;
+}
