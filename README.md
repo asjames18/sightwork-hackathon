@@ -4,7 +4,7 @@
 
 **Built by Antonio James** for the Meta AI Developer Hackathon (Oct 26 – Nov 4, 2026), Startup track.
 
-SightWork turns a 60–90 second phone walkthrough of a property into a work plan you can act on.
+SightWork turns a short phone walkthrough of a property into a work plan you can act on. How long to film depends on how big the space is (see [Video length by room size](#video-length-by-room-size)).
 
 ## What it does
 You film one walkthrough. SightWork returns:
@@ -50,6 +50,18 @@ SAM 3.1, Muse Image and the cost step are optional: when one is unavailable, the
 The plan and review calls run at temperature 0.2, so two runs on the same video stay closer together. When web search puts a sentence of prose ahead of the answer, the caller still finds the JSON answer in the response instead of failing the step.
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How the build maps to the judging criteria: [docs/JUDGING.md](docs/JUDGING.md).
+
+## Video length by room size
+Before filming, pick how big the space is. The size sets the recommended length, when the recorder says to wrap up, and where it stops by itself; a picked video longer than the size's cap is refused with a note to trim it or pick a bigger size. The rules live in one place, `ROOM_SIZES` in `src/lib/client/duration.ts`.
+
+| Size | For example | Aim for | Wrap-up warning after | Cap (recorder stops) |
+| --- | --- | --- | --- | --- |
+| Small | Bedroom, office, bathroom | 30–60 s | 60 s | 75 s |
+| Medium (default) | Classroom, kitchen, stage | 60–90 s | 95 s | 2 min |
+| Large | Sanctuary, gym, big hall | 90 s–3 min | 2½ min | 3 min |
+| Extra large | Warehouse, whole floor, parking lot | 3–5 min | 4½ min | 5 min |
+
+Every size sends at most 48 frames, spread over the actual clip: takes up to 45 s get about one frame per 1.25 s, longer ones one every 2 s until that would pass 48, then evenly spread (about one every 2.5 s at 2 minutes, 3.8 s at 3 minutes and 6.4 s at 5 minutes). Anything under 5 seconds is refused for every size.
 
 ## Built during the hackathon
 Everything in this repository was written during the event (Oct 26 – Nov 4, 2026). The idea and planning came before; no earlier code is included. Antonio built SightWork with AI coding assistance and deploys it himself.
@@ -98,7 +110,7 @@ On /start, **Record a walkthrough** opens the camera in the page (back camera, a
 
 While the in-page camera is open, the screen stays on (where the browser supports screen wake lock), so phone auto-lock can't end a take mid-walk. A small meter in the corner shows the mic level, and if a take has been quiet for 5 seconds a hint asks you to say what you see. With no mic at all, a note says the plan will use the video only.
 
-A narrated run makes two requests. First the browser sends the narration as 16 kHz mono audio to `POST /api/transcribe`; then it sends still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) plus the transcript text to `POST /api/plan`. Narration recorded from arm's length in a big room is often very quiet, so before the audio is encoded the browser lifts a quiet take until its loud parts sit near full level (up to +24 dB, read from the loudest 0.1% so one click doesn't set it, never clipped and never turned down). If the transcribe request fails for any reason other than a bad tester code, the browser falls back to sending the audio along with the frames in one plan request, so narration is never dropped. The full video stays on the device.
+A narrated run makes two requests. First the browser sends the narration as 16 kHz mono audio to `POST /api/transcribe`; then it sends still frames from the video (one about every 2 seconds, up to 48, longest side 1024 px) plus the transcript text to `POST /api/plan`. Narration recorded from arm's length in a big room is often very quiet, so before the audio is encoded the browser lifts a quiet take until its loud parts sit near full level (up to +24 dB, read from the loudest 0.1% so one click doesn't set it, never clipped and never turned down). Narration longer than about 80 seconds is cut into chunks of at most 80 seconds, each cut placed at the quietest moment in the last 12 seconds before the limit so no word is split, and each chunk goes to `/api/transcribe` in its own request; the browser then shifts each chunk's turn times by where the chunk starts and joins them, so the transcript times still match the video. If a transcribe request fails for any reason other than a bad tester code (one retry per chunk), the browser falls back to sending the audio along with the frames in one plan request when that fits, so narration is never dropped. The full video stays on the device.
 
 The browser keeps a request under about 9 MB, since the server accepts up to 10 MB. Some hosts cap request bodies lower (Vercel functions take 4.5 MB). On those, set `NEXT_PUBLIC_SIGHTWORK_MAX_REQUEST_BYTES` at build time (for example `4300000`), and the browser softens the frames to fit or says the take is too long up front, instead of the host rejecting it.
 

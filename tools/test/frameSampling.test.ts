@@ -105,14 +105,14 @@ describe("longer-take sampling prep, more cases (still not wired)", () => {
     assert.equal(pickSharpest([NaN, 3, 3, 1]), 1);
     assert.equal(pickSharpest([NaN, NaN]), -1);
   });
-  test("stays unwired: buildPlanRequest still samples with pickFrameTimes and duration limits are 95/150", async () => {
+  test("stays unwired: buildPlanRequest still samples with pickFrameTimes and Medium (default) duration limits are 95/120", async () => {
     const { readFile } = await import("node:fs/promises");
     const build = await readFile(new URL("../../src/lib/client/buildPlanRequest.ts", import.meta.url), "utf8");
     assert.ok(!build.includes("frameSampling"));
     const { checkDuration } = await import("@/lib/client/duration");
     assert.equal(checkDuration(95).kind, "ok");
     assert.equal(checkDuration(96).kind, "warn");
-    assert.equal(checkDuration(150).kind, "warn");
-    assert.equal(checkDuration(151).kind, "block");
+    assert.equal(checkDuration(120).kind, "warn");
+    assert.equal(checkDuration(121).kind, "block");
   });
 });

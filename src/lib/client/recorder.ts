@@ -2,7 +2,7 @@
  * Pure helpers behind the in-page camera recorder on the upload screen (no browser globals, so
  * tools/test can check them). The component lives in src/components/CameraRecorder.tsx.
  */
-import { HARD_MAX_SEC, MIN_SEC, SOFT_MAX_SEC } from "./duration";
+import { durationRulesFor, type DurationRules } from "./duration";
 
 /** About 8 Mbps: a sharp 1080p30 take (phone camera apps use roughly 8 to 17 Mbps at 1080p). */
 export const RECORD_VIDEO_BPS = 8_000_000;
@@ -146,17 +146,20 @@ export function baseMime(mime: string): string {
 
 export type ElapsedState = "short" | "ok" | "long" | "max";
 
-/** Where a running take is against the length limits: under 5 s, fine, past 95 s, at 150 s (stop). */
-export function elapsedState(sec: number): ElapsedState {
-  if (sec >= HARD_MAX_SEC) return "max";
-  if (sec > SOFT_MAX_SEC) return "long";
-  if (sec < MIN_SEC) return "short";
+/**
+ * Where a running take is against the chosen room size's length rules (duration.ts): under 5 s, fine,
+ * past the size's warn point (wrap up), at its cap (stop). Medium when no rules are passed.
+ */
+export function elapsedState(sec: number, rules: DurationRules = durationRulesFor()): ElapsedState {
+  if (sec >= rules.hardMaxSec) return "max";
+  if (sec > rules.warnAfterSec) return "long";
+  if (sec < rules.minSec) return "short";
   return "ok";
 }
 
-/** Seconds left before the automatic stop. */
-export function secondsLeft(sec: number): number {
-  return Math.max(0, Math.ceil(HARD_MAX_SEC - sec));
+/** Seconds left before the automatic stop at the size's cap. */
+export function secondsLeft(sec: number, rules: DurationRules = durationRulesFor()): number {
+  return Math.max(0, Math.ceil(rules.hardMaxSec - sec));
 }
 
 /** Average bitrate of a finished take in bits per second (0 when it can't be worked out). */

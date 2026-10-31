@@ -6,12 +6,14 @@ import { hasLastPlan } from "@/lib/client/lastPlan";
 import { EXAMPLES, type Example } from "@/lib/examples";
 import { loadTestCode, saveTestCode } from "@/lib/client/testCode";
 import { checkLocation, CITY_MAX, isUsStateCode, isValidCity, loadLocation, saveLocation, US_STATES, type RunLocation } from "@/lib/client/location";
-import { checkDuration, formatDuration, type Check } from "@/lib/client/duration";
+import { aimRange, aimRangeSpoken, checkDuration, DEFAULT_ROOM_SIZE, durationRulesFor, formatDuration, shortLength, type Check, type RoomSize } from "@/lib/client/duration";
+import { loadRoomSize, saveRoomSize } from "@/lib/client/roomSize";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
 import { lightMessage, lightVerdict, type LightVerdict } from "@/lib/client/lightCheck";
 import { sampleVideoLuma } from "@/lib/client/sampleVideoLuma";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
 import { SpacePicker } from "./SpacePicker";
+import { RoomSizePicker } from "./RoomSizePicker";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -57,7 +59,22 @@ export function UploadStep({
   // instead of letting keyboard and screen-reader users fall back to the top of the page.
   const card = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<{ url: string; file: File } | null>(null);
-  const [check, setCheck] = useState<Check>({ kind: "reading" });
+  // The picked video's length as read, and the room size; the length check comes from both (duration.ts),
+  // so changing the size on the video card re-checks the same video.
+  const [len, setLen] = useState<{ state: "reading" } | { state: "known"; sec: number } | { state: "unplayable" }>({ state: "reading" });
+  const [roomSize, setRoomSize] = useState<RoomSize>(DEFAULT_ROOM_SIZE);
+  useEffect(() => setRoomSize(loadRoomSize()), []);
+  const changeRoomSize = (size: RoomSize) => {
+    setRoomSize(size);
+    saveRoomSize(size);
+  };
+  const rules = durationRulesFor(roomSize);
+  const check: Check =
+    len.state === "reading"
+      ? { kind: "reading" }
+      : len.state === "unplayable"
+        ? { kind: "block", message: "This browser can't play that video. Try an MP4, or record it again here." }
+        : checkDuration(len.sec, roomSize);
   // Read in an effect so the server render and the first client render match.
   const [runner, setRunner] = useState<RunnerKind>("mock");
   // Where the user's own video goes: a real run, unless an example-plan preview was asked for on purpose.
@@ -108,7 +125,7 @@ export function UploadStep({
     setCameraNote(null);
     setRecorded(info);
     setAskCode(false);
-    setCheck({ kind: "reading" });
+    setLen({ state: "reading" });
     setPreview({ url: URL.createObjectURL(file), file });
   }, []);
   // Back from a run the server refused for the tester code: the same video, with the code prompt open.
@@ -206,7 +223,7 @@ export function UploadStep({
     <section>
       <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl">Film a walkthrough. Get a work plan.</h1>
       <p className="mt-3 text-ink/70">
-        Walk the space for 60 to 90 seconds and say what needs work. SightWork counts what&apos;s there, finds the problems
+        Walk the space and say what needs work. Pick its size below for how long to film. SightWork counts what&apos;s there, finds the problems
         (including the ones you didn&apos;t mention), and lays out the work in order.
       </p>
 
@@ -232,6 +249,7 @@ export function UploadStep({
         <>
           {recording ? (
             <CameraRecorder
+              rules={rules}
               onRecorded={(file, info) => pick(file, info)}
               onCancel={() => setRecording(false)}
               onUnavailable={(message) => {
@@ -240,8 +258,10 @@ export function UploadStep({
               }}
             />
           ) : (
+            <>
+            <RoomSizePicker value={roomSize} onChange={changeRoomSize} className="mt-6" />
             <div
-              className={`mt-6 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-7 text-center transition-colors ${
+              className={`mt-4 flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-7 text-center transition-colors ${
                 dragging ? "border-dashed border-accent-dark bg-accent/5" : "border-ink/20 bg-white"
               }`}
             >
@@ -262,10 +282,11 @@ export function UploadStep({
                 </button>
               </div>
               <span className="text-sm text-ink/70">
-                MP4 or MOV, about 60 to 90 seconds<span className="hidden [@media(pointer:fine)]:inline">. Or drag it here.</span>
+                MP4 or MOV, {aimRange(rules)} (up to {shortLength(rules.hardMaxSec)})<span className="hidden [@media(pointer:fine)]:inline">. Or drag it here.</span>
               </span>
               <p className="text-xs text-ink/65">For the sharpest video, record in your Camera app and choose it here.</p>
             </div>
+            </>
           )}
           {cameraNote && (
             <div role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -298,7 +319,7 @@ export function UploadStep({
           ) : null}
           {recent}
           {runner === "api" && <TesterCode />}
-          <FilmingTips />
+          <FilmingTips aim={aimRangeSpoken(rules)} label={rules.label} />
           <ExamplePicker onPick={onExample} />
         </>
       ) : (
@@ -322,12 +343,10 @@ export function UploadStep({
               const url = preview.url;
               // In-page recordings (WebM) report an unknown length until scanned; work it out first.
               void resolveVideoDuration(e.currentTarget).then((d) => {
-                if (previewUrl.current === url) setCheck(checkDuration(d));
+                if (previewUrl.current === url) setLen({ state: "known", sec: d });
               });
             }}
-            onError={() =>
-              setCheck({ kind: "block", message: "This browser can't play that video. Try an MP4, or record it again here." })
-            }
+            onError={() => setLen({ state: "unplayable" })}
           />
           <div className="flex items-center justify-between gap-3 p-4">
             <p className="min-w-0 truncate text-sm text-ink/70">
@@ -374,6 +393,7 @@ export function UploadStep({
               />
             )}
             <SpacePicker />
+            <RoomSizePicker value={roomSize} onChange={changeRoomSize} className="mb-3" />
             <button
               type="button"
               disabled={!canSend}
@@ -433,13 +453,13 @@ export const FILMING_TIPS: { icon: TipIcon; title: string; detail: string }[] = 
   { icon: "speak", title: "Point out problems", detail: "Say what needs work. SightWork also looks for what you don\u2019t mention." },
 ];
 
-function FilmingTips() {
+function FilmingTips({ aim, label }: { aim: string; label: string }) {
   return (
     <section aria-labelledby="film-tips-heading" className="mt-6 rounded-2xl bg-white/70 p-4 ring-1 ring-ink/10 sm:p-5">
       <h2 id="film-tips-heading" className="text-lg font-extrabold">
         How to film
       </h2>
-      <p className="mt-0.5 text-sm text-ink/70">One steady take of 60 to 90 seconds. Talking is optional, but it helps.</p>
+      <p className="mt-0.5 text-sm text-ink/70">One steady take, about {aim} for a {label.toLowerCase()} space. Talking is optional, but it helps.</p>
       <ul className="mt-3 grid grid-cols-1 gap-x-5 gap-y-2.5 sm:gap-y-3 sm:grid-cols-2">
         {FILMING_TIPS.map((t) => (
           <li key={t.title} className="flex gap-3">

@@ -3,7 +3,7 @@ import { SightWorkFlow } from "@/components/SightWorkFlow";
 
 export const metadata: Metadata = {
   title: "Make a work plan | SightWork",
-  description: "Upload a 60 to 90 second walkthrough video and get a work plan: problems worst first with proof frames, counts, steps in order and materials.",
+  description: "Upload a walkthrough video (30 seconds for a small room up to 5 minutes for a warehouse) and get a work plan: problems worst first with proof frames, counts, steps in order and materials.",
 };
 
 // `?view=last` (the last plan saved on this device) can only be read in the browser, so the page would first

@@ -103,17 +103,18 @@ export const REQUEST_OVERHEAD_BYTES = 64 * 1024;
 /** Smallest share of the budget a frame may get; below this the take is too long to send. */
 export const MIN_FRAME_BYTES = 20 * 1024;
 
-export const TOO_LONG_MESSAGE = "That video is too long to send. Try a walkthrough of 90 seconds or less.";
+export const TOO_LONG_MESSAGE = "That video is too long to send. Try a shorter walkthrough, or trim this one.";
 
 /**
- * Bytes the frames may use in the plan request. When the narration goes to /api/transcribe in its own
- * request, the WAV isn't in the plan request, so it doesn't come out of the frames' share (before
- * 2026-10-31 it always did: on a 4.3 MB budget every narrated take over about 80 s was refused as
- * "too long", though it fit once split). Null when the take can't be sent: the frames' share is under
- * MIN_FRAME_BYTES each, or the WAV alone doesn't fit a request of its own.
+ * Bytes the frames may use in the plan request. When the narration goes to /api/transcribe on its own,
+ * the WAV isn't in the plan request, so it doesn't come out of the frames' share (before 2026-10-31 it
+ * always did: on a 4.3 MB budget every narrated take over about 80 s was refused as "too long", though
+ * it fit once split). The WAV's own size doesn't matter then either: narration longer than one request
+ * holds is sent in chunks that each fit (narrationChunks.ts), so a 5-minute Extra large take still
+ * goes (before chunking, any narration over about 100 s was refused here). Null when the frames' share
+ * is under MIN_FRAME_BYTES each.
  */
 export function frameBudgetBytes(maxRequestBytes: number, audioChars: number, frameCount: number, narrationSentSeparately: boolean): number | null {
-  if (narrationSentSeparately && audioChars + REQUEST_OVERHEAD_BYTES > maxRequestBytes) return null;
   const budget = maxRequestBytes - (narrationSentSeparately ? 0 : audioChars) - REQUEST_OVERHEAD_BYTES;
   return budget < frameCount * MIN_FRAME_BYTES ? null : budget;
 }
