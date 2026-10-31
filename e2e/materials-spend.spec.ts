@@ -41,6 +41,8 @@ test("real run with prices: the list shows what the materials still to buy cost,
     await expect(spend).toBeVisible();
     await expectNoSideScroll(page);
   }
+  // Scroll to the top first: a row that sits under the sticky section nav mid-scroll reads as an obscured target to axe.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expectNoAxeViolations(page, "materials list with a spend line");
   if (shotDir && test.info().project.name === "phone-390") {
     fs.mkdirSync(shotDir, { recursive: true });
