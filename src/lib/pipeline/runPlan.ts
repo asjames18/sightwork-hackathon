@@ -798,8 +798,8 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     // hand the reason step a null transcript while the finished plan
     // still carried the turns. An empty turns array with null stays
     // valid — that is the real empty-narration case from
-    // /api/transcribe. (The route validator in planRequest.ts still
-    // checks only undefined here; that side is a follow-up piece.)
+    // /api/transcribe. (The route validator in planRequest.ts
+    // checks the same pair, so a bad pair fails on "uploading".)
     if (
       request.transcript === undefined ||
       (request.transcript === null && request.transcriptTurns.length > 0)
