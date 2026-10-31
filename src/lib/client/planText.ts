@@ -5,6 +5,7 @@ import { countsShareLine } from "./countMethod";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
+import { walkTextLines } from "./walkTimeline";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -200,11 +201,16 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   if (narrated && plan.transcriptSummary) lines.push(`Asked for: ${clean(plan.transcriptSummary)}`);
 
   const review = planReview(plan);
+  let walkAt: [number, number] | null = null;
   if (issues.length > 0) {
     lines.push("");
     for (const [n, i] of issues.entries()) {
       lines.push(`${n + 1}. ${clean(i.title)}`, `   ${issueNote(i, narrated, verdictFor(review, i))}`);
     }
+    // Where along the walk each problem was seen, when the walk caught something nobody said.
+    // Extra context: dropped right after the counts line when the text runs long, before anything is cut.
+    const walk = walkTextLines(plan, issues, narrated);
+    if (walk.length > 0) walkAt = [lines.push(...walk) - walk.length, walk.length];
     const line = plainReviewLine(plan);
     if (line) lines.push(line);
   } else {
@@ -257,6 +263,12 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   if (text.length <= maxChars) return text;
   if (countsAt >= 0) {
     lines.splice(countsAt, 2);
+    text = lines.join("\n");
+    if (text.length <= maxChars) return text;
+  }
+  // The walk lines sit above the counts line, so its removal never shifts them.
+  if (walkAt) {
+    lines.splice(walkAt[0], walkAt[1]);
     text = lines.join("\n");
     if (text.length <= maxChars) return text;
   }

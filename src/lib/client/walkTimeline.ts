@@ -139,3 +139,46 @@ export function markLabel(m: WalkMark, tierLabel: string): string {
   const who = `${m.ranks.length === 1 ? "Problem" : "Problems"} ${markText(m)}`;
   return `${who}: seen at ${Math.round(m.atSec)} s, ${tierLabel}${m.unsaid ? ", never mentioned" : ""}`;
 }
+
+/**
+ * The problems in the order the walk reached them, for the shared text and the PDF:
+ * "In walk order: #2 at 10 s, #4 at 30 s, #1 at 50 s (never mentioned)."
+ * `numberOf` maps a problem's rank to the number the reader sees next to it (the text and the PDF number
+ * problems 1..n down the list). Problems that share a marker are listed one by one at their own second.
+ */
+export function walkOrderLine(t: WalkTimeline, issues: Issue[], numberOf: (rank: number) => number): string | null {
+  const byRank = new Map(issues.map((i) => [i.rank, i]));
+  const parts: string[] = [];
+  for (const m of t.marks) {
+    for (const rank of m.ranks) {
+      const i = byRank.get(rank);
+      if (!i) continue;
+      const unsaid = m.unsaid && i.unmentioned === true;
+      parts.push(`#${numberOf(rank)} at ${Math.round(i.frameTimeSec)} s${unsaid ? " (never mentioned)" : ""}`);
+    }
+  }
+  return parts.length > 1 ? `In walk order: ${parts.join(", ")}.` : null;
+}
+
+/**
+ * The timeline as lines of plain text for the shared text and the PDF: the summary, then the walk order.
+ * Empty when the plan screen would show no timeline. Problems are numbered by their place in `issues`
+ * (sorted by rank), the same numbers the text and the PDF print next to each problem.
+ */
+export function walkShareLines(plan: WorkPlan, issues: Issue[], narrated: boolean): string[] {
+  const t = walkTimeline(plan, issues, narrated);
+  if (!t) return [];
+  const sorted = [...issues].sort((a, b) => a.rank - b.rank);
+  const pos = new Map(sorted.map((i, n) => [i.rank, n + 1]));
+  const order = walkOrderLine(t, sorted, (rank) => pos.get(rank) ?? rank);
+  return order ? [walkSummary(t), order] : [walkSummary(t)];
+}
+
+/**
+ * Walk lines for the shared text, which has a length cap: only when the walk caught something nobody said,
+ * the part of the timeline worth the space in a group text. The PDF has no cap and uses walkShareLines.
+ */
+export function walkTextLines(plan: WorkPlan, issues: Issue[], narrated: boolean): string[] {
+  const t = walkTimeline(plan, issues, narrated);
+  return t && t.unsaid > 0 ? walkShareLines(plan, issues, narrated) : [];
+}

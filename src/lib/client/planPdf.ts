@@ -13,6 +13,7 @@ import { AFTER_IMAGE_LABEL, COST_LABEL, masksAvailable, type Box, type WorkPlan 
 import { planReview, verdictFor } from "@/lib/review";
 import { compareSummary, type CompareRow, type PlanComparison } from "./planCompare";
 import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { walkShareLines } from "./walkTimeline";
 import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
@@ -330,6 +331,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     }
     y += h + 8;
   }
+  // Where along the walk each problem was seen: the plan screen's timeline in words.
+  for (const l of walkShareLines(plan, issues, narrated)) para(l, 9.5, "normal", MUTED, M, W, 4);
   const reviewText = plainReviewLine(plan);
   if (reviewText) para(reviewText, 9.5, "normal", MUTED, M, W, 4);
   const why = coverageLine(plan);
