@@ -82,6 +82,68 @@ export function gotLine(got: number, total: number): string {
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
+/** Leading number of a qty string ("12 chairs" -> 12, "1 box" -> 1, none -> 1): the same rule the cost step uses. */
+export function qtyCount(qty: string): number {
+  const m = /^\s*(\d+(?:\.\d+)?)/.exec(qty);
+  const n = m ? Number(m[1]) : 1;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+export interface MaterialsSpend {
+  /** Summed low/high of qty x unit price over the counted items, rounded to whole dollars. */
+  low: number;
+  high: number;
+  /** Items still needed that carry a price. */
+  priced: number;
+  /** Items still needed with no price on them. */
+  unpriced: number;
+}
+
+/**
+ * Rough spend on the materials still needed (everything not ticked as in hand), from the per-item prices
+ * on the plan. Null when no needed item has a price, so example and older plans show nothing.
+ */
+export function materialsSpend(plan: Pick<WorkPlan, "materials">, got: number[] = []): MaterialsSpend | null {
+  const have = new Set(got);
+  let low = 0;
+  let high = 0;
+  let priced = 0;
+  let unpriced = 0;
+  plan.materials.forEach((m, i) => {
+    if (have.has(i)) return;
+    const c = m.unitCost;
+    if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) {
+      unpriced++;
+      return;
+    }
+    const q = qtyCount(m.qty);
+    const lo = Math.max(0, Math.min(c[0], c[1]));
+    const hi = Math.max(0, c[0], c[1]);
+    low += q * lo;
+    high += q * hi;
+    priced++;
+  });
+  if (priced === 0) return null;
+  return { low: Math.round(low), high: Math.round(high), priced, unpriced };
+}
+
+/**
+ * One sentence for the list and the shared text, e.g.
+ * "Materials to buy: about $120-$180 for 4 items. 1 more has no price yet."
+ * Uses "Still to buy" once something is ticked. Labor is not included; "" when nothing needed is priced.
+ */
+export function spendLine(spend: MaterialsSpend | null, opts: { started?: boolean; dash?: string } = {}): string {
+  if (!spend) return "";
+  const dash = opts.dash ?? "\u2013";
+  const money = spend.low === spend.high ? usd(spend.low) : `${usd(spend.low)}${dash}${usd(spend.high)}`;
+  const lead = opts.started ? "Still to buy" : "Materials to buy";
+  const items = `${spend.priced} item${spend.priced === 1 ? "" : "s"}`;
+  const rest = spend.unpriced
+    ? ` ${spend.unpriced} more ${spend.unpriced === 1 ? "has" : "have"} no price yet.`
+    : "";
+  return `${lead}: about ${money} for ${items}, materials only.${rest}`;
+}
+
 /**
  * The still-needed materials as plain text, for whoever is doing the buying.
  * Each line carries its quantity, the problems it fixes and a per-unit price estimate when the plan has one.
@@ -105,6 +167,8 @@ export function shoppingListText(plan: PlanMaterials, got: number[] = [], opts: 
       .join("; ");
     lines.push(`[ ] ${clean(m.item)}: ${clean(m.qty)}${extra ? ` (${extra})` : ""}`);
   }
+  const spend = spendLine(materialsSpend(plan, got), { started: have.size > 0, dash: "-" });
+  if (spend) lines.push("", spend);
   lines.push("", need.some((m) => m.unitCost) ? "Prices are rough estimates, not quotes. Made with SightWork." : "Made with SightWork.");
   return lines.join("\n");
 }

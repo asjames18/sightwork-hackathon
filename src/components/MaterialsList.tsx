@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
-import { gotLine, loadGotMaterials, saveGotMaterials, shoppingListText } from "@/lib/client/materialsList";
+import {
+  gotLine,
+  loadGotMaterials,
+  materialsSpend,
+  saveGotMaterials,
+  shoppingListText,
+  spendLine,
+} from "@/lib/client/materialsList";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -58,6 +65,7 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
 
   const line = gotLine(got.length, total);
   const allGot = total > 0 && got.length >= total;
+  const spend = ready && !allGot ? spendLine(materialsSpend(plan, got), { started: got.length > 0 }) : "";
 
   return (
     <>
@@ -89,6 +97,11 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
       <p role="status" aria-live="polite" className="mb-2 text-sm text-ink/70 empty:hidden print:hidden">
         {status}
       </p>
+      {spend && (
+        <p data-testid="materials-spend" className="mb-3 rounded-xl bg-ink/[0.04] px-3 py-2 text-sm text-ink/80">
+          {spend} Rough estimate, not a quote.
+        </p>
+      )}
       <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
         {plan.materials.map((m, i) => {
           const isGot = got.includes(i);
