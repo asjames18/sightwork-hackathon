@@ -63,6 +63,8 @@ export interface ReviewSparkCaller {
     prompt: string;
     images: string[];
     schema: Record<string, unknown>;
+    /** Sampling temperature, forwarded verbatim when set. */
+    temperature?: number;
   }): Promise<{
     json: unknown;
     latencyMs: number;
@@ -82,6 +84,8 @@ export interface ReviewDeps {
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
+/** Deterministic structured output for the review call (Grok Bot 2026-10-30 7:52 PM GO). */
+const SPARK_TEMPERATURE = 0.2;
 
 /** Baseten image cap, same as the reason step: at most 8 images per request. */
 export const MAX_REVIEW_IMAGES = 8;
@@ -286,7 +290,7 @@ export async function runReview(input: ReviewInput, deps: ReviewDeps): Promise<P
   for (let attempt = 0; attempt < 2; attempt++) {
     let res: Awaited<ReturnType<ReviewSparkCaller>>;
     try {
-      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema: deps.schema });
+      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema: deps.schema, temperature: SPARK_TEMPERATURE });
     } catch (err) {
       console.warn(`runReview: call failed, review not run: ${err instanceof Error ? err.message : String(err)}`);
       return { ...REVIEW_NOT_RUN };
