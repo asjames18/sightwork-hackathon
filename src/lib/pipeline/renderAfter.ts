@@ -136,12 +136,28 @@ function isHiddenStep(step: WorkStep): boolean {
  * the middle of the video. Null when the plan has no frames.
  */
 export function pickHeroFrameIndex(plan: WorkPlan): number | null {
+  if (!plan || typeof plan !== "object") {
+    throw new Error("renderAfter: plan must be an object");
+  }
   const frames = plan.frames;
+  if (frames !== undefined && !Array.isArray(frames)) {
+    throw new Error("renderAfter: plan.frames must be an array when given");
+  }
   if (!frames || frames.length === 0) return null;
   const inRange = (i: number | undefined) =>
     typeof i === "number" && Number.isInteger(i) && i >= 0 && i < frames.length;
   if (inRange(plan.heroFrameIndex)) return plan.heroFrameIndex as number;
 
+  // The ranked pick below spreads issues and filters workOrder, so a
+  // direct caller bypassing runRenderAfter's input validation used to
+  // get a raw TypeError here with no step name. Valid plans pass
+  // through unchanged: runRenderAfter already requires both arrays.
+  if (!Array.isArray(plan.issues)) {
+    throw new Error("renderAfter: plan.issues must be an array");
+  }
+  if (!Array.isArray(plan.workOrder)) {
+    throw new Error("renderAfter: plan.workOrder must be an array");
+  }
   const ranked = [...plan.issues].sort((a, b) => a.rank - b.rank);
   for (const issue of ranked) {
     const fixing = plan.workOrder.filter((s) => s.fixes?.includes(issue.rank));
