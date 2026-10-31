@@ -329,3 +329,26 @@ test("a real run with a city names the pricing step: Muse Spark with web search 
   await expect(planning).toContainText("via Muse Spark with web search");
   await expectNoSideScroll(page);
 });
+
+test("a real run's time line uses measured times, then says so when it runs long", async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    window.localStorage.setItem("sightwork:test-code", "stub-code");
+    window.localStorage.setItem("sightwork:location", JSON.stringify({ city: "Sebring", state: "FL" }));
+  });
+  await page.route("**/api/transcribe", (r) => r.fulfill({ json: { transcript: "", transcriptTurns: [] } }));
+  // Hold the plan request open so the run stays on the processing screen.
+  await page.route("**/api/plan", () => new Promise<void>(() => {}));
+  await page.goto("/start?runner=api");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Working on your plan" })).toBeVisible();
+  const hint = page.getByTestId("run-time-hint");
+  await expect(hint).toContainText("Usually about 3 minutes, including live prices for Sebring, FL.");
+  await expectNoSideScroll(page);
+  await page.clock.fastForward("03:40");
+  await expect(hint).toContainText("Taking a little longer than usual. It's still working.");
+  await page.clock.fastForward("01:00");
+  await expect(hint).toContainText("close to the 5-minute limit");
+  await expectNoAxeViolations(page, "long-running real run");
+});
