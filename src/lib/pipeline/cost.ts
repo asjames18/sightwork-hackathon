@@ -77,7 +77,7 @@ import {
   type WorkPlan,
   type WorkStep,
 } from "../types";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 import { regionalFactors, stateFromRegion } from "../regionalCost";
 
 /** Reason output this step consumes, plus the cost request fields. */
@@ -560,7 +560,18 @@ export async function estimateCost(input: CostInput, deps: CostDeps): Promise<Co
   validateCostDeps(deps);
   const laborBasis = input.laborBasis ?? "volunteer";
 
-  const res = await deps.callSpark({ model: SPARK_MODEL, prompt: deps.prompt, schema: deps.schema });
+  // A billed-but-failed call (e.g. a non-JSON response) still spent
+  // money: record it before rethrowing, or the route total misses
+  // the failed-parse spend. A tracker throw here is a spike-cap stop
+  // and replaces the original error, as on the success path. No
+  // retry: a throw is not a shape failure.
+  let res: Awaited<ReturnType<typeof deps.callSpark>>;
+  try {
+    res = await deps.callSpark({ model: SPARK_MODEL, prompt: deps.prompt, schema: deps.schema });
+  } catch (err) {
+    recordFailedCall(deps.tracker, SPARK_MODEL, "estimateCost", err);
+    throw err;
+  }
   // The tracker enforces the spike cap: a throw here stops the run.
   deps.tracker.record({
     model: SPARK_MODEL,
