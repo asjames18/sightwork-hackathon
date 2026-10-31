@@ -32,6 +32,12 @@
  *   returned for the step's own validation + one retry.
  * - Cost: computed from the response's usage tokens at $1.25/M input
  *   and $4.25/M output (spike-measured: 8,812 in / 2,805 out = $0.0229).
+ *   Usage is priced BEFORE the answer text is parsed, mirroring
+ *   ./client.ts: a response whose text is not JSON, or that has no
+ *   text at all, still spent its tokens, so those failures throw
+ *   BasetenCallError carrying costUsd/latencyMs for the pipeline step
+ *   to record (recordFailedCall in ../pipeline/usage.ts), instead of
+ *   a plain error that drops the spend from the route total.
  *   Provider errors are surfaced verbatim (status + body) so a failing
  *   step fails loudly instead of guessing.
  * - A transient 404 model_not_found is retried, up to 3 attempts with a
@@ -85,6 +91,25 @@ export interface BasetenCallResult {
 export interface BasetenClient {
   /** One Chat Completions call. Returns parsed JSON, latency, cost, and the model used. */
   callSpark(req: BasetenCallRequest): Promise<BasetenCallResult>;
+}
+
+/**
+ * A Baseten call that failed AFTER billing, e.g. a 200 response whose
+ * answer text is not JSON. Mirrors MetaCallError in ./client.ts: it
+ * carries the call's costUsd/latencyMs so the pipeline step can record
+ * the spend on the usage tracker before failing the run, instead of
+ * silently dropping it from the route total. Duck-typed by
+ * recordFailedCall, not instanceof-checked, like the Meta error.
+ */
+export class BasetenCallError extends Error {
+  readonly costUsd: number;
+  readonly latencyMs: number;
+  constructor(message: string, costUsd: number, latencyMs: number) {
+    super(message);
+    this.name = "BasetenCallError";
+    this.costUsd = costUsd;
+    this.latencyMs = latencyMs;
+  }
 }
 
 const DEFAULT_BASE_URL = "https://inference.baseten.co/v1";
@@ -302,9 +327,30 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       }
       const latencyMs = Date.now() - started;
       const parsed = (await res.json()) as Record<string, unknown>;
+      // Usage is priced BEFORE the answer text is parsed, mirroring
+      // the Meta caller: a response whose text is not JSON, or that
+      // has no text, still spent its tokens, and the failures below
+      // throw BasetenCallError so the step records that spend. A bad
+      // provider token count still throws a plain error here, at the
+      // cost computation, because a bad count cannot be priced.
+      const usage = (parsed.usage ?? {}) as { prompt_tokens?: number; completion_tokens?: number };
+      for (const [field, value] of [
+        ["prompt_tokens", usage.prompt_tokens],
+        ["completion_tokens", usage.completion_tokens],
+      ] as const) {
+        if (
+          value !== undefined &&
+          (typeof value !== "number" || !Number.isInteger(value) || value < 0)
+        ) {
+          throw new Error(`baseten: usage ${field} must be an integer >= 0`);
+        }
+      }
+      const inputTokens = usage.prompt_tokens ?? 0;
+      const outputTokens = usage.completion_tokens ?? 0;
+      const costUsd = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
       const choices = parsed.choices;
       if (!Array.isArray(choices) || choices.length === 0) {
-        throw new Error("baseten: response had no choices");
+        throw new BasetenCallError("baseten: response had no choices", costUsd, latencyMs);
       }
       // A null or non-object first choice used to throw a raw
       // TypeError here ("cannot read message of null") instead of
@@ -323,33 +369,18 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
       // message.content is the answer, and only that is parsed.
       const text = message?.content;
       if (typeof text !== "string") {
-        throw new Error("baseten: response message had no text content");
+        throw new BasetenCallError("baseten: response message had no text content", costUsd, latencyMs);
       }
       let json: unknown;
       try {
         json = JSON.parse(stripCodeFences(text));
       } catch {
-        throw new Error(`baseten: response text was not JSON: ${text.slice(0, 200)}`);
+        throw new BasetenCallError(
+          `baseten: response text was not JSON: ${text.slice(0, 200)}`,
+          costUsd,
+          latencyMs,
+        );
       }
-      const usage = (parsed.usage ?? {}) as { prompt_tokens?: number; completion_tokens?: number };
-      // Mirror the Meta caller: a bad provider token count must fail
-      // fast here, at the cost computation, not later as a generic
-      // usage-tracker cost rejection. A missing field still means
-      // zero tokens, as before.
-      for (const [field, value] of [
-        ["prompt_tokens", usage.prompt_tokens],
-        ["completion_tokens", usage.completion_tokens],
-      ] as const) {
-        if (
-          value !== undefined &&
-          (typeof value !== "number" || !Number.isInteger(value) || value < 0)
-        ) {
-          throw new Error(`baseten: usage ${field} must be an integer >= 0`);
-        }
-      }
-      const inputTokens = usage.prompt_tokens ?? 0;
-      const outputTokens = usage.completion_tokens ?? 0;
-      const costUsd = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
       return { json, latencyMs, costUsd, model };
     },
   };
