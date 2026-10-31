@@ -306,6 +306,29 @@ export function parseTurns(raw: unknown): TranscriptTurn[] {
 
 /** Build the "[t] text" string from turns, one line per turn. */
 export function buildTranscript(turns: TranscriptTurn[]): string | null {
+  // A non-array or malformed turn would otherwise throw a raw
+  // TypeError from .length/.toFixed below, with no step name to
+  // trace it to. Reject both here with a named error, the same
+  // named-error rule parseTurns above already follows. Valid
+  // callers are unchanged: turns always come from parseTurns (or
+  // applyCleanup over them), so they are arrays of finite-startSec,
+  // string-text turns.
+  if (!Array.isArray(turns)) {
+    throw new Error("transcribe: turns must be an array");
+  }
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i] as unknown;
+    if (turn === null || typeof turn !== "object" || Array.isArray(turn)) {
+      throw new Error(`transcribe: turn ${i} is not an object`);
+    }
+    const rec = turn as Record<string, unknown>;
+    if (typeof rec.startSec !== "number" || !Number.isFinite(rec.startSec)) {
+      throw new Error(`transcribe: turn ${i} has no valid startSec`);
+    }
+    if (typeof rec.text !== "string") {
+      throw new Error(`transcribe: turn ${i} has no valid text`);
+    }
+  }
   if (turns.length === 0) return null;
   return turns.map((t) => `[${t.startSec.toFixed(1)}] ${t.text}`).join("\n");
 }
