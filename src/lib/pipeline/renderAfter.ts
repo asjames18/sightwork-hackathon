@@ -32,6 +32,9 @@
  *   A judge failure is the exception: the optional judge only picks
  *   between two good candidates, so a bad judge answer keeps the first
  *   candidate instead of discarding a valid image.
+ *   A billed judge failure is recorded on the tracker before that
+ *   fallback, so the route total counts it; a tracker throw on the
+ *   record is warned, not a spending stop, as in the review step.
  * - afterImageUrl is null (never omitted or an empty string) when the
  *   image is skipped or fails, and afterImageLabel is set only when an
  *   image exists, per the plan-screen contract.
@@ -49,7 +52,7 @@
  */
 
 import { AFTER_IMAGE_LABEL, type WorkPlan, type WorkStep } from "../types";
-import type { UsageTracker } from "./usage";
+import { recordFailedCall, type UsageTracker } from "./usage";
 
 /** Muse Image edit of the hero frame. Never a real call in tests. */
 export interface ImageCaller {
@@ -520,6 +523,21 @@ export async function runRenderAfter(
           picked = candidates[0];
         }
       } catch (err) {
+        // A billed-but-failed judge call still spent money (e.g. a
+        // MetaCallError on a non-JSON response): record it before
+        // falling back, so the route total counts it. A tracker
+        // throw on the record is a failed judge, not a spending
+        // stop — the image already exists, so the first candidate
+        // still ships, as in the review step.
+        try {
+          if (deps.judgeModel) {
+            recordFailedCall(deps.tracker, deps.judgeModel, "renderAfterJudge", err);
+          }
+        } catch (recErr) {
+          console.warn(
+            `renderAfter: judge usage record failed, keeping first candidate: ${recErr instanceof Error ? recErr.message : String(recErr)}`,
+          );
+        }
         // A spike-cap throw is a spending stop, not a bad judge
         // answer: rethrow it so the outer catch reports
         // cap-exceeded instead of silently returning a candidate
