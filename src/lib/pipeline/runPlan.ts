@@ -52,6 +52,7 @@ import { estimateCost, type CostDeps, type CostInput } from "./cost";
 import { MAX_PLAN_FRAMES } from "./planRequest";
 import {
   runReason,
+  formatReasonStability,
   type ReasonDeps,
   type ReasonInput,
   type ReasonOutput,
@@ -1154,6 +1155,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       : deps.reason;
     const rawReason = await runReason(reasonInput, reasonDeps);
     reason = reasonSubset ? remapReasonOutput(rawReason, reasonSubset) : rawReason;
+    console.log(formatReasonStability(reasonSegmentation, reason));
     if (reason.warnings?.length) {
       console.warn(`runPlan: reason kept with warnings:\n${reason.warnings.join("\n")}`);
     }
