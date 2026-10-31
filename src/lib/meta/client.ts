@@ -302,7 +302,22 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
           body: JSON.stringify(body),
         });
         if (res.ok) {
-          parsed = (await res.json()) as Record<string, unknown>;
+          // A 200 body that is not JSON carries no usage tokens to
+          // price (Spark bills by the tokens in the body that failed
+          // to parse), so it cannot be priced and keeps a plain
+          // named error — res.json() used to throw a raw SyntaxError
+          // here, surfacing parser internals instead of the caller
+          // and the cause. The step's recordFailedCall records
+          // nothing for a plain error, as for any unpriceable
+          // failure, and no spend is invented. (Contrast the
+          // text-parse failures below: there the body IS JSON, so
+          // usage is known and the failure carries its spend on a
+          // MetaCallError.)
+          try {
+            parsed = (await res.json()) as Record<string, unknown>;
+          } catch {
+            throw new Error("meta: response was not JSON");
+          }
           break;
         }
         lastStatus = res.status;
