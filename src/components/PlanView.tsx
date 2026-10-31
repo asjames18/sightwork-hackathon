@@ -1,3 +1,4 @@
+import { WalkTimeline } from "./WalkTimeline";
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { noNarrationNote, noNarrationTag } from "@/lib/client/narrationNote";
 import { ProofFrame } from "./ProofFrame";
@@ -291,6 +292,7 @@ export function PlanView({
                 : "Outlines on the proof frames are off for this plan. Each problem still shows the frame it was found in."}
           </p>
         )}
+        <WalkTimeline plan={plan} issues={issues} narrated={narrated} />
         {reviewText && <ReviewLine text={reviewText} ok={review?.ran === true && review.items.every((i) => verdictKind(i) === "verified")} />}
         <ProblemList plan={plan} issues={issues} watch={watch} narrated={narrated} review={review} masks={masks} sample={sample} issueCosts={issueCosts} />
       </Section>
