@@ -8,8 +8,11 @@
  * plus audio inside one 4.5 MB plan request. The transcribe request
  * itself still carries the WAV, so it is still under the same
  * platform cap: 16 kHz mono WAV is ~32 KB/s raw, ~43 KB/s once
- * base64-encoded, so ~110 s of narration fits; longer takes still
- * get a platform 413 on this route.
+ * base64-encoded, so ~110 s of narration fits per request.
+ * Narration over 80 s arrives as several requests of at most 80 s
+ * each (cut at quiet points by the browser, one retry per piece),
+ * so each request stays well under that limit; joining and
+ * time-shifting stay client-only.
  *
  * Request (JSON): { audioWavBase64?: string, spaceType?: string } —
  * the same fields as TranscribeInput in src/lib/pipeline/transcribe.ts.
