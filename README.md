@@ -7,7 +7,8 @@ SightWork turns a 60–90 second phone walkthrough of a property into a work pla
 ## What it does
 You film one walkthrough. SightWork returns:
 - **Counts:** an inventory of what's in the space.
-- **Ranked problems:** what needs attention, worst first, including issues the person filming never mentioned.
+- **Ranked problems:** what needs attention, worst first and grouped into Fix now, Fix soon and Can wait, including issues the person filming never mentioned.
+- **Worth a closer look:** lower-confidence finds kept in a separate list to check in person, instead of being dropped or padded into the ranked problems.
 - **Proof frames:** the video frame behind each finding.
 - **Materials:** what the work will need.
 - **Order of work:** the steps, in the order they should happen.
@@ -19,10 +20,10 @@ SightWork is a multi-step agent where every model is a Meta model. Each step has
 
 | Step | Meta model | Where it runs | What it does |
 |---|---|---|---|
-| 0. Pick frames | (on the device) | Browser | Sharpest still about every 2 s, plus the narration as 16 kHz audio. The video never leaves the phone. |
+| 0. Pick frames | (on the device) | Browser | Sharpest stills: about one per 1.25 s on takes up to 45 s, plus frames where the picture changes fast; about one every 2 s on longer takes; up to 48. Plus the narration as 16 kHz audio. The video never leaves the phone. |
 | 1. Listen | **Muse Voice Transcribe** | Meta Model API | Narration to timestamped text, so SightWork knows what was said. |
 | 2. Look and count | **SAM 3.1** | Meta Model API | Outlines and counts what's in the room, frame by frame. |
-| 3. Compare and plan | **Muse Spark Open** (default) or **Muse Spark** | Meta open weights on Baseten, or Meta Model API | Checks what was said against what was seen, ranks the problems (including ones nobody mentioned) with a proof frame each, then writes the materials and the ordered work steps. |
+| 3. Compare and plan | **Muse Spark Open** (default) or **Muse Spark** | Meta open weights on Baseten, or Meta Model API | Sweeps the space zone by zone against a categorized checklist (life safety, electrical, AV, lighting, seating, flooring, walls, accessibility and more, plus extra checks for the space type picked), checks what was said against what was seen, ranks the problems (including ones nobody mentioned) with a proof frame each, then writes the materials and the ordered work steps. |
 | 4. Price | **Muse Spark** with web search | Meta Model API | A rough local cost range, when a location is given. |
 | 5. Picture | **Muse Image** | Meta Model API | An AI concept of the finished space. |
 | 6. Review | same plan model, review only | as step 3 | Checks every problem against its proof photo and marks any it can't back as Unverified. Never edits the plan. |
@@ -81,7 +82,9 @@ To send a walkthrough to the models, record or choose a video on `http://localho
 
 If SAM 3.1 or Muse Image isn't available to your key, those steps are skipped and the plan still comes back complete. Keys are never logged or committed.
 
-Each run is capped at $10 of model spend, enforced in code. If a call would push a run past the cap, the run stops with a failure message instead of moving on to the next step, and the calls it did make are logged on the server.
+Before a real run, the video card asks what kind of space it is (sanctuary, auditorium, fellowship hall, classroom, kitchen, office, hallway or another room; a sanctuary, classroom or kitchen also adds its own extra checks to the sweep) and an optional name, plus the city and state, which are required so the cost step prices materials and labor for that place. All three are kept on the device so someone filming the same building picks them once. The plan header, the PDF and the shared text show "Cost range for City, ST", and the plan keeps its city and state even when the cost step fails.
+
+Each run is capped at $10 of model spend, enforced in code. The two paid routes also allow at most 30 requests per IP address per 10 minutes and answer 429 with a Retry-After header after that; requests the server rejects as malformed, and silent audio that is never sent to a model, don't count. If a call would push a run past the cap, the run stops with a failure message instead of moving on to the next step, and the calls it did make are logged on the server.
 
 On /start, **Record a walkthrough** opens the camera in the page (back camera, asks for 1920×1080 at 30 fps with sound, records at about 8 Mbps, shows the size it actually got, stops itself at 2:30). If the browser can't open the camera it falls back to the phone's camera app; **Choose a video** picks a file you already have. A Camera-app recording is usually still the sharpest.
 
@@ -100,11 +103,15 @@ While a plan runs, the processing screen shows each step with the model behind i
 Each finished step can carry a short check note under it ("Checked: …", or "Flagged: …" when something looked off, such as a count with no outline or a problem without a proof frame), and the last step is **Reviewing**. The reviewer is review-only: a separate pass looks at each problem next to its proof photos and marks any it can't back with a photo as **Unverified**, with a one-line reason. It never rewrites the plan. The plan then shows "Reviewed by a separate check: N of M problems backed by a photo." above the problems, and an Unverified badge on each problem it couldn't back; that carries into Save PDF and the shared text. If the review doesn't run, the plan says so instead of implying everything was checked. The example plans carry a review worked out ahead of time from their own proof photos (no model runs), and say that. On real runs the check notes and the review appear once the server sends them; without them the plan shows neither.
 
 On the plan screen:
+- **Problems are grouped by how soon to act:** Fix now (safety), Fix soon (damage that grows, things that don't work) and Can wait (cosmetic), worst first inside each group. Each problem can show where it is, what its photo literally shows, and its share of the cost range.
+- **Worth a closer look** (collapsed) lists the lower-confidence finds with their photos. When a plan has fewer than three problems, a short note says why (for example, only the stage was filmed).
 - **Send to your team** shares the plan as plain text: the phone's share sheet on touch devices, the clipboard elsewhere. The text follows the screen (problems worst first, work steps in order, materials, and the cost range with its "rough estimate, not a quote" label).
 - **Work steps are a checklist.** Tick each step as it's done; ticks are saved on this device for that plan, so a crew lead can come back to it later. "Clear ticks" resets them.
 - **Materials are a shopping list.** Tick each item as you get it (saved on this device for that plan), see how many are in hand and a rough materials subtotal when unit costs are known, and **Send shopping list** shares only what's still needed, with quantities, the problems each item fixes and the per-unit estimate.
 - **Save PDF** makes a real PDF file in the browser (jsPDF, loaded on first use): title, city and state, date, counts, problems worst first with their proof photos and outlines, steps in order, materials, the cost range with its estimate label, the after picture, and a sample label on example plans. On phones it opens the share sheet with the file (Save to Files, Messages, Mail); on computers it downloads `sightwork-plan-<date>.pdf`. The print view stays as the fallback.
 - **Send to your team** sends a short text (space, city and state, date, problems in plain words, steps, materials, cost) and, on phones that can share files, attaches the same PDF so the proof photos go with it.
+
+On /start, **Your recent plans** lists the last 5 finished real runs on this device (space, city and state, date, problem count): tap one to reopen it, or remove it. Example plans are never listed.
 
 ### Status page
 `/status` shows whether the site is up, which build is live, whether real runs are on, and whether the plan engine and the Meta Model API are configured, as presence checks only (no key, code or URL is ever shown). It makes no model calls, so it costs nothing to check. It also lists the safeguards that are always on.
