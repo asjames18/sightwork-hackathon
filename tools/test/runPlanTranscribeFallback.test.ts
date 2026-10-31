@@ -131,7 +131,8 @@ describe("runPlan transcribe fallback (offline)", () => {
     const listeningCheck = statuses.find(
       (s) => s.state === "running" && s.step === "listening" && s.check,
     );
-    assert.equal(listeningCheck?.check?.note, "Transcription unavailable this run");
+    assert.ok(listeningCheck && listeningCheck.state === "running");
+    assert.equal(listeningCheck.check?.note, "Transcription unavailable this run");
   });
 
   test("a spike-cap throw still fails the run at listening", async () => {
