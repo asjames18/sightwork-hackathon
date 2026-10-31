@@ -1,3 +1,5 @@
+import { findResponseJson } from "../responseJson";
+
 /**
  * SightWork Meta client (Muse Spark via the Meta Model API).
  *
@@ -148,24 +150,6 @@ function isImageBase64(value: string): boolean {
   return false;
 }
 
-function extractText(body: Record<string, unknown>): string | null {
-  if (typeof body.output_text === "string") return body.output_text;
-  const output = body.output;
-  if (!Array.isArray(output)) return null;
-  for (const item of output) {
-    if (item === null || typeof item !== "object") continue;
-    const content = (item as Record<string, unknown>).content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (part !== null && typeof part === "object" && (part as Record<string, unknown>).type === "output_text") {
-        const text = (part as Record<string, unknown>).text;
-        if (typeof text === "string") return text;
-      }
-    }
-  }
-  return null;
-}
-
 export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
   const apiKey = opts.apiKey ?? readEnv("MODEL_API_KEY") ?? readEnv("META_API_KEY");
   if (!apiKey) {
@@ -311,16 +295,10 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
         throw new Error(`meta: ${lastStatus} ${lastDetail}`);
       }
       const latencyMs = Date.now() - started;
-      const text = extractText(parsed);
-      if (text === null) {
-        throw new Error("meta: response had no text output");
-      }
-      let json: unknown;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        throw new Error(`meta: response text was not JSON: ${text.slice(0, 200)}`);
-      }
+      const found = findResponseJson(parsed);
+      if (!found.ok && found.text === null) throw new Error("meta: response had no text output");
+      if (!found.ok) throw new Error(`meta: response text was not JSON: ${(found.text ?? "").slice(0, 200)}`);
+      const json: unknown = found.json;
       const usage = (parsed.usage ?? {}) as MetaUsage;
       // A bad provider token count would otherwise flow into the
       // cost math unchecked and only surface later, mid-run, when
