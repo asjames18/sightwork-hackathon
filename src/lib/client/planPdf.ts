@@ -18,6 +18,7 @@ import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
+import { calendarSummary, stepWhen } from "./stepCalendar";
 import { materialsSpend, spendLine } from "./materialsList";
 import { fixFirstPlanLines } from "./fixFirst";
 import { countMethodNote } from "./countMethod";
@@ -454,6 +455,14 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       for (const l of startHere.slice(1)) para(l, 9.5, "normal", MUTED, M, W, 2);
       y += 6;
     }
+    // Same schedule as the Add to calendar file: weekdays 9 to 5 from the next workday after this PDF's date.
+    const schedule = calendarSummary(steps, date);
+    const when = stepWhen(steps, date);
+    if (schedule) {
+      para(`Schedule: ${schedule}`, 9.5, "bold", INK, M, W, 0);
+      para("Times below assume work starts the next workday and runs weekdays 9 to 5, the same as Add to calendar.", 9, "normal", MUTED, M, W, 2);
+      y += 6;
+    }
     const crew = crewSummary(steps);
     if (showCrewSummary(crew)) {
       // Same "Who does the work" lines as the plan screen, so whoever books the trades sees it up front.
@@ -508,6 +517,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       }
       if (s.detail) para(clean(s.detail), 9.5, "normal", INK, M + 24, W - 24, 0);
       if (extra) para(extra, 9, "normal", MUTED, M + 24, W - 24, 0);
+      const at = when.get(s.order);
+      if (at) para(`When: ${at}`, 9, "normal", MUTED, M + 24, W - 24, 0);
       y += 8;
     }
   }
