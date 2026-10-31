@@ -28,3 +28,25 @@ test("Start here fits and passes axe at 375, 768 and 1280", async ({ page }) => 
     await expectNoAxeViolations(page, `start here ${width}`);
   }
 });
+
+test("ticking work steps shows on Start here and the problem cards, and stays clean at 375, 768 and 1280", async ({ page }) => {
+  await page.goto("/start?view=example&ex=sanctuary");
+  const card = page.getByTestId("fix-first");
+  await expect(card.getByTestId("fix-first-progress")).toHaveCount(0);
+  await page.getByRole("checkbox", { name: /^Step 2 done:/ }).check();
+  await expect(card.getByTestId("fix-first-progress")).toHaveText("Start here: 1 of 2 done.");
+  await expect(card.getByRole("link", { name: /Step 2:.*\(done\)/ })).toBeVisible();
+  const boxes = page.getByRole("checkbox", { name: /^Step \d+ done:/ });
+  for (let i = 0; i < (await boxes.count()); i++) await boxes.nth(i).check();
+  await expect(card.getByTestId("fix-first-progress")).toContainText("all ticked off");
+  await expect(page.getByTestId("fixed-in-done").first()).toBeVisible();
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await card.scrollIntoViewIfNeeded();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `start here ticked ${width}`);
+  }
+  await page.getByRole("button", { name: "Clear ticks" }).click();
+  await expect(card.getByTestId("fix-first-progress")).toHaveCount(0);
+  await expect(page.getByTestId("fixed-in-done")).toHaveCount(0);
+});
