@@ -193,6 +193,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           skipped={skipped}
           checks={checks}
           region={stage.runner === "api" ? loadRegion() : null}
+          realRun={stage.runner === "api"}
         />
       )}
       {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} onMakeYourOwn={startOver} />}

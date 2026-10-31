@@ -3,6 +3,7 @@ import type { RunStep, StepCheck } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS, planningNowLine, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
+import { runTimeHint } from "@/lib/client/runTimeHint";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -55,6 +56,7 @@ export function ProcessingStep({
   skipped,
   checks,
   region,
+  realRun = false,
 }: {
   steps: ScreenStep[];
   current: number;
@@ -76,6 +78,8 @@ export function ProcessingStep({
   checks?: Partial<Record<RunStep, StepCheck>>;
   /** "City, ST" this real run is priced for. The Planning row then names the pricing step and its engine. */
   region?: string | null;
+  /** A real run on the live pipeline: the time line uses measured run times instead of "a few minutes". */
+  realRun?: boolean;
 }) {
   const ENGINE = engines ?? currentStepEngines(region);
   const place = region?.trim() || null;
@@ -98,6 +102,7 @@ export function ProcessingStep({
   const nowStep = work[Math.min(current, work.length - 1)];
   const announce = failed || !nowStep ? "" : `Step ${position} of ${total}: ${LABELS[nowStep]}.`;
   const { clock, elapsedMs } = useStepClock(current, failed);
+  const hint = runTimeHint(elapsedMs, { real: realRun, region });
   // Keep the phone screen on while the plan runs: auto-lock can suspend the tab and drop the request.
   useEffect(() => (failed ? undefined : keepScreenOn()), [failed]);
   const [screenStaysOn, setScreenStaysOn] = useState(false);
@@ -161,8 +166,8 @@ export function ProcessingStep({
           />
         </div>
         {!failed && (
-          <p className="mt-2 text-sm text-ink/65">
-            Usually a few minutes. Keep this tab open{screenStaysOn ? "; we'll keep your screen on until it's done." : "."}
+          <p data-testid="run-time-hint" className={`mt-2 text-sm ${hint.tone === "normal" ? "text-ink/65" : "font-medium text-ink/80"}`}>
+            {hint.text} Keep this tab open{screenStaysOn ? "; we'll keep your screen on until it's done." : "."}
           </p>
         )}
       </div>
