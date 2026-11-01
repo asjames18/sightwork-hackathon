@@ -35,7 +35,9 @@ test("links fit and pass axe at 375, 768 and 1280", async ({ page }) => {
     await page.locator("#problem-4").scrollIntoViewIfNeeded();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `problem cards ${width}`);
-    await page.locator("#step-1").scrollIntoViewIfNeeded();
+    // Step 1 to the top, just under the sticky header (its scroll margin), so the crew card above it is off screen
+    // rather than half-covered by the sticky chips.
+    await page.locator("#step-1").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `work steps ${width}`);
     await page.screenshot({ path: `/workspace/sw/run1030/links-${width}.png`, fullPage: false });
