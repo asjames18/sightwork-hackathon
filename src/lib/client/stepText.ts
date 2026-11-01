@@ -2,6 +2,7 @@ import type { WorkPlan, WorkStep } from "@/lib/types";
 import { isVolunteerTrade } from "./crewSummary";
 import { SHARE_SIGNOFF } from "./planText";
 import { stepWhen } from "./stepCalendar";
+import { stepMaterialIndexes } from "./stepMaterials";
 
 /**
  * One work step as plain text, for handing a single step to a single person (a volunteer, a trade) by share sheet
@@ -16,6 +17,7 @@ import { stepWhen } from "./stepCalendar";
  *   Wait for step 2 (Clear the stage) to finish first.
  *   Bring:
  *   - Gaffer tape: 2 rolls
+ *   - Cable ramp: 1 (in hand)
  *   Space: Hope City sanctuary
  */
 export interface StepTextOptions {
@@ -23,6 +25,8 @@ export interface StepTextOptions {
   sample?: boolean;
   /** When set, a "When:" line from the plan's starting schedule, the same times as the "Add to calendar" file. */
   scheduleFrom?: Date;
+  /** Materials ticked as in hand on the shopping list (indexes into plan.materials); those Bring lines say so. */
+  got?: readonly number[];
 }
 
 type StepPlan = Pick<WorkPlan, "spaceName" | "issues" | "materials" | "workOrder">;
@@ -65,13 +69,14 @@ export function stepToText(plan: StepPlan, step: WorkStep, opts: StepTextOptions
   const dep = step.dependsOn != null ? steps.find((s) => s.order === step.dependsOn) : undefined;
   if (dep && dep.order !== step.order) lines.push(`Wait for step ${dep.order} (${oneLine(dep.title)}) to finish first.`);
 
-  const fixing = new Set(fixes);
-  const materials = (plan.materials ?? []).filter((m) => (m.forIssues ?? []).some((r) => fixing.has(r)));
-  if (materials.length) {
+  const need = stepMaterialIndexes(plan, step);
+  if (need.length) {
+    const have = new Set(opts.got ?? []);
     lines.push("Bring:");
-    for (const m of materials) {
+    for (const i of need) {
+      const m = plan.materials[i];
       const qty = oneLine(m.qty);
-      lines.push(`- ${oneLine(m.item)}${qty ? `: ${qty}` : ""}`);
+      lines.push(`- ${oneLine(m.item)}${qty ? `: ${qty}` : ""}${have.has(i) ? " (in hand)" : ""}`);
     }
   }
   const space = oneLine(plan.spaceName);
