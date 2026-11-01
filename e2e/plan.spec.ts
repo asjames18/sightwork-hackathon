@@ -47,7 +47,7 @@ test.describe("plan screen", () => {
     await slider.focus();
     await page.keyboard.press("ArrowRight");
     await expect(slider).toHaveValue("51");
-    await expect(slider).toHaveAttribute("aria-valuetext", "51% before");
+    await expect(slider).toHaveAttribute("aria-valuetext", "51% before, 49% after");
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
     await expect(slider).toHaveValue("49");
@@ -55,12 +55,41 @@ test.describe("plan screen", () => {
     await expect(slider).toHaveValue("100");
     await page.keyboard.press("Home");
     await expect(slider).toHaveValue("0");
-    await expect(slider).toHaveAttribute("aria-valuetext", "0% before");
+    await expect(slider).toHaveAttribute("aria-valuetext", "Showing only the after picture");
     // The before picture is clipped away entirely at 0 and fully shown at 100.
     const clip = page.locator('figure div[style*="clip-path"]').first();
     await expect(clip).toHaveAttribute("style", /inset\(0(px)? 100% 0(px)? 0(px)?\)/);
     await expectNoAxeViolations(page, "plan with the slider at 0");
   });
+
+  for (const width of [375, 768, 1280]) {
+    test(`before/after buttons show the whole before or after picture in one tap (${width} px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(REAL_RUN);
+      const slider = page.getByRole("slider", { name: "Compare before and after" });
+      const show = page.getByRole("group", { name: "Show" });
+      const before = show.getByRole("button", { name: "Before" });
+      const compare = show.getByRole("button", { name: "Compare" });
+      const after = show.getByRole("button", { name: "After" });
+      await expect(compare).toHaveAttribute("aria-pressed", "true");
+      await before.click();
+      await expect(slider).toHaveValue("100");
+      await expect(before).toHaveAttribute("aria-pressed", "true");
+      await expect(compare).toHaveAttribute("aria-pressed", "false");
+      await expect(slider).toHaveAttribute("aria-valuetext", "Showing only the before picture");
+      await after.click();
+      await expect(slider).toHaveValue("0");
+      await expect(after).toHaveAttribute("aria-pressed", "true");
+      // Dragging off a preset leaves no button pressed; Compare brings it back to the middle.
+      await slider.focus();
+      await page.keyboard.press("ArrowRight");
+      await expect(show.locator('[aria-pressed="true"]')).toHaveCount(0);
+      await compare.click();
+      await expect(slider).toHaveValue("50");
+      await expectNoSideScroll(page);
+      await expectNoAxeViolations(page, `plan with the before/after buttons (${width} px)`);
+    });
+  }
 
   test("the print view (the Save PDF fallback) hides the screen-only parts", async ({ page }) => {
     await page.goto(REAL_RUN);
