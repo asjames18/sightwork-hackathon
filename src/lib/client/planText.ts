@@ -1,4 +1,4 @@
-import { COST_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanReviewItem, type WorkPlan } from "@/lib/types";
+import { COST_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanReviewItem, type SaidVsSeenEntry, type WorkPlan } from "@/lib/types";
 import { fixFirstPlanLines } from "./fixFirst";
 import { shareProgressLine } from "./stepProgress";
 import { countsShareLine } from "./countMethod";
@@ -123,6 +123,38 @@ export function saidVsSeenLines(plan: Pick<WorkPlan, "saidVsSeen" | "transcript"
       notSeen: row.status === "mentioned_not_seen" || !summary,
     };
   });
+}
+
+/** How each said-vs-seen row turned out, in the words the plan screen tags it with. */
+export type SaidVsSeenKind = "matched" | "unmentioned" | "notSeen";
+
+/** The tag a row gets: seen and never said, said but not on video, or both. */
+export function saidVsSeenKind(row: Pick<SaidVsSeenEntry, "status" | "seen">): SaidVsSeenKind {
+  if (row.status === "unmentioned") return "unmentioned";
+  if (row.status === "mentioned_not_seen" || !row.seen || !String(row.seen.summary ?? "").trim()) return "notSeen";
+  return "matched";
+}
+
+export const SAID_VS_SEEN_TAG: Record<SaidVsSeenKind, string> = {
+  matched: "Matched",
+  unmentioned: "You didn't mention",
+  notSeen: "Check in person",
+};
+
+/**
+ * One line above the said-vs-seen rows: "2 matched, 3 you didn't mention, 1 to check in person." Kinds with no
+ * rows are left out; empty when there are no rows.
+ */
+export function saidVsSeenTally(rows: ReadonlyArray<Pick<SaidVsSeenEntry, "status" | "seen">> | null | undefined): string {
+  if (!Array.isArray(rows) || rows.length === 0) return "";
+  const n: Record<SaidVsSeenKind, number> = { matched: 0, unmentioned: 0, notSeen: 0 };
+  for (const r of rows) n[saidVsSeenKind(r)] += 1;
+  const parts = [
+    n.matched > 0 ? `${n.matched} matched` : "",
+    n.unmentioned > 0 ? `${n.unmentioned} you didn't mention` : "",
+    n.notSeen > 0 ? `${n.notSeen} to check in person` : "",
+  ].filter(Boolean);
+  return `${parts.join(", ")}.`;
 }
 
 /** "3 problems, worst first" / "1 problem" / "No problems found". */
