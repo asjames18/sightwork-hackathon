@@ -1,6 +1,7 @@
 import { COST_LABEL, masksAvailable, parsePricingCounts, type Issue, type PlanReviewItem, type SaidVsSeenEntry, type WorkPlan } from "@/lib/types";
 import { fixFirstPlanLines } from "./fixFirst";
 import { shareProgressLine } from "./stepProgress";
+import { shareFixedLine } from "./problemsFixed";
 import { countsShareLine } from "./countMethod";
 import { partlyCount, planReview, reviewTally, supportedScope, verdictFor, verdictKind } from "@/lib/review";
 import { runCostLine } from "./runCost";
@@ -395,6 +396,8 @@ function planTextLines(plan: WorkPlan, opts: PlanTextOptions, trim: ShareTrim): 
     if (schedule) lines.push(`Schedule: ${schedule}`);
     const progress = sample ? null : shareProgressLine(steps, opts.doneSteps ?? []);
     if (progress) lines.push(progress);
+    const fixedLine = sample ? null : shareFixedLine(issues, steps, opts.doneSteps ?? []);
+    if (fixedLine) lines.push(fixedLine);
   }
 
   if (plan.materials.length > 0) {

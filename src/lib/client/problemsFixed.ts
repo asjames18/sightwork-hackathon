@@ -39,3 +39,26 @@ export function problemsFixed(
   const line = fixed < total ? `${fixed} of ${total} ${noun} fixed` : total === 1 ? "Problem fixed" : `All ${total} problems fixed`;
   return { fixed, total, untracked: issues.length - total, line, percent: Math.round((fixed / total) * 100) };
 }
+
+/**
+ * Line for the Send to your team text, under the step progress line: how many problems are fixed and which.
+ * Null when nothing is fixed yet (the step progress line already says what was ticked).
+ */
+export function shareFixedLine(
+  issues: readonly Pick<Issue, "rank">[],
+  workOrder: readonly WorkStep[],
+  done: readonly number[],
+): string | null {
+  const tally = problemsFixed(issues, workOrder, done);
+  if (!tally || tally.fixed === 0) return null;
+  if (tally.fixed >= tally.total) return tally.total === 1 ? "Problems fixed: the one tracked problem." : `Problems fixed: all ${tally.total}.`;
+  const ranks = [...new Set(issues.map((i) => i.rank))]
+    .filter((rank) => {
+      const orders = stepsFixing(workOrder, rank);
+      return orders.length > 0 && allStepsDone(orders, done);
+    })
+    .sort((a, b) => a - b)
+    .map((rank) => `#${rank}`);
+  const named = ranks.length > 1 ? `${ranks.slice(0, -1).join(", ")} and ${ranks[ranks.length - 1]}` : ranks[0];
+  return `Problems fixed: ${tally.fixed} of ${tally.total} (${named}).`;
+}
