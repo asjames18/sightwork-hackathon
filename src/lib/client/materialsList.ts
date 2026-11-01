@@ -1,4 +1,5 @@
 import type { WorkPlan } from "@/lib/types";
+import { materialsNeededBy, neededByLine } from "./materialsNeededBy";
 
 /**
  * Materials shopping list: which materials are already in hand, kept on this device per plan so whoever
@@ -149,17 +150,24 @@ export function spendLine(spend: MaterialsSpend | null, opts: { started?: boolea
  * Each line carries its quantity, the problems it fixes and a per-unit price estimate when the plan has one.
  * Returns "" when everything is already in hand.
  */
-export function shoppingListText(plan: PlanMaterials, got: number[] = [], opts: { sample?: boolean } = {}): string {
+export function shoppingListText(
+  plan: PlanMaterials & Partial<Pick<WorkPlan, "workOrder">>,
+  got: number[] = [],
+  opts: { sample?: boolean; now?: Date } = {},
+): string {
   const have = new Set(got);
-  const need = plan.materials.filter((_, i) => !have.has(i));
+  // With a date, each line also says which step first needs it and when that step starts (same schedule as Add to calendar).
+  const neededBy = opts.now && plan.workOrder?.length ? materialsNeededBy({ materials: plan.materials, workOrder: plan.workOrder }, opts.now) : null;
+  const need = plan.materials.map((m, i) => ({ m, by: neededBy?.[i] ?? null })).filter((_, i) => !have.has(i));
   if (need.length === 0) return "";
   const lines = [`Shopping list: ${clean(plan.spaceName) || "Walkthrough"}`];
   if (opts.sample) lines.push("(Example plan with sample data, not a real run.)");
   if (have.size > 0) lines.push(`${need.length} still needed, ${plan.materials.length - need.length} already in hand.`);
   lines.push("");
-  for (const m of need) {
+  for (const { m, by } of need) {
     const extra = [
       m.forIssues?.length ? `for #${m.forIssues.join(", #")}` : null,
+      by ? neededByLine(by).replace(/^Needed/, "needed") : null,
       m.unitCost ? `about ${m.unitCost[0] === m.unitCost[1] ? usd(m.unitCost[0]) : `${usd(m.unitCost[0])}-${usd(m.unitCost[1])}`} each` : null,
       m.note ? clean(m.note) : null,
     ]
@@ -169,6 +177,6 @@ export function shoppingListText(plan: PlanMaterials, got: number[] = [], opts: 
   }
   const spend = spendLine(materialsSpend(plan, got), { started: have.size > 0, dash: "-" });
   if (spend) lines.push("", spend);
-  lines.push("", need.some((m) => m.unitCost) ? "Prices are rough estimates, not quotes. Made with SightWork." : "Made with SightWork.");
+  lines.push("", need.some(({ m }) => m.unitCost) ? "Prices are rough estimates, not quotes. Made with SightWork." : "Made with SightWork.");
   return lines.join("\n");
 }

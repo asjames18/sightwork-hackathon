@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import {
   gotLine,
@@ -10,6 +10,7 @@ import {
   shoppingListText,
   spendLine,
 } from "@/lib/client/materialsList";
+import { firstNeededLine, materialsNeededBy, neededByLine } from "@/lib/client/materialsNeededBy";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -28,6 +29,8 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const total = plan.materials.length;
+  // Dates depend on today, so they are worked out only after mount (the server render has none).
+  const neededBy = useMemo(() => (ready ? materialsNeededBy(plan) : []), [plan, ready]);
 
   useEffect(() => {
     setGot(loadGotMaterials(plan));
@@ -50,7 +53,7 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
   }
 
   async function onSend() {
-    const text = shoppingListText(plan, got, { sample });
+    const text = shoppingListText(plan, got, { sample, now: new Date() });
     if (busy || !text) return;
     setBusy(true);
     setStatus("");
@@ -66,6 +69,7 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
   const line = gotLine(got.length, total);
   const allGot = total > 0 && got.length >= total;
   const spend = ready && !allGot ? spendLine(materialsSpend(plan, got), { started: got.length > 0 }) : "";
+  const buyFirst = ready && !allGot ? firstNeededLine(neededBy, got) : "";
 
   return (
     <>
@@ -102,6 +106,15 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
           {spend} Rough estimate, not a quote.
         </p>
       )}
+      {buyFirst && (
+        <p data-testid="materials-buy-first" className="mb-3 flex items-start gap-2 text-sm font-semibold text-ink">
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4.5" width="14" height="12" rx="2" />
+            <path d="M3 8.5h14M7 2.5v4M13 2.5v4" />
+          </svg>
+          <span>{buyFirst}</span>
+        </p>
+      )}
       <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
         {plan.materials.map((m, i) => {
           const isGot = got.includes(i);
@@ -126,6 +139,11 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
                 <p className="text-sm text-ink/70">
                   {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
                 </p>
+                {neededBy[i] && !isGot && (
+                  <p data-testid="material-needed-by" className="text-sm font-medium text-ink/80">
+                    {neededByLine(neededBy[i])}
+                  </p>
+                )}
               </div>
               <div className="shrink-0 pt-1.5 text-right print:pt-0">
                 <p className="font-semibold">{m.qty}</p>
