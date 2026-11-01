@@ -7,13 +7,15 @@ import { alsoReadyLine, nextUp, nextUpHours, nextUpProgress } from "@/lib/client
 import { stepMaterialsDescription, stepMaterialsLabel, stepMaterialsState } from "@/lib/client/stepMaterials";
 import { stepWhoLabel } from "@/lib/client/stepText";
 import { stepAnchor } from "@/lib/client/stepLinks";
+import { StepSendButton } from "@/components/WorkSteps";
 
 /**
  * "Next up": once any work step is ticked off, names the next step that is ready to start, who does it, about how
- * long, whether its materials are in hand, with a link to the step and a button to tick it off from here.
+ * long, whether its materials are in hand, with a link to the step, a button to tick it off from here and one to
+ * send just that step to whoever does it.
  * Nothing shows on an untouched plan. Live with the ticks (and other tabs). Hidden in print.
  */
-export function NextUp({ plan }: { plan: Pick<WorkPlan, "spaceName" | "workOrder" | "issues" | "materials"> }) {
+export function NextUp({ plan }: { plan: WorkPlan }) {
   const { done, ready, update } = useDoneSteps(plan);
   const { got } = useGotMaterials(plan);
   if (!ready) return null;
@@ -100,13 +102,16 @@ export function NextUp({ plan }: { plan: Pick<WorkPlan, "spaceName" | "workOrder
           {also}
         </p>
       )}
-      <button
-        type="button"
-        onClick={() => update([...done, step.order])}
-        className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-ink/15 px-4 text-sm font-semibold hover:bg-ink/[0.04] focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50"
-      >
-        Mark step {step.order} done
-      </button>
+      <div className="mt-3 flex flex-wrap items-start gap-x-3 gap-y-2">
+        <button
+          type="button"
+          onClick={() => update([...done, step.order])}
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-ink/15 px-4 text-sm font-semibold hover:bg-ink/[0.04] focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50"
+        >
+          Mark step {step.order} done
+        </button>
+        <StepSendButton plan={plan} step={step} got={got} testId="next-up-send" spacing="" />
+      </div>
     </section>
   );
 }

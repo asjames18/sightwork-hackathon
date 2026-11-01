@@ -43,3 +43,33 @@ test("Next up shows after the first tick, names the next ready step, ticks it fr
   await page.locator("#steps").getByRole("button", { name: "Clear ticks" }).click();
   await expect(page.getByTestId("next-up")).toHaveCount(0);
 });
+
+test("Next up sends just the next ready step, and the step rows keep their own send buttons", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/start?view=example&ex=kitchen");
+  const steps = page.locator('li[id^="step-"]');
+  const total = await steps.count();
+  await page.getByRole("checkbox", { name: /^Step 2 done:/ }).check();
+  const card = page.getByTestId("next-up");
+  const send = card.getByTestId("next-up-send");
+  await expect(send).toHaveAccessibleName(/^Send this step 1$/);
+  await expect(page.getByTestId("send-step")).toHaveCount(total);
+
+  await send.click();
+  await expect(card.getByRole("status")).toHaveText(/Copied/);
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text.startsWith(`Example plan, not a real inspection.\nStep 1 of ${total}`)).toBe(true);
+  expect(text).toContain("Make the ceiling safe");
+
+  for (const width of [320, 375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await card.scrollIntoViewIfNeeded();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `next up send ${width}`);
+  }
+
+  await card.getByRole("button", { name: "Mark step 1 done" }).click();
+  await expect(card.getByTestId("next-up-send")).not.toHaveAccessibleName(/^Send this step 1$/);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByTestId("next-up")).toBeHidden();
+});

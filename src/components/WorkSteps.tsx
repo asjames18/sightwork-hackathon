@@ -315,7 +315,21 @@ function FixesChip({ className, fixes, problemRanks }: { className: string; fixe
  * Sends just this step (stepText.ts) by the phone's share sheet, else the clipboard, so one step can go to the one
  * person doing it: when, how long, what it fixes, what to wait for and what to bring. Hidden in print.
  */
-function StepSendButton({ plan, step, got }: { plan: WorkPlan; step: WorkPlan["workOrder"][number]; got: readonly number[] }) {
+export function StepSendButton({
+  plan,
+  step,
+  got,
+  testId = "send-step",
+  spacing = "mt-2",
+}: {
+  plan: WorkPlan;
+  step: WorkPlan["workOrder"][number];
+  got: readonly number[];
+  /** Test hook; the Next up card passes its own so the step rows keep theirs. */
+  testId?: string;
+  /** Top margin; the Next up card lines it up beside its own button instead. */
+  spacing?: string;
+}) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -337,12 +351,12 @@ function StepSendButton({ plan, step, got }: { plan: WorkPlan; step: WorkPlan["w
   }
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+    <div className={`${spacing} flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden`}>
       <button
         type="button"
         onClick={onSend}
         disabled={busy}
-        data-testid="send-step"
+        data-testid={testId}
         className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
       >
         <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
