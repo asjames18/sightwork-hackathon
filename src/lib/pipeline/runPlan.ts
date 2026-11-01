@@ -1648,8 +1648,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       durationSec: request.durationSec,
     };
     const reasonDeps: ReasonDeps = deps.reasonPrompt
-      ? { ...deps.reason, prompt: deps.reasonPrompt(reasonInput) }
-      : deps.reason;
+      ? { ...deps.reason, prompt: deps.reasonPrompt(reasonInput), signal: deps.signal }
+      : { ...deps.reason, signal: deps.signal };
     const rawReason = await runReason(reasonInput, reasonDeps);
     reason = reasonSubset ? remapReasonOutput(rawReason, reasonSubset) : rawReason;
     // Server log only: whether the remap dropped any reason output.
