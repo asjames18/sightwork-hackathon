@@ -68,6 +68,12 @@ export interface ReviewSparkCaller {
     schema: Record<string, unknown>;
     /** Sampling temperature, forwarded verbatim when set. */
     temperature?: number;
+    /**
+     * Abort signal for a stopped run (2026-11-01): forwarded to the
+     * model caller so stopping a run can cut the in-flight review
+     * call short. Omit it and the call behaves exactly as before.
+     */
+    signal?: AbortSignal;
   }): Promise<{
     json: unknown;
     latencyMs: number;
@@ -84,6 +90,8 @@ export interface ReviewDeps {
   schema: Record<string, unknown>;
   callSpark: ReviewSparkCaller;
   tracker: UsageTracker;
+  /** Abort signal from runPlan (the route's request signal), forwarded to callSpark. */
+  signal?: AbortSignal;
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
@@ -293,7 +301,7 @@ export async function runReview(input: ReviewInput, deps: ReviewDeps): Promise<P
   for (let attempt = 0; attempt < 2; attempt++) {
     let res: Awaited<ReturnType<ReviewSparkCaller>>;
     try {
-      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema: deps.schema, temperature: SPARK_TEMPERATURE });
+      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema: deps.schema, temperature: SPARK_TEMPERATURE, signal: deps.signal });
     } catch (err) {
       // A billed-but-failed call still spent money (e.g. MetaCallError
       // on a non-JSON response): record it before returning, so the
