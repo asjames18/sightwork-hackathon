@@ -10,6 +10,7 @@ import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import { SectionNav } from "./SectionNav";
+import { SendCountsButton } from "./SendCountsButton";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictKind } from "@/lib/review";
 import { ProblemList } from "./ProblemList";
@@ -358,6 +359,7 @@ export function PlanView({
         {plan.inventory.length > 0 && (
           <p data-testid="counts-footnote" className="mt-2 text-sm text-ink/70">{countsFootnote(masks, sharedMethod)}</p>
         )}
+        <SendCountsButton inventory={plan.inventory} masks={masks} spaceName={plan.spaceName} sample={sample || !!example || plan.meta?.isExample === true} />
       </Section>
 
       <Section title="Do the work in this order" id="steps">
