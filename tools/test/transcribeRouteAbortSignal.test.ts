@@ -3,8 +3,9 @@
  * the standalone transcribe route never passed one, so a split run
  * whose client went away still paid for the whole ASR call. The route
  * now forwards req.signal: aborting mid-flight reaches the ASR fetch
- * (the same signal object), the fetch rejects, and the run fails with
- * no second call and no spend recorded. Fake key + stubbed fetch
+ * (a signal following the request signal, per the Fetch spec), the
+ * fetch rejects, and the run fails with no second call and no spend
+ * recorded. Fake key + stubbed fetch
  * only; no network, no key, no paid call. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -82,8 +83,13 @@ test("POST: aborting mid-flight reaches the ASR fetch and fails with no second c
       await new Promise((r) => setTimeout(r, 10));
     }
     assert.equal(state.calls(), 1);
-    assert.equal(state.seenSignal(), controller.signal);
+    // The request's signal follows the controller's signal rather
+    // than being the same object (Fetch spec), so identity is not
+    // the check: aborting the controller must abort the signal the
+    // ASR fetch received.
+    assert.ok(state.seenSignal() instanceof AbortSignal);
     controller.abort();
+    assert.equal((state.seenSignal() as AbortSignal).aborted, true);
     const res = await resPromise;
     assert.equal(res.status, 500);
     assert.deepEqual(await res.json(), {
