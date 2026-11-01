@@ -697,6 +697,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * Two steps sharing one title printed verbatim as title="Fix leak"
  * twice; they now fail fast (each work step has its own title, so the
  * cost model and the step ticks cannot merge two different fixes).
+ * Two materials sharing one item printed verbatim as item="paint"
+ * twice; they now fail fast (each materials line is its own item, so
+ * the cost model cannot price the same item twice).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -719,6 +722,7 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   if (!Array.isArray(input.materials)) {
     throw new Error("buildCostPrompt: materials must be an array");
   }
+  const seenMaterials = new Set<string>();
   input.materials.forEach((m, i) => {
     if (
       !m ||
@@ -730,6 +734,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     ) {
       throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
     }
+    if (seenMaterials.has(m.item.trim())) {
+      throw new Error(`buildCostPrompt: materials[${i}].item must be unique`);
+    }
+    seenMaterials.add(m.item.trim());
     if (m.note !== undefined && typeof m.note !== "string") {
       throw new Error(`buildCostPrompt: materials[${i}].note must be a string when given`);
     }
