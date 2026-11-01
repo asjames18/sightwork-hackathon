@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import type { Example } from "@/lib/examples";
 import { usePlanComparison } from "@/lib/client/usePlanComparison";
+import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import {
   deliverPlanPdf,
   downloadBlob,
@@ -38,7 +39,10 @@ export function SavePdfButton({ plan, example, sample }: { plan: WorkPlan; examp
   }, []);
   // Real plans only: the PDF then has the same "Since your last walkthrough" section as the screen.
   const since = usePlanComparison(plan, !sample && !example && !plan.meta?.isExample);
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since };
+  // Steps ticked off on this device are marked Done on paper too (real plans only).
+  const { done } = useDoneSteps(plan);
+  const doneSteps = !sample && !example && !plan.meta?.isExample ? done : undefined;
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps };
   const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
 
   // A new plan drops a file waiting for a second tap.

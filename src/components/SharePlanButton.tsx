@@ -36,8 +36,8 @@ export function SharePlanButton({ plan, sample = false, example }: { plan: WorkP
   const { done } = useDoneSteps(plan);
   const doneSteps = !sample && !example && !plan.meta?.isExample ? done : undefined;
 
-  // Same label as Save PDF (comparison included), so both buttons share one built file.
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since };
+  // Same label as Save PDF (comparison and ticks included), so both buttons share one built file.
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps };
   const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => warmPlanPdf(plan, label), [plan, labelKey]);

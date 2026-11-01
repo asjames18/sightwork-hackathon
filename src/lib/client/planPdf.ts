@@ -22,6 +22,8 @@ import { calendarSummary, stepWhen } from "./stepCalendar";
 import { materialsSpend, spendLine } from "./materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
+import { shareProgressLine } from "./stepProgress";
+import { shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
@@ -50,6 +52,8 @@ export interface PlanPdfOptions {
   compress?: boolean;
   /** Real plans only: the comparison with the previous saved walkthrough of this space and place, and its date. */
   since?: { comparison: PlanComparison; when?: string | null } | null;
+  /** Real plans only: work steps ticked off on this device. Marks those steps Done and adds the progress lines. */
+  doneSteps?: readonly number[];
 }
 
 export const PDF_SAMPLE_LABEL = "Example plan with sample data, not a real run";
@@ -470,6 +474,15 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   // --- Work steps ---------------------------------------------------------------------
   if (steps.length) {
     heading("Do the work in this order", 70);
+    // Same progress lines as Send to your team, so a printed copy shows how far the work has come.
+    const done = sample || opts.example ? [] : [...new Set(opts.doneSteps ?? [])];
+    const progress = shareProgressLine(steps, done);
+    if (progress) {
+      para(progress, 10, "bold", TAG_MATCHED, M, W, 0);
+      const fixedLine = shareFixedLine(issues, steps, done);
+      if (fixedLine) para(fixedLine, 9.5, "normal", MUTED, M, W, 0);
+      y += 8;
+    }
     // Same Start here sentence as the card on the plan screen, so the first move is on paper too.
     const startHere = fixFirstPlanLines(plan);
     if (startHere.length > 0) {
@@ -527,11 +540,16 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       ]
         .filter(Boolean)
         .join(" \u00B7 ");
+      const isDone = done.includes(s.order);
       font(11, "bold");
-      const t = wrap(clean(s.title), W - 28);
+      const t = wrap(clean(s.title), W - 28 - (isDone ? 44 : 0));
       ensure(lineH(11) * t.length + 12);
-      font(11, "bold", ACCENT_DARK);
+      font(11, "bold", isDone ? TAG_MATCHED : ACCENT_DARK);
       doc.text(`${s.order}.`, M, y + 11);
+      if (isDone) {
+        font(8, "bold", TAG_MATCHED);
+        doc.text("DONE", M + W, y + 10, { align: "right" });
+      }
       font(11, "bold");
       for (const l of t) {
         doc.text(l, M + 24, y + 11);
