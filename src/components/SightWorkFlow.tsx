@@ -10,6 +10,7 @@ import { loadRegion } from "@/lib/client/location";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { addRecentPlan } from "@/lib/client/recentPlans";
+import { cuePlanReady } from "@/lib/client/planReadyCue";
 import { RecentPlans } from "./RecentPlans";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
@@ -34,12 +35,15 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     const example = findExample(initialExampleId);
     return { kind: "plan", plan: example.plan, videoName: null, example };
   });
+  // Set when a run finishes into a plan, so only that plan (not an example or a saved plan) gets the tab cue.
+  const readyCue = useRef(false);
   const { status: job, checks } = usePlanJob(stage.kind === "processing" ? planJobFor(stage.runner) : idleJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
       // The preview (mock) runner ends on an example plan: keep its Real run / Sample label.
       const example = EXAMPLES.find((e) => e.plan === job.plan);
+      readyCue.current = true;
       setStage({ kind: "plan", plan: job.plan, videoName: stage.file.name, example });
       saveLastPlan(job.plan, stage.file.name);
       // Only real runs go on the recent list; a preview run that ends on an example plan doesn't.
@@ -75,6 +79,15 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // A plan that finished while the tab was in the background: the tab title says so until the tab is
+  // shown again. This runs after the processing screen's own title cleanup, so the cue isn't overwritten.
+  const planIssues = stage.kind === "plan" ? stage.plan.issues.length : null;
+  useEffect(() => {
+    if (stage.kind !== "plan" || !readyCue.current) return;
+    readyCue.current = false;
+    return cuePlanReady(planIssues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
   // The `?view=last` plan is on screen: show the app (app/start/page.tsx hid it to avoid an upload-screen flash).
   useEffect(() => {
     if (stage.kind === "plan") document.documentElement.classList.remove("sw-opening");
