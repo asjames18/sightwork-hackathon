@@ -20,6 +20,7 @@ import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
 import { calendarSummary, stepWhen } from "./stepCalendar";
 import { materialsSpend, spendLine } from "./materialsList";
+import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
 import { countMethodNote } from "./countMethod";
 
@@ -526,7 +527,11 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   // --- Materials ----------------------------------------------------------------------
   if (plan.materials.length) {
     heading("Materials", 40);
-    for (const m of plan.materials) {
+    // Same "needed by" schedule as the work steps above (and Add to calendar), counted from this PDF's date.
+    const neededBy = steps.length ? materialsNeededBy({ materials: plan.materials, workOrder: steps }, date) : [];
+    const buyFirst = firstNeededLine(neededBy);
+    if (buyFirst) para(buyFirst, 9.5, "bold", INK, M, W, 6);
+    for (const [mi, m] of plan.materials.entries()) {
       const cost = m.unitCost ? `${usd(m.unitCost[0])}${m.unitCost[1] !== m.unitCost[0] ? `-${usd(m.unitCost[1])}` : ""} each` : "";
       font(10.5, "bold");
       const itemL = wrap(clean(m.item), W - 200);
@@ -545,6 +550,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       const refs = m.forIssues?.length ? `For problem${m.forIssues.length === 1 ? "" : "s"} #${m.forIssues.join(", #")}` : "";
       const sub = [refs, m.note ? clean(m.note) : ""].filter(Boolean).join(". ");
       if (sub) para(sub, 9, "normal", MUTED, M, W - 200, 0);
+      const by = neededByLine(neededBy[mi] ?? null);
+      if (by) para(by, 9, "normal", MUTED, M, W - 200, 0);
       y += 4;
     }
     // Same total line as the list on the plan screen (nothing ticked in a saved plan), materials only.
