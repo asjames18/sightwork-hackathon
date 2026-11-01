@@ -700,6 +700,10 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * Two materials sharing one item printed verbatim as item="paint"
  * twice; they now fail fast (each materials line is its own item, so
  * the cost model cannot price the same item twice).
+ * Two materials sharing one item apart from case printed verbatim as
+ * item="paint" and item="Paint" twice; they now fail fast too (the
+ * comparison is trimmed and lowercased, so case alone cannot make
+ * one item look like two lines to price).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -734,10 +738,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     ) {
       throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
     }
-    if (seenMaterials.has(m.item.trim())) {
+    if (seenMaterials.has(m.item.trim().toLowerCase())) {
       throw new Error(`buildCostPrompt: materials[${i}].item must be unique`);
     }
-    seenMaterials.add(m.item.trim());
+    seenMaterials.add(m.item.trim().toLowerCase());
     if (m.note !== undefined && typeof m.note !== "string") {
       throw new Error(`buildCostPrompt: materials[${i}].note must be a string when given`);
     }
