@@ -5,6 +5,7 @@
  * Client-only, no network.
  */
 import type { WorkPlan, WorkStep } from "@/lib/types";
+import { stepsWaitingOn, waitersShareLine } from "./stepWaiters";
 
 export const DAY_START_HOUR = 9;
 export const DAY_HOURS = 8;
@@ -120,7 +121,7 @@ function planKey(plan: Pick<WorkPlan, "spaceName" | "workOrder">): string {
 
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`);
 
-/** Event description: the step detail, who does it, what it fixes and what it waits on. */
+/** Event description: the step detail, who does it, what it fixes, what it waits on and which steps wait on it. */
 export function stepDescription(plan: Pick<WorkPlan, "spaceName" | "issues" | "workOrder">, step: WorkStep, block: CalendarBlock): string {
   const lines: string[] = [];
   if (clean(step.detail)) lines.push(clean(step.detail));
@@ -134,6 +135,8 @@ export function stepDescription(plan: Pick<WorkPlan, "spaceName" | "issues" | "w
     const dep = plan.workOrder.find((s) => s.order === step.dependsOn);
     lines.push(`Wait for step ${step.dependsOn}${dep ? ` (${clean(dep.title)})` : ""} to finish first.`);
   }
+  const after = waitersShareLine(stepsWaitingOn(plan.workOrder, step.order));
+  if (after) lines.push(after);
   lines.push(`From the SightWork plan for ${clean(plan.spaceName) || "this space"}. Times are a starting schedule. Move them as needed.`);
   return lines.join("\n");
 }
