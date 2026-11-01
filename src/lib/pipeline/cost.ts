@@ -99,6 +99,8 @@ export interface CostCaller {
     model: string;
     prompt: string;
     schema: Record<string, unknown>;
+    /** Abort signal for a stopped run (2026-11-01): forwarded to the model fetch. */
+    signal?: AbortSignal;
   }): Promise<{ json: unknown; latencyMs: number; costUsd: number }>;
 }
 
@@ -109,6 +111,12 @@ export interface CostDeps {
   schema: Record<string, unknown>;
   callSpark: CostCaller;
   tracker: UsageTracker;
+  /**
+   * Abort signal from runPlan (the route's request signal), forwarded to
+   * the model caller so stopping a run can cut the in-flight cost call
+   * instead of billing it to completion.
+   */
+  signal?: AbortSignal;
 }
 
 /** What the step returns: the range plus materials with unitCost filled in. */
@@ -567,7 +575,7 @@ export async function estimateCost(input: CostInput, deps: CostDeps): Promise<Co
   // retry: a throw is not a shape failure.
   let res: Awaited<ReturnType<typeof deps.callSpark>>;
   try {
-    res = await deps.callSpark({ model: SPARK_MODEL, prompt: deps.prompt, schema: deps.schema });
+    res = await deps.callSpark({ model: SPARK_MODEL, prompt: deps.prompt, schema: deps.schema, signal: deps.signal });
   } catch (err) {
     recordFailedCall(deps.tracker, SPARK_MODEL, "estimateCost", err);
     throw err;
