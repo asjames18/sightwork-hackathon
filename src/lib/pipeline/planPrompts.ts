@@ -711,6 +711,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * A material qty starting with zero printed verbatim as qty="0";
  * it now fails fast (a listed material is needed in some amount, so
  * a zero qty would price it at nothing and drop it from the spend).
+ * A material qty starting with a minus sign printed verbatim as
+ * qty="-2 gallons"; it now fails fast (a negative qty would price
+ * as a credit, not a need).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -748,6 +751,9 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     const qtyMatch = /^\s*(\d+(?:\.\d+)?)/.exec(m.qty);
     if (qtyMatch && Number(qtyMatch[1]) === 0) {
       throw new Error(`buildCostPrompt: materials[${i}].qty must be greater than zero when it starts with a number`);
+    }
+    if (m.qty.trim().startsWith("-")) {
+      throw new Error(`buildCostPrompt: materials[${i}].qty must not be negative`);
     }
     if (seenMaterials.has(m.item.trim().toLowerCase())) {
       throw new Error(`buildCostPrompt: materials[${i}].item must be unique`);
