@@ -18,7 +18,9 @@
  * - The model returns unit prices, a labor rate, contingency, assumptions
  *   and sources; code computes the range. Totals are reproducible.
  * - Materials: qty is the leading number of the qty string, or 1 when
- *   there is none. A material with no model price gets [0, 0] plus a
+ *   there is none; thousands commas read as digits ("1,000" -> 1000,
+ *   so a bulk qty prices as a thousand, not as one). A material with
+ *   no model price gets [0, 0] plus a
  *   "No price for <item>" assumption line. A model price for a
  *   material index outside the materials array is ignored, never
  *   silently dropped: it adds an "Ignored price for material index
@@ -188,10 +190,10 @@ const LICENSED_TRADE = /electrician|plumber|roofer/i;
 const COMPUTED_LINE =
   "Total = materials + labor + contingency, computed from the line items";
 
-/** Leading number of a qty string ("12 chairs" -> 12, "1 box" -> 1, none -> 1). */
+/** Leading number of a qty string ("12 chairs" -> 12, "1 box" -> 1, "1,000 sq ft" -> 1000, none -> 1). */
 export function parseQty(qty: string): number {
-  const m = /^\s*(\d+(?:\.\d+)?)/.exec(qty);
-  return m ? Number(m[1]) : 1;
+  const m = /^\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/.exec(qty);
+  return m ? Number(m[1].replace(/,/g, "")) : 1;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
