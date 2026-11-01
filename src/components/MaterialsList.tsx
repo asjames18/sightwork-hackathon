@@ -12,6 +12,7 @@ import {
 } from "@/lib/client/materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "@/lib/client/materialsNeededBy";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { fixLinks, problemAnchor } from "@/lib/client/stepLinks";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -22,7 +23,16 @@ const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
 };
 
 /** Materials as a shopping list: tick items off as you get them (saved on this device per plan) and send what's still needed. */
-export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample?: boolean }) {
+export function MaterialsList({
+  plan,
+  sample = false,
+  problemRanks,
+}: {
+  plan: WorkPlan;
+  sample?: boolean;
+  /** Ranks that have a problem card on the page; "for #N" links up to those cards. */
+  problemRanks?: ReadonlySet<number>;
+}) {
   const [got, setGot] = useState<number[]>([]);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("");
@@ -137,7 +147,9 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
               <div className="min-w-0 flex-1 pt-1.5 print:pt-0">
                 <p className={`font-medium break-words ${isGot ? "text-ink/70 line-through decoration-2" : ""}`}>{m.item}</p>
                 <p className="text-sm text-ink/70">
-                  {[m.forIssues?.length && `for #${m.forIssues.join(", #")}`, m.note].filter(Boolean).join(" · ")}
+                  {m.forIssues?.length ? <ForIssues ranks={m.forIssues} problemRanks={problemRanks} /> : null}
+                  {m.forIssues?.length && m.note ? " · " : null}
+                  {m.note}
                 </p>
                 {neededBy[i] && !isGot && (
                   <p data-testid="material-needed-by" className="text-sm font-medium text-ink/80">
@@ -158,5 +170,34 @@ export function MaterialsList({ plan, sample = false }: { plan: WorkPlan; sample
         })}
       </ul>
     </>
+  );
+}
+
+/** "for #1, #3": each rank with a problem card on the page links up to it, others stay plain. */
+function ForIssues({ ranks, problemRanks }: { ranks: number[]; problemRanks?: ReadonlySet<number> }) {
+  const { linked } = fixLinks(ranks, problemRanks ?? new Set());
+  const canLink = new Set(linked);
+  const seen = new Set<number>();
+  const shown = ranks.filter((r) => (seen.has(r) ? false : (seen.add(r), true)));
+  return (
+    <span data-testid="material-for">
+      for{" "}
+      {shown.map((r, i) => (
+        <span key={r}>
+          {i > 0 && ", "}
+          {canLink.has(r) ? (
+            <a
+              href={`#${problemAnchor(r)}`}
+              className="inline-flex min-h-6 min-w-6 items-center justify-center font-semibold text-accent-dark underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark print:text-ink print:no-underline"
+              aria-label={`Go to problem ${r}`}
+            >
+              #{r}
+            </a>
+          ) : (
+            <>#{r}</>
+          )}
+        </span>
+      ))}
+    </span>
   );
 }

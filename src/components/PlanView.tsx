@@ -369,7 +369,7 @@ export function PlanView({
       <div className={plan.costRange || plan.materials.length > 0 ? "lg:grid lg:grid-cols-2 lg:items-start lg:gap-8" : undefined}>
         <Section title="Materials" id="materials">
           {plan.materials.length === 0 && <Empty>No materials needed.</Empty>}
-          {plan.materials.length > 0 && <MaterialsList plan={plan} sample={sample} />}
+          {plan.materials.length > 0 && <MaterialsList plan={plan} sample={sample} problemRanks={new Set(issues.map((i) => i.rank))} />}
         </Section>
 
         {!plan.costRange && plan.materials.length > 0 && (
