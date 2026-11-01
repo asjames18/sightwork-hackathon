@@ -24,6 +24,7 @@ import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNee
 import { fixFirstPlanLines } from "./fixFirst";
 import { noStepsCostLine, noStepsLine } from "./planEmpty";
 import { shareProgressLine } from "./stepProgress";
+import { nextUpShareLine } from "./nextUp";
 import { problemFixTag, shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
 
@@ -499,6 +500,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       para(progress, 10, "bold", TAG_MATCHED, M, W, 0);
       const fixedLine = shareFixedLine(issues, steps, done);
       if (fixedLine) para(fixedLine, 9.5, "normal", MUTED, M, W, 0);
+      const next = nextUpShareLine(steps, done);
+      if (next) para(next, 9.5, "normal", INK, M, W, 0);
       y += 8;
     }
     // Same Start here sentence as the card on the plan screen, so the first move is on paper too.

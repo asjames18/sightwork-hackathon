@@ -9,6 +9,7 @@ import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/pl
 import { walkTextLines } from "./walkTimeline";
 import { calendarSummary } from "./stepCalendar";
 import { noStepsCostLine, noStepsLine } from "./planEmpty";
+import { nextUpShareLine } from "./nextUp";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -399,6 +400,9 @@ function planTextLines(plan: WorkPlan, opts: PlanTextOptions, trim: ShareTrim): 
     if (progress) lines.push(progress);
     const fixedLine = sample ? null : shareFixedLine(issues, steps, opts.doneSteps ?? []);
     if (fixedLine) lines.push(fixedLine);
+    // Where to pick up, so the teammate reading the text knows the next step without the plan screen.
+    const next = sample ? null : nextUpShareLine(steps, opts.doneSteps ?? []);
+    if (next) lines.push(next);
   } else if (!sample && issues.length > 0) {
     // Same honest line as the plan screen: the problems are real, the step-by-step order just wasn't laid out.
     lines.push("", noStepsLine(issues.length));
