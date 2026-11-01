@@ -482,6 +482,37 @@ export function formatSegmentBudget(
 }
 
 /**
+ * Server-log-only summary of what the capped reason remap dropped.
+ * Pure, and it changes no plan output: runPlan logs it only when the
+ * remap from subset positions back to plan frames actually drops an
+ * issue or a watch entry, so a real Large/XL run shows whether the
+ * reason step's output survived the subset (the subset lines above
+ * show what the reason step saw; this line shows what came back).
+ * Returns null when nothing was dropped and on malformed counts
+ * (non-integer, negative, or after > before), so ordinary and
+ * malformed runs stay out of the server log. Counts only, nothing
+ * user-identifying.
+ */
+export function formatReasonRemapDropped(
+  beforeIssues: number,
+  afterIssues: number,
+  beforeWatch: number,
+  afterWatch: number,
+): string | null {
+  for (const n of [beforeIssues, afterIssues, beforeWatch, afterWatch]) {
+    if (!Number.isInteger(n) || n < 0) return null;
+  }
+  if (afterIssues > beforeIssues || afterWatch > beforeWatch) return null;
+  const droppedIssues = beforeIssues - afterIssues;
+  const droppedWatch = beforeWatch - afterWatch;
+  if (droppedIssues === 0 && droppedWatch === 0) return null;
+  const parts: string[] = [];
+  if (droppedIssues > 0) parts.push(`dropped ${droppedIssues} of ${beforeIssues} issues`);
+  if (droppedWatch > 0) parts.push(`dropped ${droppedWatch} of ${beforeWatch} watch entries`);
+  return `runPlan: reason remap: ${parts.join(", ")}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1405,6 +1436,18 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       : deps.reason;
     const rawReason = await runReason(reasonInput, reasonDeps);
     reason = reasonSubset ? remapReasonOutput(rawReason, reasonSubset) : rawReason;
+    // Server log only: whether the remap dropped any reason output.
+    // No plan output, no UI change. The subset lines above show what
+    // the reason step saw; this line shows what survived coming back.
+    if (reasonSubset) {
+      const remapDropped = formatReasonRemapDropped(
+        rawReason.issues.length,
+        reason.issues.length,
+        (rawReason.watch ?? []).length,
+        (reason.watch ?? []).length,
+      );
+      if (remapDropped) console.log(remapDropped);
+    }
     console.log(formatReasonStability(reasonSegmentation, reason));
     if (reason.warnings?.length) {
       console.warn(`runPlan: reason kept with warnings:\n${reason.warnings.join("\n")}`);
