@@ -74,6 +74,14 @@ export interface ImageCaller {
     image: string;
     /** Candidates wanted; 1 unless the wiring asks for 2. */
     n?: number;
+    /**
+     * Abort signal for a stopped run (2026-11-01): when set, it is
+     * passed to the fetch, and an already-aborted signal throws an
+     * AbortError before any fetch, so a stopped run never starts
+     * (or pays for) an image it no longer needs. Callers that omit
+     * it behave exactly as before.
+     */
+    signal?: AbortSignal;
   }): Promise<{ images: string[]; latencyMs: number; costUsd: number }>;
 }
 
@@ -300,6 +308,18 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
         `image: n must be at most ${MAX_IMAGES_PER_CALL}, got ${String(req.n)}`,
       );
     }
+    // A stopped run must not start (or pay for) a call it no
+    // longer needs: an already-aborted signal throws here,
+    // before any fetch, with the same AbortError name the
+    // pipeline runner uses, so the route treats it as a stop,
+    // not a step failure. A signal that aborts mid-flight
+    // rejects the fetch below, which propagates unchanged
+    // (it is not a transient 404, so no retry follows it).
+    if (req.signal?.aborted) {
+      const err = new Error("image: aborted");
+      err.name = "AbortError";
+      throw err;
+    }
     const images: string[] = [];
     let latencyMs = 0;
     let costUsd = 0;
@@ -329,6 +349,7 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify(body),
+            signal: req.signal,
           });
           if (res.ok) {
             // A 200 body that is not JSON carries no completed image,
