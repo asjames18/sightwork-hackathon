@@ -6,6 +6,7 @@ import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
 import { runTimeHint } from "@/lib/client/runTimeHint";
 import { failedRunCostLine } from "@/lib/client/runCost";
 import { narrationPartLine } from "@/lib/client/narrationChunks";
+import { STOP_RUN_LABEL, stopRunConfirm } from "@/lib/client/stopRun";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -52,6 +53,7 @@ export function ProcessingStep({
   failure,
   onRetry,
   onExample,
+  onStop,
   onEnterCode,
   enterCodeLabel = "Enter tester code",
   engines,
@@ -69,6 +71,8 @@ export function ProcessingStep({
   failure?: StepFailure | null;
   onRetry?: () => void;
   onExample?: () => void;
+  /** Stops the run in progress and goes back to the video (real runs confirm first, see stopRun.ts). */
+  onStop?: () => void;
   /** Set when the run stopped for a missing or wrong tester code: back to the video with the code prompt. */
   onEnterCode?: () => void;
   /** Label for the onEnterCode button ("Add city and state" when the run was stopped for the location). */
@@ -244,6 +248,8 @@ export function ProcessingStep({
       {!failed && <WhileYouWait place={place} />}
       </div>
 
+      {!failed && onStop && <StopRun onStop={onStop} realRun={realRun} />}
+
       {failure && (
         <div role="alert" className="mt-6 rounded-2xl border border-red-600/30 bg-white p-4">
           <p className="font-semibold text-red-700">Stopped at: {LABELS[steps[current]] ?? "a step"}</p>
@@ -284,6 +290,48 @@ export function ProcessingStep({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * "Stop this run" under the step list. A preview run stops on the first tap; a real run shows a short
+ * question with Stop run / Keep going first, since the step in progress may still finish and bill.
+ */
+function StopRun({ onStop, realRun }: { onStop: () => void; realRun: boolean }) {
+  const [asking, setAsking] = useState(false);
+  const question = stopRunConfirm(realRun);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const stopRef = useRef<HTMLButtonElement>(null);
+  const wasAsking = useRef(false);
+  // Focus follows the swap: onto "Keep going" (the safe choice) when the question opens, back to the button when it closes.
+  useEffect(() => {
+    if (asking) keepRef.current?.focus();
+    else if (wasAsking.current) stopRef.current?.focus();
+    wasAsking.current = asking;
+  }, [asking]);
+  if (asking && question) {
+    return (
+      <div role="group" aria-labelledby="stop-run-question" data-testid="stop-run-confirm" className="mt-5 rounded-2xl border border-ink/15 bg-white p-4">
+        <p id="stop-run-question" className="text-sm text-ink/80">
+          {question}
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <button type="button" onClick={onStop} className="btn-secondary flex-1 active:scale-[.99]">
+            Stop run
+          </button>
+          <button ref={keepRef} type="button" onClick={() => setAsking(false)} className="btn-primary flex-1 active:scale-[.99]">
+            Keep going
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-4 flex justify-center lg:justify-start">
+      <button ref={stopRef} type="button" onClick={() => (question ? setAsking(true) : onStop())} className="btn-tertiary">
+        {STOP_RUN_LABEL}
+      </button>
+    </div>
   );
 }
 

@@ -15,6 +15,7 @@ import { interruptedTakeNote } from "@/lib/client/recorder";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
 import { SpacePicker } from "./SpacePicker";
 import { RoomSizePicker } from "./RoomSizePicker";
+import { stoppedRunNote } from "@/lib/client/stopRun";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -36,11 +37,14 @@ export function UploadStep({
   onLastPlan,
   recent,
   resumeFile,
+  stoppedFile,
 }: {
   /** Starts the run. `runner` is chosen here, once per video (see ownVideoRunnerKind). */
   onVideo: (file: File, runner: RunnerKind) => void;
   /** A video to show again with the tester-code prompt open (the server refused the code). */
   resumeFile?: File;
+  /** A video whose run was stopped on the processing screen: shown again, ready to start, with a short note. */
+  stoppedFile?: File;
   /** Opens an example plan by id (the featured real run when omitted). */
   onExample: (id?: string) => void;
   /** Reopens the last finished plan on this device; the link only shows when one is saved. */
@@ -56,6 +60,7 @@ export function UploadStep({
   const [recording, setRecording] = useState(false);
   const [recorded, setRecorded] = useState<RecordingInfo | null>(null);
   const [cameraNote, setCameraNote] = useState<string | null>(null);
+  const [stoppedNote, setStoppedNote] = useState<string | null>(null);
   // The picker button unmounts once a video is chosen, so move focus to the preview card
   // instead of letting keyboard and screen-reader users fall back to the top of the page.
   const card = useRef<HTMLDivElement>(null);
@@ -126,6 +131,7 @@ export function UploadStep({
     setCameraNote(null);
     setRecorded(info);
     setAskCode(false);
+    setStoppedNote(null);
     setLen({ state: "reading" });
     setPreview({ url: URL.createObjectURL(file), file });
   }, []);
@@ -141,6 +147,12 @@ export function UploadStep({
       setAskCode(!loadTestCode());
     }
   }, [resumeFile, pick]);
+  // Back from a run stopped on the processing screen: the same video, ready to change details and start again.
+  useEffect(() => {
+    if (!stoppedFile) return;
+    pick(stoppedFile);
+    setStoppedNote(stoppedRunNote(stoppedFile.name));
+  }, [stoppedFile, pick]);
   // Desktop: drop a video anywhere on the upload screen (dropping it outside a target used to make the
   // browser open the file in the tab and leave the app). The drop zone lights up while a file is dragged.
   const [dragging, setDragging] = useState(false);
@@ -343,6 +355,11 @@ export function UploadStep({
           className="mt-8 overflow-hidden rounded-2xl bg-white shadow-sm focus:outline-none"
         >
           <p aria-live="polite" className="sr-only">{liveText}</p>
+          {stoppedNote && (
+            <p role="status" data-testid="stopped-run-note" className="border-b border-ink/10 bg-ink/[.04] px-4 py-3 text-sm font-medium text-ink/80 break-words">
+              {stoppedNote}
+            </p>
+          )}
           {/* Phone walkthroughs are usually portrait: cap the height and letterbox instead of forcing 16:9. */}
           <video
             key={preview.url}

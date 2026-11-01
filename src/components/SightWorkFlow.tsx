@@ -19,7 +19,8 @@ import { SavePdfButton } from "./SavePdfButton";
 type Stage =
   // `resume`: back from a run the server refused for a missing or wrong tester code; the same video is
   // shown again with the code prompt open.
-  | { kind: "upload"; resume?: File }
+  // `stopped`: the user stopped the run on the processing screen; the same video is shown again, ready to start.
+  | { kind: "upload"; resume?: File; stopped?: File }
   | { kind: "processing"; file: File; run: number; runner: RunnerKind }
   | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example };
 
@@ -170,6 +171,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
         <UploadStep
           onVideo={(file, runner) => setStage({ kind: "processing", file, run: 1, runner })}
           resumeFile={stage.resume}
+          stoppedFile={stage.stopped}
           onExample={showExample}
           onLastPlan={showLastPlan}
           recent={<RecentPlans onOpen={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })} />}
@@ -190,6 +192,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           }
           enterCodeLabel={job?.state === "failed" && !isTesterCodeFailure(job.message) ? "Add city and state" : undefined}
           onExample={() => showExample()}
+          onStop={() => setStage({ kind: "upload", stopped: stage.file })}
           skipped={skipped}
           checks={checks}
           region={stage.runner === "api" ? loadRegion() : null}
