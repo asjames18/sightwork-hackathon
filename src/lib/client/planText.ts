@@ -157,6 +157,28 @@ export function saidVsSeenTally(rows: ReadonlyArray<Pick<SaidVsSeenEntry, "statu
   return `${parts.join(", ")}.`;
 }
 
+/** Most "said, not seen" quotes the shared text lists before it says how many more. */
+const MAX_SHARE_NOT_SEEN = 3;
+
+/**
+ * The said-vs-seen section for the shared text, when the walk named things the video never showed: the same
+ * tally the plan screen shows, then those quotes, so the team knows what to check in person. Empty without
+ * narration, without rows, or when everything said was seen (the header line already counts what wasn't said).
+ */
+export function saidVsSeenShareLines(plan: Pick<WorkPlan, "saidVsSeen" | "transcript" | "transcriptTurns">): string[] {
+  const rows = saidVsSeenLines(plan);
+  if (rows.length === 0 || !Array.isArray(plan.saidVsSeen)) return [];
+  const notSeen = plan.saidVsSeen
+    .map((row, i) => ({ kind: saidVsSeenKind(row), said: rows[i].said }))
+    .filter((r) => r.kind === "notSeen" && r.said !== "Not mentioned")
+    .map((r) => r.said);
+  if (notSeen.length === 0) return [];
+  const lines = [`${SAID_VS_SEEN_HEADING}: ${saidVsSeenTally(plan.saidVsSeen)}`, "Said on the walk, not seen on video (check in person):"];
+  for (const q of notSeen.slice(0, MAX_SHARE_NOT_SEEN)) lines.push(`- ${q}`);
+  if (notSeen.length > MAX_SHARE_NOT_SEEN) lines.push(`- and ${notSeen.length - MAX_SHARE_NOT_SEEN} more`);
+  return lines;
+}
+
 /** "3 problems, worst first" / "1 problem" / "No problems found". */
 export function problemSummary(count: number): string {
   if (count === 0) return "No problems found";
@@ -277,6 +299,9 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const counts = countsShareLine(plan.inventory ?? [], masksAvailable(plan));
   // The counts line is extra context: it is the first thing dropped when the text runs long.
   const countsAt = counts ? lines.push("", counts) - 2 : -1;
+  // Said vs saw sits right after the counts line and is the first thing dropped when the text runs long.
+  const said = saidVsSeenShareLines(plan);
+  const saidAt: [number, number] | null = said.length > 0 ? [lines.push("", ...said) - said.length - 1, said.length + 1] : null;
   if (!sample && opts.sinceLines && opts.sinceLines.length > 0) lines.push("", ...opts.sinceLines);
   if (watch.length > 0) {
     lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
@@ -320,6 +345,12 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
 
   let text = lines.join("\n");
   if (text.length <= maxChars) return text;
+  // Below the counts line, so its removal never shifts the counts or walk lines.
+  if (saidAt) {
+    lines.splice(saidAt[0], saidAt[1]);
+    text = lines.join("\n");
+    if (text.length <= maxChars) return text;
+  }
   if (countsAt >= 0) {
     lines.splice(countsAt, 2);
     text = lines.join("\n");
