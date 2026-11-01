@@ -63,6 +63,13 @@ export interface ImageCaller {
     image: string;
     /** Candidates wanted; 1 unless the wiring asks for 2. */
     n?: number;
+    /**
+     * Abort signal for a stopped run (2026-11-01): forwarded to
+     * the image caller. An aborted signal there throws an
+     * AbortError, which this step rethrows (see runRenderAfter)
+     * instead of reporting a model failure.
+     */
+    signal?: AbortSignal;
   }): Promise<{ images: string[]; latencyMs: number; costUsd: number }>;
 }
 
@@ -73,6 +80,12 @@ export interface JudgeCaller {
     prompt: string;
     /** [original, candidate 1, candidate 2], in that order. */
     images: [string, string, string];
+    /**
+     * Abort signal for a stopped run (2026-11-01): forwarded to
+     * the judge caller; an aborted judge call rethrows instead
+     * of falling back to the first candidate.
+     */
+    signal?: AbortSignal;
   }): Promise<{ json: unknown; latencyMs: number; costUsd: number }>;
 }
 
@@ -85,6 +98,8 @@ export interface RenderAfterDeps {
   /** Muse Image model ID, confirmed at the first spike. */
   imageModel: string;
   callImage: ImageCaller;
+  /** Abort signal from runPlan (the route's request signal), forwarded to callImage/callJudge. */
+  signal?: AbortSignal;
   /** Optional judge; required when generateTwo is true. */
   judgeModel?: string;
   callJudge?: JudgeCaller;
@@ -517,6 +532,7 @@ export async function runRenderAfter(
         prompt,
         image: heroFrame.url,
         n: wantTwo ? 2 : 1,
+        signal: deps.signal,
       });
     } catch (err) {
       // A billed-but-failed image call still spent money (e.g. a
@@ -552,6 +568,7 @@ export async function runRenderAfter(
           model: deps.judgeModel,
           prompt: buildJudgePrompt(visibleChanges),
           images: [heroFrame.url, candidates[0], candidates[1]],
+          signal: deps.signal,
         });
         deps.tracker.record({
           model: deps.judgeModel,
@@ -566,6 +583,10 @@ export async function runRenderAfter(
           picked = candidates[0];
         }
       } catch (err) {
+        // A stopped run stops here too: an aborted judge call
+        // must not fall back to the first candidate and ship an
+        // image for a run the user stopped.
+        if (err instanceof Error && err.name === "AbortError") throw err;
         // A billed-but-failed judge call still spent money (e.g. a
         // MetaCallError on a non-JSON response): record it before
         // falling back, so the route total counts it. A tracker
@@ -597,6 +618,11 @@ export async function runRenderAfter(
       visibleChanges,
     };
   } catch (err) {
+    // A stopped run is a stop, not a model failure: an AbortError
+    // from the image or judge call propagates, so runPlan and the
+    // route treat it as a stop instead of shipping a plan with a
+    // silently skipped after picture.
+    if (err instanceof Error && err.name === "AbortError") throw err;
     const message = err instanceof Error ? err.message : String(err);
     const cap = /spike cap/i.test(message);
     return {
