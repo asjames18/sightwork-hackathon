@@ -19,7 +19,7 @@ import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { noNarrationNote } from "./narrationNote";
 import { crewSummary, hoursLabel, showCrewSummary, stepsLabel } from "./crewSummary";
 import { calendarSummary, stepWhen } from "./stepCalendar";
-import { materialsSpend, spendLine } from "./materialsList";
+import { gotLine, materialsSpend, spendLine } from "./materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
 import { shareProgressLine } from "./stepProgress";
@@ -54,6 +54,8 @@ export interface PlanPdfOptions {
   since?: { comparison: PlanComparison; when?: string | null } | null;
   /** Real plans only: work steps ticked off on this device. Marks those steps Done and adds the progress lines. */
   doneSteps?: readonly number[];
+  /** Real plans only: shopping list items ticked as in hand on this device (indexes into plan.materials). */
+  gotMaterials?: readonly number[];
 }
 
 export const PDF_SAMPLE_LABEL = "Example plan with sample data, not a real run";
@@ -133,6 +135,12 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   const masks = masksAvailable(plan);
   // Steps ticked off on this device; real plans only, so samples and example PDFs never look half done.
   const done = sample || opts.example ? [] : [...new Set(opts.doneSteps ?? [])];
+  // Shopping list items ticked as in hand on this device, same rule (real plans only, items that still exist).
+  const got =
+    sample || opts.example
+      ? []
+      : [...new Set(opts.gotMaterials ?? [])].filter((i) => Number.isInteger(i) && i >= 0 && i < plan.materials.length).sort((a, b) => a - b);
+  const have = new Set(got);
   let y = M;
 
   doc.setProperties({ title: pdfSafe(`Work plan: ${clean(plan.spaceName)}`), subject: "SightWork work plan", creator: "SightWork" });
@@ -577,11 +585,15 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     heading("Materials", 40);
     // Same "needed by" schedule as the work steps above (and Add to calendar), counted from this PDF's date.
     const neededBy = steps.length ? materialsNeededBy({ materials: plan.materials, workOrder: steps }, date) : [];
-    const buyFirst = firstNeededLine(neededBy);
+    // Items already in hand drop out of "Buy first"; the in-hand tally sits above the list, like the plan screen.
+    const inHand = gotLine(got.length, plan.materials.length);
+    if (inHand) para(inHand, 9.5, "bold", TAG_MATCHED, M, W, 4);
+    const buyFirst = firstNeededLine(neededBy, got);
     if (buyFirst) para(buyFirst, 9.5, "bold", INK, M, W, 6);
     for (const [mi, m] of plan.materials.entries()) {
       const cost = m.unitCost ? `${usd(m.unitCost[0])}${m.unitCost[1] !== m.unitCost[0] ? `-${usd(m.unitCost[1])}` : ""} each` : "";
-      font(10.5, "bold");
+      const isGot = have.has(mi);
+      font(10.5, "bold", isGot ? TAG_MATCHED : INK);
       const itemL = wrap(clean(m.item), W - 200);
       ensure(lineH(10.5) * itemL.length + 4);
       const top = y;
@@ -598,12 +610,13 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       const refs = m.forIssues?.length ? `For problem${m.forIssues.length === 1 ? "" : "s"} #${m.forIssues.join(", #")}` : "";
       const sub = [refs, m.note ? clean(m.note) : ""].filter(Boolean).join(". ");
       if (sub) para(sub, 9, "normal", MUTED, M, W - 200, 0);
-      const by = neededByLine(neededBy[mi] ?? null);
+      if (isGot) para("IN HAND", 8.5, "bold", TAG_MATCHED, M, W - 200, 0);
+      const by = isGot ? "" : neededByLine(neededBy[mi] ?? null);
       if (by) para(by, 9, "normal", MUTED, M, W - 200, 0);
       y += 4;
     }
-    // Same total line as the list on the plan screen (nothing ticked in a saved plan), materials only.
-    const spend = spendLine(materialsSpend(plan), { dash: "-" });
+    // Same total line as the list on the plan screen: once items are in hand it counts only what's still to buy.
+    const spend = spendLine(materialsSpend(plan, got), { started: got.length > 0, dash: "-" });
     if (spend) {
       y += 6;
       para(spend, 10, "bold", INK, M, W, 6);
