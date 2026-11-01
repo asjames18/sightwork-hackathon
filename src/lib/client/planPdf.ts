@@ -12,7 +12,7 @@ import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, masksAvailable, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
 import { compareSummary, type CompareRow, type PlanComparison } from "./planCompare";
-import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, unmentionedHeadline, unmentionedTitlesLine, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, SAID_VS_SEEN_TAG, saidVsSeenKind, saidVsSeenLines, saidVsSeenTally, shareDate, unmentionedHeadline, unmentionedTitlesLine, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { walkShareLines } from "./walkTimeline";
 import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
@@ -98,6 +98,7 @@ const MUTED: Rgb = [92, 96, 102];
 const LINE: Rgb = [224, 222, 216];
 const ACCENT: Rgb = [232, 89, 12];
 const ACCENT_DARK: Rgb = [194, 65, 12];
+const TAG_MATCHED: Rgb = [4, 120, 87];
 const PDF_TIER: Record<CompareRow["tier"], string> = { urgent: "fix now", soon: "fix soon", later: "can wait" };
 const SEVERITY: Record<string, Rgb> = { high: [220, 38, 38], medium: [245, 158, 11], low: [180, 182, 186] };
 const AMBER_BG: Rgb = [254, 243, 199];
@@ -362,13 +363,26 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   const saidRows = saidVsSeenLines(plan);
   if (saidRows.length) {
     heading(SAID_VS_SEEN_HEADING, 50);
+    // Same tally, column words and per-row tags as the plan screen, so the paper copy reads the same way.
+    const sourceRows = Array.isArray(plan.saidVsSeen) ? plan.saidVsSeen : [];
+    const tally = saidVsSeenTally(sourceRows);
+    if (tally) para(tally, 10, "bold", INK, M, W, 4);
     const half = (W - 16) / 2;
     font(8, "bold", MUTED);
     ensure(lineH(8) + 4);
-    doc.text("SAID", M, y + 8);
-    doc.text("SEEN", M + half + 16, y + 8);
+    doc.text("YOU SAID", M, y + 8);
+    doc.text("WE SAW", M + half + 16, y + 8);
     y += lineH(8) + 4;
-    for (const row of saidRows) {
+    for (const [i, row] of saidRows.entries()) {
+      const src = sourceRows[i];
+      if (src) {
+        const kind = saidVsSeenKind(src);
+        const rank = Number.isInteger(src.issueRank) && (src.issueRank as number) > 0 ? ` \u00B7 Problem ${src.issueRank}` : "";
+        font(8, "bold", kind === "unmentioned" ? ACCENT_DARK : kind === "notSeen" ? MUTED : TAG_MATCHED);
+        ensure(lineH(8) + lineH(10) + 10);
+        doc.text(`${SAID_VS_SEEN_TAG[kind]}${rank}`.toUpperCase(), M, y + 8);
+        y += lineH(8);
+      }
       font(10);
       const left = wrap(row.said, half);
       font(10, row.unmentioned ? "bold" : "normal");

@@ -61,7 +61,7 @@ test("PDF has the section between the problems and the counts, with every row", 
   const text = pdfText(buildPlanPdf(jsPDF, plan(), { date: DAY, compress: false }));
   const at = text.indexOf(SAID_VS_SEEN_HEADING);
   assert.ok(at > text.indexOf("Problems, worst first"), "after the problems");
-  for (const want of ["SAID", "SEEN", "\"That tile is stained.\" (20 s)", "Brown ring on a ceiling tile", "Not mentioned", "Cord across the main exit", "Not visible in the video"]) {
+  for (const want of ["YOU SAID", "WE SAW", "\"That tile is stained.\" (20 s)", "Brown ring on a ceiling tile", "Not mentioned", "Cord across the main exit", "Not visible in the video"]) {
     assert.ok(text.includes(want), `missing: ${want}`);
   }
 });
@@ -78,4 +78,17 @@ test("narrated examples carry the section into their PDF", () => {
     const text = pdfText(buildPlanPdf(jsPDF, e.plan, { date: DAY, compress: false, example: e }));
     assert.ok(text.includes(SAID_VS_SEEN_HEADING), `${e.plan.spaceName} PDF has the section`);
   }
+});
+
+test("PDF tags each row like the plan screen, with a tally line and the matching problem number", () => {
+  const text = pdfText(buildPlanPdf(jsPDF, plan(), { date: DAY, compress: false }));
+  const at = text.indexOf(SAID_VS_SEEN_HEADING);
+  const section = text.slice(at);
+  assert.ok(section.includes("1 matched, 1 you didn't mention, 1 to check in person."), "tally line");
+  const matched = section.indexOf("MATCHED \u00B7 PROBLEM 2");
+  const unmentioned = section.indexOf("YOU DIDN'T MENTION \u00B7 PROBLEM 1");
+  const check = section.indexOf("CHECK IN PERSON");
+  assert.ok(matched >= 0 && unmentioned > matched && check > unmentioned, "tags in row order");
+  assert.ok(section.indexOf("Brown ring on a ceiling tile") > matched, "tag sits above its row");
+  assert.ok(!/CHECK IN PERSON \u00B7 PROBLEM/.test(section), "no problem number when the row has none");
 });
