@@ -1,8 +1,9 @@
 /**
- * buildCostPrompt rejects a double quote in a material item, instead
+ * buildCostPrompt escapes a double quote in a material item, instead
  * of printing it verbatim, so the item="..." field in the materials
- * list cannot be closed early. A note is printed quoted too, but it
- * is not covered by this guard yet, so a quote there still builds.
+ * list cannot be closed early. An inch mark like 2" pipe still builds,
+ * as 2\" pipe. A note is printed quoted too, but it is not covered
+ * by this treatment yet, so a quote there still builds verbatim.
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -24,15 +25,12 @@ const base: CostInput = {
 };
 
 describe("buildCostPrompt double quote in material item", () => {
-  test("rejects a double quote in a material item", () => {
-    assert.throws(
-      () =>
-        buildCostPrompt(
-          { ...base, materials: [{ item: 'pa"int', qty: "2 gallons" }] },
-          "church sanctuary",
-        ),
-      /buildCostPrompt: materials\[0\]\.item must not contain a double quote/,
+  test("escapes a double quote in a material item", () => {
+    const prompt = buildCostPrompt(
+      { ...base, materials: [{ item: 'pa"int', qty: "2 gallons" }] },
+      "church sanctuary",
     );
+    assert.ok(prompt.includes('item="pa\\"int"'));
   });
 
   test("keeps a clean material item in the prompt", () => {
