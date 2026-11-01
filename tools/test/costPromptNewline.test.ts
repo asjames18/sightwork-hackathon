@@ -99,7 +99,7 @@ describe("buildCostPrompt newline fields", () => {
       { ...base, materials: [{ item: '2" pipe', qty: "1" }] },
       "church sanctuary",
     );
-    assert.match(prompt, /item="2" pipe"/);
+    assert.match(prompt, /item="2\\" pipe"/);
   });
 
   test("still rejects a malformed thousands qty", () => {
