@@ -167,6 +167,12 @@ export async function POST(req: Request): Promise<Response> {
     const out = await runTranscribe(input, {
       callTranscribe: createAsrTranscribeCaller(),
       tracker,
+      // A stopped split run stops its in-flight ASR call instead of
+      // billing it to completion: the plan route already hands its
+      // request signal to runPlan's transcribe deps (2026-11-01),
+      // but this standalone route never passed one, so a client
+      // that went away still paid for the whole ASR call.
+      signal: req.signal,
     });
     console.log(
       `transcribe route: done, spike total $${tracker.totals().spikeTotalUsd}, ` +
