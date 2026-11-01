@@ -557,6 +557,54 @@ export function formatReviewCoverage(
 }
 
 /**
+ * Server-log-only summary of what the reviewer verdicts say.
+ * Pure, and it changes no plan output: runPlan logs it only when
+ * the reviewing step did not run, or when a ran review leaves an
+ * issue unverified or without a verdict, so a real run shows
+ * whether the reviewer actually backed every problem (a ran review
+ * with all issues verified stays quiet, as does a run with no
+ * issues: the no-issue case reads as a ran review with no verdicts
+ * by design). A verdict counts only when its problemId parses to
+ * one of the plan's issue ranks; stray or malformed verdicts are
+ * ignored, and the first verdict per rank wins, so ordinary and
+ * malformed runs stay out of the server log. Rank numbers only,
+ * nothing user-identifying.
+ */
+export function formatReviewVerdicts(
+  review: { ran: boolean; items: Array<{ problemId: string; verified: boolean }> },
+  issueRanks: number[],
+): string | null {
+  if (
+    !review ||
+    typeof review.ran !== "boolean" ||
+    !Array.isArray(review.items) ||
+    !Array.isArray(issueRanks)
+  )
+    return null;
+  const ranks = [...new Set(issueRanks.filter((n) => Number.isInteger(n) && n >= 1))].sort(
+    (a, b) => a - b,
+  );
+  if (ranks.length === 0) return null;
+  if (!review.ran) return `runPlan: review: did not run for ${ranks.length} issues`;
+  const verdicts = new Map<number, boolean>();
+  for (const item of review.items) {
+    if (!item || typeof item.problemId !== "string" || typeof item.verified !== "boolean")
+      continue;
+    const rank = Number(item.problemId);
+    if (!Number.isInteger(rank) || !ranks.includes(rank) || verdicts.has(rank)) continue;
+    verdicts.set(rank, item.verified);
+  }
+  const verified = ranks.filter((r) => verdicts.get(r) === true);
+  const unverified = ranks.filter((r) => verdicts.get(r) === false);
+  const noVerdict = ranks.filter((r) => !verdicts.has(r));
+  if (unverified.length === 0 && noVerdict.length === 0) return null;
+  const parts: string[] = [];
+  if (unverified.length > 0) parts.push(`not verified: ${unverified.join(", ")}`);
+  if (noVerdict.length > 0) parts.push(`no verdict: ${noVerdict.join(", ")}`);
+  return `runPlan: review: ${verified.length}/${ranks.length} issues verified, ${parts.join(", ")}`;
+}
+
+/**
  * Server-log-only summary of whether the cost step priced and
  * grounded every material. Pure, and it changes no plan output:
  * runPlan logs it only when at least one material is unpriced or
@@ -1813,6 +1861,16 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       console.warn(`runPlan: review failed unexpectedly, continuing without review: ${detailOf(err)}`);
       review = { ran: false, items: [] };
     }
+    // Server log only: what the reviewer verdicts say. No plan
+    // output, no UI change. The finished plan carries review.ran and
+    // review.items, but no one-line summary of which issues the
+    // reviewer failed to verify, so without this line a real run
+    // never says at a glance whether reviewing backed the plan.
+    const reviewVerdicts = formatReviewVerdicts(
+      review,
+      plan.issues.map((issue) => issue.rank),
+    );
+    if (reviewVerdicts) console.log(reviewVerdicts);
     // The final plan's meta was computed before reviewing (above), so
     // recompute it here: otherwise the review call's spend and model
     // would be missing from meta.costUsd / meta.models on every
