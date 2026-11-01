@@ -22,6 +22,7 @@ import { calendarSummary, stepWhen } from "./stepCalendar";
 import { gotLine, materialsSpend, spendLine } from "./materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
+import { noStepsCostLine, noStepsLine } from "./planEmpty";
 import { shareProgressLine } from "./stepProgress";
 import { problemFixTag, shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
@@ -578,6 +579,10 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       if (at) para(`When: ${at}`, 9, "normal", MUTED, M + 24, W - 24, 0);
       y += 8;
     }
+  } else if (!sample && issues.length > 0) {
+    // Same honest line as the plan screen: the problems are real, the step-by-step order just wasn't laid out.
+    heading("Do the work in this order");
+    para(noStepsLine(issues.length), 10, "normal", MUTED, M, W, 2);
   }
 
   // --- Materials ----------------------------------------------------------------------
@@ -649,8 +654,12 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     }
   } else if (plan.materials.length) {
     heading("What it might cost");
+    // A plan without work steps has nothing to price, so say that rather than "couldn't be worked out".
+    const noStepsCost = sample ? null : noStepsCostLine(steps.length, plan.materials.length);
     para(
-      plan.meta?.skipped?.cost
+      noStepsCost
+        ? noStepsCost
+        : plan.meta?.skipped?.cost
         ? "The cost range couldn't be worked out this run. The materials and work steps above are complete."
         : sample
           ? "This sample has no cost range. On a real run with a city and state, SightWork prices the materials and labor for that area."
