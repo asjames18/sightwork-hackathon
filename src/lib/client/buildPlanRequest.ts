@@ -1,6 +1,6 @@
 import type { LaborBasis, PlanRequest } from "@/lib/types";
 import type { BuildPlanRequest } from "./apiPlanJob";
-import { assignZones, frameSignature, SIGNATURE_SIDE, type FrameSignature } from "./zones";
+import { assignZones, frameSignature, medianSpacingSec, SIGNATURE_SIDE, type FrameSignature } from "./zones";
 import { trimFramesCoveringZones } from "./zoneCoverage";
 import { resolveVideoDuration } from "./videoDuration";
 import { BLANK_SIDE, BLANK_TAKE_MESSAGE, isBlankTake, lumaStats, type LumaStats } from "./blankTake";
@@ -289,7 +289,7 @@ async function extractNarration(file: File, sampleRate: number, signal: AbortSig
  */
 export function withZoneIds(frames: PlanRequest["frames"], signatures: (FrameSignature | null)[]): PlanRequest["frames"] {
   if (frames.length === 0 || signatures.length !== frames.length || signatures.some((s) => s === null)) return frames;
-  const ids = assignZones(signatures as FrameSignature[]);
+  const ids = assignZones(signatures as FrameSignature[], { frameSpacingSec: medianSpacingSec(frames.map((f) => f.tSec)) });
   return frames.map((f, i) => ({ ...f, zoneId: ids[i] }));
 }
 
