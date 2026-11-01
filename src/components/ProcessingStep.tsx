@@ -351,7 +351,7 @@ function CheckNote({ check }: { check: StepCheck }) {
 
 /** What the finished plan holds, beside the step list on desktop so the screen isn't half empty. Only parts
  * every run produces are listed, plus the cost range when the run carries a place (no after picture, an
- * optional step). Phones skip it. */
+ * optional step). Phones and tablets get it folded under the step list. */
 const PLAN_PARTS = [
   "Problems ranked by priority, including ones you didn't mention",
   "Rough counts of what's in the room",
@@ -361,22 +361,41 @@ const PLAN_PARTS = [
 
 function WhileYouWait({ place }: { place: string | null }) {
   const parts = place ? [...PLAN_PARTS, `A rough cost range for ${place}`] : PLAN_PARTS;
+  const list = (
+    <ul className="mt-3 space-y-2.5 text-sm text-ink/80">
+      {parts.map((t) => (
+        <li key={t} className="flex gap-2">
+          <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-dark" />
+          <span>{t}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  const ready = "When it's ready, your plan opens here on its own.";
   return (
-    <aside aria-labelledby="while-you-wait" className="hidden rounded-2xl bg-ink/[.04] p-5 lg:block">
-      <h2 id="while-you-wait" className="text-base font-bold">
-        While you wait
-      </h2>
-      <p className="mt-1 text-sm text-ink/70">Your plan will have:</p>
-      <ul className="mt-3 space-y-2.5 text-sm text-ink/80">
-        {parts.map((t) => (
-          <li key={t} className="flex gap-2">
-            <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-dark" />
-            <span>{t}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-4 text-sm text-ink/70">When it's ready, your plan opens here on its own.</p>
-    </aside>
+    <>
+      <aside aria-labelledby="while-you-wait" className="hidden rounded-2xl bg-ink/[.04] p-5 lg:block">
+        <h2 id="while-you-wait" className="text-base font-bold">
+          While you wait
+        </h2>
+        <p className="mt-1 text-sm text-ink/70">Your plan will have:</p>
+        {list}
+        <p className="mt-4 text-sm text-ink/70">{ready}</p>
+      </aside>
+      {/* Phones and tablets: the same list, folded under the steps so the progress stays on screen. */}
+      <details data-testid="while-you-wait-compact" className="group mt-4 rounded-2xl bg-ink/[.04] px-4 lg:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+          What your plan will have
+          <span aria-hidden="true" className="shrink-0 text-ink/60 transition-transform group-open:rotate-180 motion-reduce:transition-none">
+            ▾
+          </span>
+        </summary>
+        <div className="pb-4">
+          {list}
+          <p className="mt-3 text-sm text-ink/70">{ready}</p>
+        </div>
+      </details>
+    </>
   );
 }
 
