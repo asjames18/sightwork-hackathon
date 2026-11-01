@@ -27,7 +27,8 @@ test("each work step sends just that step", async ({ page, context }) => {
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await steps.last().getByTestId("send-step").evaluate((el) => el.scrollIntoView({ block: "center" }));
+    // "end" keeps the button in view without leaving a link half under the sticky header at the top edge.
+    await steps.last().getByTestId("send-step").evaluate((el) => el.scrollIntoView({ block: "end" }));
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `send step ${width}`);
   }

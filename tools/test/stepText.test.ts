@@ -64,7 +64,8 @@ test("When: line matches the calendar schedule when asked", () => {
 test("no trade, no space: those lines drop out", () => {
   const bare = { ...plan, spaceName: "" };
   const text = stepToText(bare, { order: 1, title: "Look", detail: "Look" });
-  assert.deepEqual(text.split("\n"), ["Step 1 of 3", "Look", "", SHARE_SIGNOFF]);
+  // Step 2 of this plan waits on step 1, so the text says who can start next.
+  assert.deepEqual(text.split("\n"), ["Step 1 of 3", "Look", "When this is done, step 2 (Tape down stage cables) can start.", "", SHARE_SIGNOFF]);
 });
 
 test("labels and title", () => {
