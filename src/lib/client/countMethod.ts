@@ -15,16 +15,42 @@ export type CountMethodNote = {
  * `masks` is false when the outline step was skipped this run, so a "sam" method can't be claimed.
  * Returns null when the plan doesn't say how the count was made and the confidence is fine.
  */
-export function countMethodNote(item: InventoryItem, masks: boolean): CountMethodNote | null {
+export function countMethodNote(item: InventoryItem, masks: boolean, shared: string | null = null): CountMethodNote | null {
   const low = Number.isFinite(item.confidence) && item.confidence < LOW_COUNT_CONFIDENCE;
+  let text = baseMethodText(item, masks);
+  // Said once under the tiles (sharedCountMethod), so the tile keeps only its own hand-check flag.
+  if (shared && text === shared) text = null;
+  if (low) text = text ? `${text}. Low confidence, check by hand` : "Low confidence, check by hand";
+  return text ? { text, low } : null;
+}
+
+/** How one count was made, without the confidence flag; null when the plan doesn't say. */
+function baseMethodText(item: InventoryItem, masks: boolean): string | null {
   let text: string | null = null;
   const usedSam = masks && (item.method === "sam" || item.method === "sam+model");
   if (usedSam && item.range) text = "SAM 3.1 outlines and the model differ, so a range";
   else if (usedSam && item.method === "sam+model") text = "SAM 3.1 outlines and the model agree";
   else if (usedSam) text = "Counted from SAM 3.1 outlines";
   else if (item.method === "model" || (item.method && !masks)) text = "Estimated by the model from the frames";
-  if (low) text = text ? `${text}. Low confidence, check by hand` : "Low confidence, check by hand";
-  return text ? { text, low } : null;
+  return text;
+}
+
+/**
+ * The method line shared by every count, when there are two or more and all were made the same way,
+ * so the screen and PDF can say it once under the tiles instead of repeating it in each one.
+ * Null when there is only one count, when methods differ, or when any count doesn't say.
+ */
+export function sharedCountMethod(inventory: InventoryItem[], masks: boolean): string | null {
+  if (inventory.length < 2) return null;
+  const first = baseMethodText(inventory[0], masks);
+  if (!first) return null;
+  return inventory.every((i) => baseMethodText(i, masks) === first) ? first : null;
+}
+
+/** The line under the count tiles; names the shared method when there is one. */
+export function countsFootnote(masks: boolean, shared: string | null): string {
+  if (shared) return `${shared}, for every count here.${masks ? "" : " Exact counts come with outlines."}`;
+  return masks ? "Counted from the video, from what the camera saw." : "Estimated from the frames, from what the camera saw. Exact counts come with outlines.";
 }
 
 /** Most counts named in the shared text; the rest become "and N more". */

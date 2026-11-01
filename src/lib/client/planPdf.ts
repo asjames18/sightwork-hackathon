@@ -22,7 +22,7 @@ import { calendarSummary, stepWhen } from "./stepCalendar";
 import { materialsSpend, spendLine } from "./materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
-import { countMethodNote } from "./countMethod";
+import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -420,6 +420,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   // --- Counts -----------------------------------------------------------------------
   if (plan.inventory.length) {
     heading("What's there (approximate)");
+    const sharedMethod = sharedCountMethod(plan.inventory, masks);
     for (const item of plan.inventory) {
       const value = item.range ? span(item.range) : String(item.count);
       font(12, "bold");
@@ -430,7 +431,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       doc.text(pdfSafe(`${clean(item.label)}${zone}`), M + 52, y + 12, { maxWidth: W - 52 });
       y += lineH(12) + 2;
       // Same line as the tile on the plan screen: how the count was made, and a hand-check flag when it's a guess.
-      const note = countMethodNote(item, masks);
+      const note = countMethodNote(item, masks, sharedMethod);
       if (note) {
         font(9, note.low ? "bold" : "normal", note.low ? AMBER_INK : MUTED);
         for (const l of wrap(note.text, W - 52)) {
@@ -442,7 +443,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       }
     }
     para(
-      masks ? "Counted from the video, from what the camera saw." : "Estimated from the frames, from what the camera saw. Exact counts come with outlines.",
+      countsFootnote(masks, sharedMethod),
       9,
       "normal",
       MUTED,

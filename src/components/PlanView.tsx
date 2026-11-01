@@ -16,7 +16,7 @@ import { rankedIssues, watchItems } from "@/lib/planExtras";
 import { issueCostShares, stepCostShares } from "@/lib/costShares";
 import { COST_INDEX_LABEL, COST_INDEX_SOURCE, describeFactors, regionalFactors, stateFromRegion } from "@/lib/regionalCost";
 import { livePricesLine, planLocation, SAID_VS_SEEN_HEADING } from "@/lib/client/planText";
-import { countMethodNote } from "@/lib/client/countMethod";
+import { countMethodNote, countsFootnote, sharedCountMethod } from "@/lib/client/countMethod";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
@@ -119,6 +119,7 @@ export function PlanView({
   const unmentioned = narrated ? rankedIssues(plan).filter((i) => i.unmentioned) : [];
   const hero = plan.heroFrameIndex !== undefined ? frames[plan.heroFrameIndex] : undefined;
   const masks = masksAvailable(plan);
+  const sharedMethod = sharedCountMethod(plan.inventory, masks);
   // Hand-written samples (example cards, or the stand-in plan shown after a preview upload) never ran the
   // outline step, so their frames just say "Frame only".
   const sample = example?.kind === "sample" || (!example && plan.meta?.isExample === true);
@@ -331,7 +332,7 @@ export function PlanView({
                 <p className="text-sm text-ink/70">{item.zone}</p>
               )}
               {(() => {
-                const note = countMethodNote(item, masks);
+                const note = countMethodNote(item, masks, sharedMethod);
                 return note ? (
                   <p data-testid="count-method" className={`mt-1 text-xs ${note.low ? "font-semibold text-amber-900" : "text-ink/70"}`}>
                     {note.text}
@@ -342,7 +343,7 @@ export function PlanView({
           ))}
         </ul>
         {plan.inventory.length > 0 && (
-          <p className="mt-2 text-sm text-ink/70">{masks ? "Counted from the video, from what the camera saw." : "Estimated from the frames, from what the camera saw. Exact counts come with outlines."}</p>
+          <p data-testid="counts-footnote" className="mt-2 text-sm text-ink/70">{countsFootnote(masks, sharedMethod)}</p>
         )}
       </Section>
 

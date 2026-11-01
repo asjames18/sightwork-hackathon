@@ -6,16 +6,17 @@ test.beforeEach(async ({ apiCalls, pageErrors }) => {
   void pageErrors;
 });
 
-test("sanctuary count tiles say they came from SAM 3.1 outlines", async ({ page }) => {
+test("sanctuary counts say once that they came from SAM 3.1 outlines", async ({ page }) => {
   await page.goto("/start?view=example&ex=sanctuary");
-  const notes = page.locator("#counts").getByTestId("count-method");
-  await expect(notes.first()).toHaveText("Counted from SAM 3.1 outlines");
-  expect(await notes.count()).toBeGreaterThan(0);
+  await expect(page.locator("#counts").getByTestId("counts-footnote")).toHaveText("Counted from SAM 3.1 outlines, for every count here.");
+  // Every count was made the same way, so no tile repeats it.
+  await expect(page.locator("#counts").getByTestId("count-method").filter({ hasText: "SAM 3.1 outlines" })).toHaveCount(0);
 });
 
-test("kitchen count tiles read as model estimates", async ({ page }) => {
+test("kitchen counts read once as model estimates", async ({ page }) => {
   await page.goto("/start?view=example&ex=kitchen");
-  await expect(page.locator("#counts").getByTestId("count-method").first()).toContainText("Estimated by the model from the frames");
+  await expect(page.locator("#counts").getByTestId("counts-footnote")).toContainText("Estimated by the model from the frames, for every count here.");
+  await expect(page.locator("#counts").getByTestId("count-method")).toHaveCount(0);
 });
 
 test("count tiles fit and pass axe at 375, 768 and 1280", async ({ page }) => {

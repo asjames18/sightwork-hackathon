@@ -1,7 +1,7 @@
 /** Counts tile "how it was counted" line (countMethod.ts). No network. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countMethodNote } from "@/lib/client/countMethod";
+import { countMethodNote, countsFootnote, sharedCountMethod } from "@/lib/client/countMethod";
 import type { InventoryItem } from "@/lib/types";
 
 const item = (extra: Partial<InventoryItem> = {}): InventoryItem => ({ label: "Chairs", count: 10, confidence: 0.8, ...extra });
@@ -34,4 +34,22 @@ test("low confidence adds a check-by-hand note, even with no method", () => {
 test("no method and fine confidence gives no line; junk confidence is not low", () => {
   assert.equal(countMethodNote(item(), true), null);
   assert.equal(countMethodNote(item({ confidence: Number.NaN }), true), null);
+});
+
+test("a method every count shares is said once, not on each tile", () => {
+  const inv = [item({ label: "A", method: "model" }), item({ label: "B", method: "model", confidence: 0.3 })];
+  const shared = sharedCountMethod(inv, false);
+  assert.equal(shared, "Estimated by the model from the frames");
+  assert.equal(countMethodNote(inv[0], false, shared), null);
+  assert.deepEqual(countMethodNote(inv[1], false, shared), { text: "Low confidence, check by hand", low: true });
+  assert.equal(countsFootnote(false, shared), "Estimated by the model from the frames, for every count here. Exact counts come with outlines.");
+  assert.equal(countsFootnote(true, "Counted from SAM 3.1 outlines"), "Counted from SAM 3.1 outlines, for every count here.");
+});
+
+test("no shared method for one count, mixed methods, or a count that doesn't say", () => {
+  assert.equal(sharedCountMethod([item({ method: "model" })], false), null);
+  assert.equal(sharedCountMethod([item({ method: "sam" }), item({ method: "model" })], true), null);
+  assert.equal(sharedCountMethod([item({ method: "sam" }), item()], true), null);
+  assert.equal(countsFootnote(true, null), "Counted from the video, from what the camera saw.");
+  assert.equal(countMethodNote(item({ method: "sam" }), true, null)?.text, "Counted from SAM 3.1 outlines");
 });
