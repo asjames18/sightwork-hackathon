@@ -1542,7 +1542,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
         })),
         concurrency: deps.segmentConcurrency,
       },
-      deps.segment,
+      { ...deps.segment, signal: deps.signal },
     );
   } catch (err) {
     if (isAbort(err)) throw err;
