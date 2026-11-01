@@ -255,14 +255,81 @@ export interface PlanTextOptions {
   doneSteps?: readonly number[];
 }
 
+/** Priority word for the one-line problem form: "high", "medium", "low". */
+const SHORT_PRIORITY: Record<string, string> = { high: "high", medium: "medium", low: "low" };
+
+/**
+ * The short form of issueNote for a long shared text, so a problem fits on its own line:
+ * "high, not mentioned" / "medium, not seen on video, check in person" / "low".
+ */
+export function shortIssueNote(issue: Issue, narrated: boolean, verdict?: PlanReviewItem): string {
+  const parts = [SHORT_PRIORITY[issue.severity] ?? issue.severity];
+  if (narrated && issue.unmentioned) parts.push("not mentioned");
+  else if (narrated && issue.status === "mentioned_not_seen") parts.push("not seen on video, check in person");
+  const kind = verdictKind(verdict);
+  if (kind === "partly") parts.push("photos back part of it");
+  else if (verdict?.verified === false && issue.status !== "mentioned_not_seen") parts.push("no photo yet, check in person");
+  return parts.join(", ");
+}
+
+/** Material quantities that say "go measure", grouped onto one line in a long shared text. */
+const ON_SITE_QTY = /^(measure on site|as needed)$/i;
+
+/** Longest "Asked for" summary in a long shared text before it is cut at a word with an ellipsis. */
+export const SHORT_ASKED_FOR = 90;
+
+function shortened(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  const atWord = cut.lastIndexOf(" ");
+  return `${(atWord > max / 2 ? cut.slice(0, atWord) : cut).replace(/[\s,;:.]+$/, "")}\u2026`;
+}
+
+/**
+ * How much a long shared text gives up to fit, in order: the said-vs-saw block, the counts line, the walk-order
+ * lines, then a compact pass (one line per problem, measure-on-site materials grouped, a shorter Asked for, the
+ * closer-look list on one line, no Start here or photo-check line). Problems, steps, materials and cost all stay.
+ */
+interface ShareTrim {
+  said: boolean;
+  counts: boolean;
+  walk: boolean;
+  compact: boolean;
+}
+
+const TRIMS: ShareTrim[] = [
+  { said: false, counts: false, walk: false, compact: false },
+  { said: true, counts: false, walk: false, compact: false },
+  { said: true, counts: true, walk: false, compact: false },
+  { said: true, counts: true, walk: true, compact: false },
+  { said: true, counts: true, walk: true, compact: true },
+];
+
 /**
  * The plan as plain text, for a group text or email to the people doing the work.
  * A short header (space, city and state, date, how many problems), then the same order as the plan screen:
  * problems worst first, the work steps, materials, then cost. Only sections with content appear, the cost
  * always carries its "not a quote" label, and nothing points at a link the teammate doesn't have.
+ * Long plans give up extras and then go compact before anything is cut (see TRIMS).
  */
 export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const maxChars = opts.maxChars ?? MAX_SHARE_CHARS;
+  let lines: string[] = [];
+  for (const trim of TRIMS) {
+    lines = planTextLines(plan, opts, trim);
+    const text = lines.join("\n");
+    if (text.length <= maxChars) return text;
+  }
+  // Keep the sign-off: cut the body at a line and say it was shortened.
+  const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
+  const tail = `\n...\n${opts.pdfAttached ? "Shortened for a text. The PDF has everything." : "Shortened for a text."}\n\n${signoff}`;
+  const body = lines.slice(0, -2).join("\n");
+  const cut = body.slice(0, Math.max(0, maxChars - tail.length));
+  const atLine = cut.lastIndexOf("\n");
+  return (atLine > 0 ? cut.slice(0, atLine) : cut) + tail;
+}
+
+function planTextLines(plan: WorkPlan, opts: PlanTextOptions, trim: ShareTrim): string[] {
   const lines: string[] = [];
   const narrated = Boolean(plan.transcript?.trim()) || (plan.transcriptTurns?.length ?? 0) > 0;
   const sample = opts.sample ?? plan.meta?.isExample === true;
@@ -272,24 +339,25 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const watch = watchItems(plan);
 
   lines.push(`Work plan: ${clean(plan.spaceName) || "Walkthrough"}`);
-  lines.push([location, shareDate(opts.date ?? new Date())].filter(Boolean).join(" · "));
+  lines.push([location, shareDate(opts.date ?? new Date())].filter(Boolean).join(" \u00B7 "));
   const headline = unmentionedHeadline(issues, narrated);
   lines.push(headline ? `${problemSummary(issues.length)}. ${headline}` : `${problemSummary(issues.length)}.`);
   if (sample) lines.push("Example plan with sample data, not a real run.");
-  if (narrated && plan.transcriptSummary) lines.push(`Asked for: ${clean(plan.transcriptSummary)}`);
+  if (narrated && plan.transcriptSummary) {
+    const asked = clean(plan.transcriptSummary);
+    lines.push(`Asked for: ${trim.compact ? shortened(asked, SHORT_ASKED_FOR) : asked}`);
+  }
 
   const review = planReview(plan);
-  let walkAt: [number, number] | null = null;
   if (issues.length > 0) {
     lines.push("");
     for (const [n, i] of issues.entries()) {
-      lines.push(`${n + 1}. ${clean(i.title)}`, `   ${issueNote(i, narrated, verdictFor(review, i))}`);
+      if (trim.compact) lines.push(`${n + 1}. ${clean(i.title)} (${shortIssueNote(i, narrated, verdictFor(review, i))})`);
+      else lines.push(`${n + 1}. ${clean(i.title)}`, `   ${issueNote(i, narrated, verdictFor(review, i))}`);
     }
     // Where along the walk each problem was seen, when the walk caught something nobody said.
-    // Extra context: dropped right after the counts line when the text runs long, before anything is cut.
-    const walk = walkTextLines(plan, issues, narrated);
-    if (walk.length > 0) walkAt = [lines.push(...walk) - walk.length, walk.length];
-    const line = plainReviewLine(plan);
+    if (!trim.walk) lines.push(...walkTextLines(plan, issues, narrated));
+    const line = trim.compact ? null : plainReviewLine(plan);
     if (line) lines.push(line);
   } else {
     lines.push("", "Nothing stood out in the frames checked. Walk it in person before you sign off.");
@@ -297,21 +365,25 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const why = coverageLine(plan);
   if (why) lines.push(why);
   const counts = countsShareLine(plan.inventory ?? [], masksAvailable(plan));
-  // The counts line is extra context: it is the first thing dropped when the text runs long.
-  const countsAt = counts ? lines.push("", counts) - 2 : -1;
-  // Said vs saw sits right after the counts line and is the first thing dropped when the text runs long.
-  const said = saidVsSeenShareLines(plan);
-  const saidAt: [number, number] | null = said.length > 0 ? [lines.push("", ...said) - said.length - 1, said.length + 1] : null;
+  if (counts && !trim.counts) lines.push("", counts);
+  const said = trim.said ? [] : saidVsSeenShareLines(plan);
+  if (said.length > 0) lines.push("", ...said);
   if (!sample && opts.sinceLines && opts.sinceLines.length > 0) lines.push("", ...opts.sinceLines);
   if (watch.length > 0) {
-    lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
-    for (const w of watch.slice(0, MAX_SHARE_WATCH)) lines.push(`- ${watchLine(w)}`);
-    if (watch.length > MAX_SHARE_WATCH) lines.push(`- and ${watch.length - MAX_SHARE_WATCH} more`);
+    if (trim.compact) {
+      const shown = watch.slice(0, MAX_SHARE_WATCH).map((w) => clean(w.title));
+      const more = watch.length > MAX_SHARE_WATCH ? ` and ${watch.length - MAX_SHARE_WATCH} more` : "";
+      lines.push("", `${WATCH_HEADING} (check in person): ${shown.join(" \u00B7 ")}${more}`);
+    } else {
+      lines.push("", `${WATCH_HEADING} (lower confidence, check in person):`);
+      for (const w of watch.slice(0, MAX_SHARE_WATCH)) lines.push(`- ${watchLine(w)}`);
+      if (watch.length > MAX_SHARE_WATCH) lines.push(`- and ${watch.length - MAX_SHARE_WATCH} more`);
+    }
   }
 
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
   if (steps.length > 0) {
-    const startHere = fixFirstPlanLines(plan);
+    const startHere = trim.compact ? [] : fixFirstPlanLines(plan);
     if (startHere.length > 0) lines.push("", ...startHere);
     lines.push("", "Do the work in this order:");
     for (const s of steps) {
@@ -327,7 +399,16 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
 
   if (plan.materials.length > 0) {
     lines.push("", "Materials:");
-    for (const m of plan.materials) lines.push(`- ${clean(m.item)}: ${clean(m.qty)}`);
+    // In the compact pass, "Measure on site" and "As needed" are said once, with their items on one line.
+    const byQty = new Map<string, string[]>();
+    for (const m of plan.materials) {
+      const q = clean(m.qty);
+      if (trim.compact && ON_SITE_QTY.test(q)) {
+        const key = q.charAt(0).toUpperCase() + q.slice(1).toLowerCase();
+        byQty.set(key, [...(byQty.get(key) ?? []), clean(m.item)]);
+      } else lines.push(`- ${clean(m.item)}: ${q}`);
+    }
+    for (const [q, items] of byQty) lines.push(`- ${q}: ${items.join(" \u00B7 ")}`);
   }
 
   if (plan.costRange) {
@@ -340,34 +421,8 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
   const runCost = runCostLine(plan, { sample });
   if (runCost) lines.push("", runCost);
 
-  const signoff = opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF;
-  lines.push("", signoff);
-
-  let text = lines.join("\n");
-  if (text.length <= maxChars) return text;
-  // Below the counts line, so its removal never shifts the counts or walk lines.
-  if (saidAt) {
-    lines.splice(saidAt[0], saidAt[1]);
-    text = lines.join("\n");
-    if (text.length <= maxChars) return text;
-  }
-  if (countsAt >= 0) {
-    lines.splice(countsAt, 2);
-    text = lines.join("\n");
-    if (text.length <= maxChars) return text;
-  }
-  // The walk lines sit above the counts line, so its removal never shifts them.
-  if (walkAt) {
-    lines.splice(walkAt[0], walkAt[1]);
-    text = lines.join("\n");
-    if (text.length <= maxChars) return text;
-  }
-  // Keep the sign-off: cut the body at a line and say it was shortened.
-  const tail = `\n...\n${opts.pdfAttached ? "Shortened for a text. The PDF has everything." : "Shortened for a text."}\n\n${signoff}`;
-  const body = lines.slice(0, -2).join("\n");
-  const cut = body.slice(0, Math.max(0, maxChars - tail.length));
-  const atLine = cut.lastIndexOf("\n");
-  return (atLine > 0 ? cut.slice(0, atLine) : cut) + tail;
+  lines.push("", opts.pdfAttached ? SHARE_SIGNOFF_PDF : SHARE_SIGNOFF);
+  return lines;
 }
 
 export type ShareResult = "shared" | "copied" | "cancelled" | "failed";
