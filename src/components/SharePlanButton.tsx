@@ -7,6 +7,7 @@ import { canShareFiles, planToText, sharePlanText, type ShareResult } from "@/li
 import { compareShareLines } from "@/lib/client/planCompare";
 import { usePlanComparison } from "@/lib/client/usePlanComparison";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
+import { useGotMaterials } from "@/lib/client/useGotMaterials";
 import { pdfKeyOf, peekPlanPdf, prefersShareSheet, warmPlanPdf } from "@/lib/client/savePlanPdf";
 
 const STATUS: Record<Exclude<ShareResult, "shared">, string> = {
@@ -35,9 +36,12 @@ export function SharePlanButton({ plan, sample = false, example }: { plan: WorkP
   // Steps already ticked off go along as one progress line (real plans only).
   const { done } = useDoneSteps(plan);
   const doneSteps = !sample && !example && !plan.meta?.isExample ? done : undefined;
+  // Shopping list items in hand ride on the attached PDF too, so it matches Save PDF (real plans only).
+  const { got } = useGotMaterials(plan);
+  const gotMaterials = !sample && !example && !plan.meta?.isExample ? got : undefined;
 
-  // Same label as Save PDF (comparison and ticks included), so both buttons share one built file.
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps };
+  // Same label as Save PDF (comparison, ticks and items in hand included), so both buttons share one built file.
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps, gotMaterials };
   const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => warmPlanPdf(plan, label), [plan, labelKey]);
