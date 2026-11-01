@@ -694,6 +694,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * Orders skipping a number or starting above 1 printed verbatim as
  * order=2, order=4; they now fail fast (the work order runs 1..N with
  * no gaps, so a missing number is a missing fix).
+ * Two steps sharing one title printed verbatim as title="Fix leak"
+ * twice; they now fail fast (each work step has its own title, so the
+ * cost model and the step ticks cannot merge two different fixes).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -738,6 +741,7 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     throw new Error("buildCostPrompt: workOrder must be non-empty");
   }
   const seenOrders = new Set<number>();
+  const seenTitles = new Set<string>();
   input.workOrder.forEach((s, i) => {
     if (
       !s ||
@@ -756,6 +760,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       throw new Error(`buildCostPrompt: workOrder[${i}].order must be unique`);
     }
     seenOrders.add(s.order);
+    if (seenTitles.has(s.title.trim())) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].title must be unique`);
+    }
+    seenTitles.add(s.title.trim());
     if (
       s.trade !== undefined &&
       (typeof s.trade !== "string" || s.trade.trim().length === 0)
