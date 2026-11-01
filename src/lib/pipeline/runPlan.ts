@@ -1462,7 +1462,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     try {
       const transcribed = await runTranscribe(
         { audioWavBase64: request.audioWavBase64, spaceType: request.spaceType },
-        deps.transcribe,
+        { ...deps.transcribe, signal: deps.signal },
       );
       transcript = transcribed.transcript;
       transcriptTurns = transcribed.transcriptTurns;
