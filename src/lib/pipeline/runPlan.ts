@@ -609,6 +609,31 @@ export function formatPicturingSkipped(
 }
 
 /**
+ * Server-log-only summary of contract errors the run kept because a
+ * reason warning already explains them. Pure, and it changes no plan
+ * output: runPlan logs it only when the contract check failed solely
+ * on explained fields, so a real run says which contract failures a
+ * kept-with-warnings plan shipped with (the draft comment says those
+ * errors are "logged, not thrown", but until now no line logged them;
+ * the warnings themselves are logged separately above). Returns null
+ * when the check passed, when any error is unexplained (that path
+ * throws instead), and on malformed inputs, so ordinary runs stay out
+ * of the server log. Error strings only, nothing user-identifying.
+ */
+export function formatExplainedContractErrors(
+  errs: string[],
+  warnings: string[],
+): string | null {
+  if (!Array.isArray(errs) || !Array.isArray(warnings)) return null;
+  if (errs.length === 0) return null;
+  const explained = errs.filter(
+    (e) => typeof e === "string" && explainedByReasonWarnings(e, warnings),
+  );
+  if (explained.length !== errs.length) return null;
+  return `runPlan: plan kept with explained contract errors:\n${explained.join("\n")}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1674,6 +1699,10 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     if (unexplained.length > 0) {
       throw new Error(`runPlan: plan failed contract check:\n${unexplained.join("\n")}`);
     }
+    // Server log only: the explained errors above, which the run
+    // kept (see the helper note). No plan output, no UI change.
+    const explainedDraftErrors = formatExplainedContractErrors(errs, reason.warnings ?? []);
+    if (explainedDraftErrors) console.warn(explainedDraftErrors);
   } catch (err) {
     if (isAbort(err)) throw err;
     if (err instanceof PlanStepError) throw err;
@@ -1721,6 +1750,10 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       `runPlan: final plan failed contract check:\n${unexplained.join("\n")}`,
     );
   }
+  // Server log only: the explained errors above, which the run
+  // kept (see the helper note). No plan output, no UI change.
+  const explainedFinalErrors = formatExplainedContractErrors(errs, reason.warnings ?? []);
+  if (explainedFinalErrors) console.warn(explainedFinalErrors);
   // picturing check: only when an after picture was actually made,
   // matching stepChecks.ts (a skipped render gets no picturing entry).
   {
