@@ -121,9 +121,16 @@ export function getProofPhoto(
   return p;
 }
 
-/** The share text when the photo goes along: the problem text with a line pointing at the photo before the sign-off. */
-export function withPhotoLine(text: string, outlined: boolean): string {
-  const line = outlined ? "Photo attached, with the problem outlined." : "Photo attached.";
+/**
+ * The share text when the photo goes along: the text with a line pointing at the photo before the sign-off.
+ * `problem` names which problem the photo shows (a step's photo is of one problem it fixes): "problem #2".
+ */
+export function withPhotoLine(text: string, outlined: boolean, problem?: string): string {
+  const line = outlined
+    ? `Photo attached, with ${problem ?? "the problem"} outlined.`
+    : problem
+      ? `Photo attached, showing ${problem}.`
+      : "Photo attached.";
   const lines = text.split("\n");
   const blank = lines.lastIndexOf("");
   if (blank <= 0) return `${text}\n${line}`;
