@@ -680,7 +680,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
 /**
  * Fail fast on a bad cost-step input, before a prompt is built.
  * A material with no item/qty or a step with no title/order used to
- * print verbatim as item="undefined" / order=undefined in the prompt.
+ * print verbatim as item="undefined" / order=undefined in the prompt,
+ * and a non-string note printed verbatim as note="[object Object]".
  * Region is required here: this builder is only called with a region
  * (runPlan guards the call, estimateCost returns null without one).
  */
@@ -715,6 +716,9 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       m.qty.trim().length === 0
     ) {
       throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
+    }
+    if (m.note !== undefined && typeof m.note !== "string") {
+      throw new Error(`buildCostPrompt: materials[${i}].note must be a string when given`);
     }
   });
   if (!Array.isArray(input.workOrder)) {
