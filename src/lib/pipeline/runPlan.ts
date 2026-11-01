@@ -428,7 +428,7 @@ export function formatReasonSubsetSpacing(
   const ordered = [...subset].sort((a, b) => a - b);
   let maxGap = -1;
   let maxPair: [number, number] | null = null;
-  let prev: number | null = null;
+  let prev: { i: number; t: number } | null = null;
   for (const i of ordered) {
     const t = tSecs[i];
     if (typeof t !== "number" || !Number.isFinite(t)) return null;
