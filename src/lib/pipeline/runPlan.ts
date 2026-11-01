@@ -513,6 +513,32 @@ export function formatReasonRemapDropped(
 }
 
 /**
+ * Server-log-only summary of whether every inventory count has a
+ * SAM outline. Pure, and it changes no plan output: runPlan logs
+ * it only when at least one count had no outline and was marked
+ * estimated, so a real run shows whether the counting check's
+ * "estimated" marks came from missing outlines rather than a
+ * model disagreement (the processing screen shows the same note
+ * to the user, but the server log otherwise keeps no record of
+ * it). Returns null when every count has an outline, when there
+ * is no inventory, and on malformed counts (non-integer,
+ * negative, or no-outline above total), so ordinary and malformed
+ * runs stay out of the server log. Counts only, nothing
+ * user-identifying.
+ */
+export function formatCountingOutlines(
+  totalInventory: number,
+  noOutline: number,
+): string | null {
+  if (!Number.isInteger(totalInventory) || totalInventory < 0) return null;
+  if (!Number.isInteger(noOutline) || noOutline < 0) return null;
+  if (totalInventory === 0) return null;
+  if (noOutline > totalInventory) return null;
+  if (noOutline === 0) return null;
+  return `runPlan: counting: ${noOutline} of ${totalInventory} counts had no outline, marked estimated`;
+}
+
+/**
  * Server-log-only summary of whether the reviewer saw a proof photo
  * for every issue. Pure, and it changes no plan output: runPlan
  * logs it only when at least one issue has no selected proof photo,
@@ -1698,6 +1724,14 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
             note: `${noOutline} ${noOutline === 1 ? "count" : "counts"} had no outline, marked estimated`,
           },
     );
+    // Server log only: whether any count lacked a SAM outline.
+    // No plan output, no UI change. The processing screen shows
+    // the same note, but this line is the server-log record.
+    const countingOutlines = formatCountingOutlines(
+      reason.inventory.length,
+      noOutline,
+    );
+    if (countingOutlines) console.log(countingOutlines);
   }
   if (Boolean(transcript?.trim()) || transcriptTurns.length > 0) {
     const said = reason.issues.filter((i) => !i.unmentioned).length;
