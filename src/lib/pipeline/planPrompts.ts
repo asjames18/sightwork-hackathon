@@ -691,6 +691,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * fast (labor hours are never negative).
  * Two steps sharing one order printed verbatim as order=1 twice; they now
  * fail fast (each work step has its own 1-based order).
+ * Orders skipping a number or starting above 1 printed verbatim as
+ * order=2, order=4; they now fail fast (the work order runs 1..N with
+ * no gaps, so a missing number is a missing fix).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -789,6 +792,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       throw new Error(`buildCostPrompt: workOrder[${i}].hours must be >= 0`);
     }
   });
+  const sortedOrders = [...seenOrders].sort((a, b) => a - b);
+  if (sortedOrders.some((order, i) => order !== i + 1)) {
+    throw new Error("buildCostPrompt: workOrder orders must start at 1 with no gaps");
+  }
 }
 
 /** Space-specific extra checks for prompt 03 step 1 (2026-10-30 proposal). Unknown types get the general checklist only. */
@@ -873,4 +880,5 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
