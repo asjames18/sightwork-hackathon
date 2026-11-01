@@ -7,6 +7,8 @@ import { materialsNeededBy, neededByLine } from "./materialsNeededBy";
  * or off, so every call fails quietly.
  */
 const PREFIX = "sightwork:materials:v1:";
+/** Fired on window after the ticks for a plan change, so the work steps can show which steps have their materials. */
+export const MATERIALS_CHANGED_EVENT = "sightwork:materials-changed";
 /** Oldest entries are dropped past this many plans, so storage never grows without bound. */
 const MAX_PLANS = 20;
 
@@ -45,15 +47,23 @@ export function saveGotMaterials(plan: PlanMaterials, got: number[]): boolean {
     const ls = window.localStorage;
     if (got.length === 0) {
       ls.removeItem(key);
+      notify(key);
       return true;
     }
     const value: Stored = { got: [...new Set(got)].sort((a, b) => a - b), at: Date.now() };
     ls.setItem(key, JSON.stringify(value));
     prune(ls);
+    notify(key);
     return true;
   } catch {
     return false;
   }
+}
+
+function notify(key: string) {
+  try {
+    window.dispatchEvent(new CustomEvent(MATERIALS_CHANGED_EVENT, { detail: { key } }));
+  } catch {}
 }
 
 function prune(ls: Storage) {
