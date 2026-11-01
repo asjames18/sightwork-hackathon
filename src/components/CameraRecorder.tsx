@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { aimRangeSpoken, durationRulesFor, formatDuration, type DurationRules } from "@/lib/client/duration";
 import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel, type MicMeter } from "@/lib/client/micLevel";
 import { keepScreenOn } from "@/lib/client/wakeLock";
+import { torchSupported, setTorch, torchButtonLabel, darkHintWithTorch } from "@/lib/client/torch";
 import { lumaStats } from "@/lib/client/blankTake";
 import { sharpness } from "@/lib/client/frameSampling";
 import {
@@ -104,6 +105,10 @@ export function CameraRecorder({
   const [tooQuiet, setTooQuiet] = useState(false);
   // Live picture hint while recording ("too dark", "slow down"), from a small on-device check of the preview.
   const [liveHint, setLiveHint] = useState<LiveHint | null>(null);
+  // Phone light: only offered when the camera track says it has one.
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchBusy, setTorchBusy] = useState(false);
   // Keep the latest callbacks without restarting the camera when the parent re-renders.
   const cb = useRef({ onRecorded, onCancel, onUnavailable });
   // Read by the running timer, so the stop point is the size picked when recording started.
@@ -164,6 +169,7 @@ export function CameraRecorder({
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
       setSettings(track?.getSettings?.() ?? null);
+      setTorchAvailable(torchSupported(track));
       const v = videoRef.current;
       if (v) {
         v.srcObject = stream;
@@ -383,6 +389,14 @@ export function CameraRecorder({
     cb.current.onCancel();
   }, [stopTick, stopTracks]);
 
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    setTorchBusy(true);
+    const next = await setTorch(track, !torchOn);
+    setTorchOn(next);
+    setTorchBusy(false);
+  }, [torchOn]);
+
   const resolution = describeResolution(settings);
   const state = elapsedState(elapsed, rules);
   const recording = phase === "recording";
@@ -505,7 +519,7 @@ export function CameraRecorder({
             data-testid="live-hint"
             data-hint={liveHint}
           >
-            {LIVE_HINT_TEXT[liveHint]}
+            {liveHint === "dark" ? darkHintWithTorch(LIVE_HINT_TEXT.dark, torchAvailable, torchOn) : LIVE_HINT_TEXT[liveHint]}
           </p>
         )}
         {cameraOpen && hasMic === false && (
@@ -540,9 +554,26 @@ export function CameraRecorder({
               Start recording
             </button>
           )}
-          <button type="button" onClick={cancel} className="btn-secondary w-full sm:w-auto">
-            Cancel
-          </button>
+          <div className="flex gap-2 sm:contents">
+            {cameraOpen && torchAvailable && (
+              <button
+                type="button"
+                onClick={toggleTorch}
+                disabled={torchBusy}
+                aria-pressed={torchOn}
+                data-testid="torch-toggle"
+                className="btn-secondary flex-1 whitespace-nowrap sm:flex-none"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" className={`mr-2 inline-block h-4 w-4 ${torchOn ? "fill-amber-500" : "fill-current"}`}>
+                  <path d="M7 2h10v4l-3 4v12h-4V10L7 6V2Zm2 2v1.34L12 9.4l3-4.06V4H9Z" />
+                </svg>
+                {torchButtonLabel(torchOn)}
+              </button>
+            )}
+            <button type="button" onClick={cancel} className="btn-secondary flex-1 sm:flex-none">
+              Cancel
+            </button>
+          </div>
         </div>
         <p className="mt-2 text-center text-xs text-ink/65">
           {rules.label} space: stops by itself at {formatDuration(rules.hardMaxSec)}. Hold the phone steady and talk as you walk.
