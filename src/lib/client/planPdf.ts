@@ -23,7 +23,7 @@ import { materialsSpend, spendLine } from "./materialsList";
 import { firstNeededLine, materialsNeededBy, neededByLine } from "./materialsNeededBy";
 import { fixFirstPlanLines } from "./fixFirst";
 import { shareProgressLine } from "./stepProgress";
-import { shareFixedLine } from "./problemsFixed";
+import { problemFixTag, shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
@@ -131,6 +131,8 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   const watch = watchItems(plan);
   const steps = [...plan.workOrder].sort((a, b) => a.order - b.order);
   const masks = masksAvailable(plan);
+  // Steps ticked off on this device; real plans only, so samples and example PDFs never look half done.
+  const done = sample || opts.example ? [] : [...new Set(opts.doneSteps ?? [])];
   let y = M;
 
   doc.setProperties({ title: pdfSafe(`Work plan: ${clean(plan.spaceName)}`), subject: "SightWork work plan", creator: "SightWork" });
@@ -307,11 +309,19 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     doc.setLineWidth(0.8);
     doc.roundedRect(M, y, W, h, 6, 6, "FD");
     const sev = SEVERITY[issue.severity] ?? SEVERITY.low;
-    doc.setFillColor(sev[0], sev[1], sev[2]);
+    // Which step fixes it, and a green FIXED (and green edge) once those steps are ticked off, same as the plan screen's tally.
+    const fixTag = problemFixTag(steps, issue.rank, done);
+    const edge = fixTag?.fixed ? TAG_MATCHED : sev;
+    doc.setFillColor(edge[0], edge[1], edge[2]);
     doc.rect(M, y, 4, h, "F");
     let ty = y + 10;
     font(10, "bold", issue.severity === "low" ? MUTED : sev);
     doc.text(`#${n + 1}`, M + 14, ty + 10);
+    if (fixTag) {
+      const tx = M + 14 + doc.getTextWidth(`#${n + 1}`) + 10;
+      font(8.5, "bold", fixTag.fixed ? TAG_MATCHED : MUTED);
+      doc.text(pdfSafe(fixTag.text).toUpperCase(), tx, ty + 10, { maxWidth: textW - (tx - M - 14) });
+    }
     ty += 14;
     font(12.5, "bold");
     for (const l of titleL) {
@@ -475,7 +485,6 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   if (steps.length) {
     heading("Do the work in this order", 70);
     // Same progress lines as Send to your team, so a printed copy shows how far the work has come.
-    const done = sample || opts.example ? [] : [...new Set(opts.doneSteps ?? [])];
     const progress = shareProgressLine(steps, done);
     if (progress) {
       para(progress, 10, "bold", TAG_MATCHED, M, W, 0);

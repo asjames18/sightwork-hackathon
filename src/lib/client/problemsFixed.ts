@@ -62,3 +62,23 @@ export function shareFixedLine(
   const named = ranks.length > 1 ? `${ranks.slice(0, -1).join(", ")} and ${ranks[ranks.length - 1]}` : ranks[0];
   return `Problems fixed: ${tally.fixed} of ${tally.total} (${named}).`;
 }
+
+/** Tag beside a problem's number on the Save PDF card: which step fixes it, and whether that is done. */
+export interface ProblemFixTag {
+  /** "Fixed: step 3 ticked off", "Fixed: steps 2 and 4 ticked off", or "Fixed in step 3" when not done yet. */
+  text: string;
+  /** True once every step that fixes this problem is ticked off. */
+  fixed: boolean;
+}
+
+/**
+ * Tag for one problem card on paper. Null when no work step fixes the problem. `done` is the ticked-off
+ * step orders (empty for samples and example plans, so they only say which step fixes it).
+ */
+export function problemFixTag(workOrder: readonly WorkStep[], rank: number, done: readonly number[]): ProblemFixTag | null {
+  const orders = stepsFixing(workOrder, rank);
+  if (orders.length === 0) return null;
+  const list = orders.length === 1 ? `step ${orders[0]}` : `steps ${orders.slice(0, -1).join(", ")} and ${orders[orders.length - 1]}`;
+  if (allStepsDone(orders, done)) return { text: `Fixed: ${list} ticked off`, fixed: true };
+  return { text: `Fixed in ${list}`, fixed: false };
+}
