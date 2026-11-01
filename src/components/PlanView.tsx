@@ -9,6 +9,7 @@ import { FixFirst } from "./FixFirst";
 import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
+import { SectionNav } from "./SectionNav";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictKind } from "@/lib/review";
 import { ProblemList } from "./ProblemList";
@@ -265,23 +266,7 @@ export function PlanView({
         </Section>
       )}
 
-      <nav
-        aria-label="Plan sections"
-        className="sticky top-[calc(3.5rem+1px+env(safe-area-inset-top))] z-10 -mx-4 mt-6 border-b border-ink/10 bg-paper/90 backdrop-blur supports-[backdrop-filter]:bg-paper/75 sm:-mx-6 print:hidden"
-      >
-        <ul className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
-          {chips.map((c) => (
-            <li key={c.href} className="shrink-0">
-              <a
-                href={c.href}
-                className="inline-flex min-h-11 items-center rounded-full border border-ink/15 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
-              >
-                {c.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <SectionNav chips={chips} />
 
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
