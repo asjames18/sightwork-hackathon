@@ -130,7 +130,7 @@ function isWavBase64(value: string): boolean {
 
 /**
  * True when the WAV is in the format Meta transcribe accepts, per its
- * 400 on Grok Bot's 2026-10-28 2:40 AM test (8 kHz rejected: "expected
+ * 400 on the 2026-10-28 2:40 AM test (8 kHz rejected: "expected
  * mono s16le at 16000 or 24000 Hz"). The fmt chunk is found by
  * scanning RIFF chunks, not by assuming it sits at offset 12, so an
  * extra chunk before fmt does not break it. Empty passes (no audio),

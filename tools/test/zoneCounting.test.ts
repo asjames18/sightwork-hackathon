@@ -3,7 +3,7 @@
  *
  * A synthetic one-take walkthrough (stage -> rows -> back wall -> stage again from another angle)
  * goes through the browser's zone grouping (withZoneIds), the route's body check
- * (validatePlanRequest), and then Mosheh's segment step and runPlan with fake model callers.
+ * (validatePlanRequest), and then the segment step and runPlan with fake model callers.
  * Nothing here reaches the network: every caller is a stub and fetch throws if anything tries.
  * The pipeline files are only imported and called, never changed.
  */

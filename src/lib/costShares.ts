@@ -1,13 +1,13 @@
 /**
  * A cost for each problem and each work step that adds up exactly to the plan's total (richer findings, item 7).
  *
- * The server works out the shares (cost.ts, Mosheh's lane: each material and paid step priced, shared
+ * The server works out the shares (cost.ts: each material and paid step priced, shared
  * lines split, contingency on every line) and sends them as costRange.byIssue and costRange.byStep. This
  * module only checks them and makes the numbers on screen add up: each list is scaled to the total when it
  * is a little off, then rounded to whole dollars with the largest-remainder rule, so the displayed shares
  * sum exactly to the displayed low and high. A list that can't be trusted (missing, unknown ranks or
  * steps, negative or inverted figures, far off the total) is left off, and the screen shows the total alone.
- * Field names as proposed in handoffs/grokbot-log.md (Oct 30, 4:30 PM ET). Pure, no DOM.
+ * Field names as proposed in the Oct 30, 4:30 PM ET review. Pure, no DOM.
  */
 import type { CostRange, WorkPlan } from "./types";
 

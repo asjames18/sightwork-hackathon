@@ -3,7 +3,7 @@
  *
  * Takes the sampled frames, the SAM segmentation result, and the
  * narration transcript, and turns them into the ranked-issues / work-plan
- * part of a WorkPlan (prompt 03 in the planning repo, owned by Grok Bot).
+ * part of a WorkPlan (prompt 03 spec).
  *
  * This module makes no API calls and holds no keys. The model caller is
  * injected by the wiring code (later: src/lib/meta), so the step is
@@ -11,8 +11,8 @@
  * this logic. Every would-be call is recorded on the usage tracker from
  * ./usage.ts, so the $10 spike cap is enforced in code.
  *
- * Prompt and schema are injected too: Grok Bot owns them, and they live
- * in the planning repo, not here. The schema is normalized before it is
+ * Prompt and schema are injected too: they come from the prompt 03
+ * spec, not from this module. The schema is normalized before it is
  * sent: local `#/$defs/*` references are inlined, because structured
  * output may not accept `$ref`. `anyOf` is passed through as written;
  * if the provider rejects it, the caller surfaces that error verbatim
@@ -34,8 +34,8 @@
  *   at least one parsed and passed the shape check, return the better
  *   result (fewer validation errors, first wins ties) with those
  *   errors on `warnings` instead of failing the run; throw only when
- *   neither attempt gives a schema-valid result (Grok Bot, 2026-10-27
- *   9:55 AM). The runner logs the warnings server-side.
+ *   neither attempt gives a schema-valid result (2026-10-27
+ *   9:55 AM review). The runner logs the warnings server-side.
  */
 
 import {
@@ -145,7 +145,7 @@ export interface ReasonDeps {
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
-/** Deterministic structured output for the reason call (Grok Bot 2026-10-30 7:52 PM GO). */
+/** Deterministic structured output for the reason call (2026-10-30 7:52 PM review). */
 const SPARK_TEMPERATURE = 0.2;
 
 /** Max decoded bytes per reason frame, same shape as the Spark caller's 5 MB image cap. */
@@ -587,7 +587,7 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   // Best schema-valid candidate so far: the filtered output plus its
   // remaining validation errors. Shape failures never become a
   // candidate, so a returned result always parsed and passed the
-  // shape check, per the Grok Bot 2026-10-27 9:55 AM guard.
+  // shape check, per the 2026-10-27 9:55 AM guard.
   let best: { output: ReasonOutput; errs: string[] } | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -606,8 +606,8 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
     // The tracker enforces the spike cap: a throw here stops the run.
     // Record the model the caller actually used: the Baseten adapter
     // reports its configured model, so the route's done log line names
-    // it instead of muse-spark-1.3 in baseten mode (Grok Bot,
-    // 2026-10-27 12:05 PM). The Meta path omits it and keeps the
+    // it instead of muse-spark-1.3 in baseten mode (2026-10-27
+    // 12:05 PM review). The Meta path omits it and keeps the
     // requested model.
     deps.tracker.record({ model: res.model ?? SPARK_MODEL, step: "reason", latencyMs: res.latencyMs, costUsd: res.costUsd });
 

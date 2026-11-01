@@ -3,8 +3,8 @@
  * keep at least one frame from every zone, then fill the rest evenly.
  *
  * Why: segment.ts sums per-zone maxima (proposal B). A zone with no counted frame adds 0, so a
- * short area at the end of the walk drops out of the total (finding B, grokbot-log Oct 29 6:50 PM
- * ET). The browser already sends every sampled frame with its zoneId, so the payload covers every
+ * short area at the end of the walk drops out of the total (finding B, Oct 29 6:50 PM
+ * ET review). The browser already sends every sampled frame with its zoneId, so the payload covers every
  * zone by construction; this helper is the guard for anything that trims frames afterwards.
  *
  * With no zoneIds it returns exactly what segment.ts's evenlySpaced returns, so it can stand in for

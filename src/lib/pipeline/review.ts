@@ -87,7 +87,7 @@ export interface ReviewDeps {
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
-/** Deterministic structured output for the review call (Grok Bot 2026-10-30 7:52 PM GO). */
+/** Deterministic structured output for the review call (2026-10-30 7:52 PM review). */
 const SPARK_TEMPERATURE = 0.2;
 
 /** Baseten image cap, same as the reason step: at most 8 images per request. */

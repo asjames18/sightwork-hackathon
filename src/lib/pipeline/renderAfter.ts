@@ -3,8 +3,8 @@
  *
  * Takes the WorkPlan from the reason step (prompt 03) and produces the
  * "after" image: a Muse Image edit of the hero frame showing only the
- * finished, visible work (prompt 04 in the planning repo, owned by
- * Grok Bot).
+ * finished, visible work (prompt 04
+ * spec).
  *
  * This module makes no API calls and holds no keys. The image caller is
  * injected by the wiring code (later: src/lib/meta), so the step is
@@ -182,7 +182,7 @@ export function pickHeroFrameIndex(plan: WorkPlan): number | null {
 /**
  * Finished-state lines for the hero frame: one per visible work step
  * that fixes an issue appearing in this frame. The step title is the
- * line (Grok Bot owns the prompt wording); duplicate steps collapse.
+ * line (the prompt 04 spec sets the wording); duplicate steps collapse.
  * Empty when nothing visible changes in this frame.
  */
 /**

@@ -147,8 +147,8 @@ export interface RunPlanDeps {
    */
   planProvider?: PlanProvider;
   /**
-   * Cap on frames handed to the reason step (Grok Bot, 2026-10-27
-   * 11:43 AM: the Baseten reason call takes at most 8 images). The
+   * Cap on frames handed to the reason step (2026-10-27
+   * 11:43 AM review: the Baseten reason call takes at most 8 images). The
    * route sets it in baseten mode only; the meta path is untouched.
    * When set, runPlan picks a subset (pickReasonFrames), the reason
    * step sees subset positions, and its output is remapped back to
@@ -166,7 +166,7 @@ export interface RunPlanDeps {
   segmentConcurrency?: number;
   /** Called with each running status, in stage order. When optional
    * steps were skipped earlier in the run, the status carries the
-   * cumulative skipped list (Grok Bot, 2026-10-27 5:45 PM: the
+   * cumulative skipped list (2026-10-27 5:45 PM review: the
    * processing screen shows those steps as skipped this run); the
    * field is omitted when nothing was skipped. */
   onStatus?: (status: PlanJobStatus) => void;
@@ -223,7 +223,7 @@ function isSpikeCapError(err: unknown): boolean {
   return /spike cap/i.test(message);
 }
 
-/** Baseten reason-call image cap (Grok Bot, 2026-10-27 11:43 AM). */
+/** Baseten reason-call image cap (2026-10-27 11:43 AM review). */
 export const REASON_MAX_FRAMES = 8;
 
 /**
@@ -241,7 +241,7 @@ export const REASON_MAX_FRAMES = 8;
  * displacing the nearest plain, non-endpoint subset member that is
  * neither flagged nor the sole representative of its own zone, so a
  * long take's areas are not left unseen by the reason step
- * (Grok Bot duration-consistency proposal, 2026-10-31; $0, no
+ * (duration-consistency proposal, 2026-10-31; $0, no
  * types.ts change — zoneIds already ride on the request). A zone
  * is left out only when no such member exists, and when zones
  * outnumber slots the earliest zones win. An absent, short, long,
@@ -412,7 +412,7 @@ export function formatReasonSubsetFlagged(
 
 /**
  * Remap a reason result from subset positions back to plan-frame
- * indices (Grok Bot, 2026-10-27 11:43 AM). `subset` maps a subset
+ * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
  * change, because a subset frame is the same frame (same tSec) as
  * its original. Any index outside the subset is dropped rather
@@ -429,7 +429,7 @@ export function formatReasonSubsetFlagged(
  * frame is the one index that cannot be dropped: when it falls
  * outside the subset, it falls back to the first subset frame and
  * the fallback is logged server-side, so the render step still has
- * a real frame (flagged for Grok Bot to confirm or replace with a
+ * a real frame (flagged for review: confirm or replace with a
  * run failure).
  */
 export function remapReasonOutput(output: ReasonOutput, subset: number[]): ReasonOutput {
@@ -965,7 +965,7 @@ export function validateRunPlanRequest(request: PlanRequest): void {
  * no longer stops the run: it is logged server-side, looking and
  * counting are reported as skipped on every later running status, and
  * the reason step continues with no segmentation counts, so a blocked
- * SAM step never kills a real plan run (Grok Bot, 2026-10-27 11:20 AM).
+ * SAM step never kills a real plan run (2026-10-27 11:20 AM review).
  */
 
 /** One proof photo as the review prompt names it, in attach order (Photo A, B, ...). */
@@ -1057,7 +1057,7 @@ export function buildReviewPhotos(
 
 export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<WorkPlan> {
   // Optional steps skipped so far this run, in stage order. Attached
-  // to every later running status (Grok Bot, 2026-10-27 5:45 PM), so
+  // to every later running status (2026-10-27 5:45 PM review), so
   // the processing screen can mark them skipped live instead of
   // waiting for the finished plan's meta.skipped. Picturing is last,
   // so its skip has no later running line and still arrives only via
@@ -1081,13 +1081,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
 
   // One meta object for both the draft and the final plan, so the
   // engine label never drifts between the two contract checks.
-  // Skipped-step flags for the plan screen (Grok Bot, 2026-10-27
-  // 12:05 PM): masks when the segment step failed or was skipped
+  // Skipped-step flags for the plan screen (2026-10-27
+  // 12:05 PM review): masks when the segment step failed or was skipped
   // (segmentation null), afterImage when the render step produced no
-  // image, cost when a regioned cost call failed (Grok Bot,
-  // 2026-10-27 2:15 PM; a run with no region sets no cost flag),
+  // image, cost when a regioned cost call failed (2026-10-27
+  // 2:15 PM review; a run with no region sets no cost flag),
   // transcribe when the transcribe call failed and the run went on
-  // without narration (Grok Bot, 2026-10-31 3:20 AM).
+  // without narration (2026-10-31 3:20 AM review).
   // Callers pass the flags; this helper only assembles them,
   // so no step result is read before it exists.
   const planMeta = (
@@ -1175,7 +1175,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       // spend another call each, as segment and cost already do.
       if (isSpikeCapError(err))
         throw new PlanStepError("listening", PLAIN_FAILURE_MESSAGE.listening, detailOf(err));
-      // Transcribe is optional (Grok Bot, 2026-10-31 3:20 AM):
+      // Transcribe is optional (2026-10-31 3:20 AM review):
       // a flaky ASR call costs the said-vs-seen part, not the plan.
       // The finished plan carries meta.skipped.transcribe, which
       // the panel's Listen row already renders as off, and the
@@ -1358,7 +1358,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
 
   // planning: region-grounded cost range (null without a region),
   // then assemble the plan shell the render step edits from.
-  // Cost is optional (Grok Bot, 2026-10-27 2:15 PM): when a region
+  // Cost is optional (2026-10-27 2:15 PM review): when a region
   // was given but the cost call fails, log a server warning, keep
   // costRange null, and set meta.skipped.cost, instead of failing
   // the run. A run with no region sets no flag, and a contract-
@@ -1427,7 +1427,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       meta: planMeta(segmentation === null, false, costSkipped, transcribeSkipped),
     };
     const errs = checkWorkPlan(draft);
-    // A reason result kept with warnings (Grok Bot 2026-10-27 9:55 AM)
+    // A reason result kept with warnings (2026-10-27 9:55 AM review)
     // may still fail the attached-frames contract check on those same
     // fields; those errors are logged, not thrown. Any error not
     // explained by a reason warning still fails the run.

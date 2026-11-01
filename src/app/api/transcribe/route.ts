@@ -1,8 +1,8 @@
 /**
  * POST /api/transcribe: one narration WAV in, one transcript out.
  *
- * Option (b) for the Vercel 4.5 MB body cap (Grok Bot, 2026-10-29
- * 9:50 PM): the browser calls this route first with the narration
+ * Option (b) for the Vercel 4.5 MB body cap (2026-10-29
+ * 9:50 PM review): the browser calls this route first with the narration
  * alone, then sends the plan request carrying the transcript instead
  * of the WAV, so a 45-60 s narrated take no longer has to fit frames
  * plus audio inside one 4.5 MB plan request. The transcribe request

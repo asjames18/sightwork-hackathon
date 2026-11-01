@@ -2,7 +2,7 @@
  * SightWork pipeline step: `estimateCost`.
  *
  * Turns the `reason` output (materials + work steps) into a rough,
- * region-grounded cost range (prompt 05 in the planning repo: prompt,
+ * region-grounded cost range (prompt 05 spec: prompt,
  * schema, and math rule). This file implements the call, the math,
  * and the validation.
  *
@@ -118,8 +118,8 @@ export interface CostResult {
   /**
    * How many materials carry a model price (valid material index, last
    * price wins on duplicates; ignored out-of-range prices excluded).
-   * Added for the processing screen's planning note (Grok Bot, 2026-10-31
-   * 12:30 AM ask): the UI can show how many prices came back, without
+   * Added for the processing screen's planning note (2026-10-31
+   * 12:30 AM review): the UI can show how many prices came back, without
    * the pipeline overwriting the proof-frame planning check.
    */
   pricedMaterials: number;
@@ -147,7 +147,7 @@ export interface StepCostShare {
 
 /**
  * A CostRange carrying the per-problem and per-step shares. The shared
- * CostRange type (Grok Bot's lane) does not declare these fields, so
+ * CostRange type (src/lib/types.ts) does not declare these fields, so
  * they ride as extra properties here and the client reads them with
  * the same cast; checkWorkPlan ignores unknown fields, so the
  * contract check in estimateCost still passes.

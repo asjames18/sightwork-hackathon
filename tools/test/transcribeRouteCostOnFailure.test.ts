@@ -1,4 +1,4 @@
-/** POST /api/transcribe failure path carries costUsd (Mosheh 2026-10-31 10:45 AM):
+/** POST /api/transcribe failure path carries costUsd (2026-10-31 10:45 AM):
  * the success path returns the tracker total, but the 500 used to return
  * only { error }, so a billed ASR failure recorded by the transcribe step
  * was invisible to the split caller except in the server log. */

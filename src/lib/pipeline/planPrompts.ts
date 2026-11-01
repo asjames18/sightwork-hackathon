@@ -1,10 +1,10 @@
 /**
  * SightWork pipeline prompts: prompt 03 (reason) and prompt 05 (cost).
  *
- * Templates and schemas copied verbatim from the planning repo on
- * 2026-10-26 (handoff/prompts/03-reason.md, handoff/prompts/05-costRange.md;
- * prompt 03 re-synced 2026-10-27 for rule 7: no total/subtotal inventory rows; 2026-10-29 proposal A (one-take zone counting) applied to the template here — planning doc handoff/prompts/03-reason.md still needs Grok Bot's matching edit so a later re-copy does not clobber it. 2026-10-30 richer-findings patch (zone-by-zone sweep, watch bucket, tier, evidence) applied to the template and REASON_SCHEMA here from Grok Bot's 2026-10-30 4:30 PM proposal; planning doc still needs Grok Bot's matching edit. 2026-10-30 plumbing checklist line added (Grok Bot 9:05 PM ask): general Plumbing [plumbing] line plus kitchen space line. 2026-10-29 Finding A: frame list carries zoneId and the SEGMENTATION header now says per-zone sums, not a single-frame max — planning doc still needs Grok Bot's matching edit.
- * Grok Bot owns the prompt wording). When a prompt file changes, re-copy
+ * Templates and schemas copied verbatim from the prompt specs on
+ * 2026-10-26 (prompt 03 reason, prompt 05 costRange;
+ * prompt 03 re-synced 2026-10-27 for rule 7: no total/subtotal inventory rows; 2026-10-29 proposal A (one-take zone counting) applied to the template here — the prompt 03 spec still needs the matching edit so a later re-copy does not clobber it. 2026-10-30 richer-findings patch (zone-by-zone sweep, watch bucket, tier, evidence) applied to the template and REASON_SCHEMA here from the 2026-10-30 4:30 PM proposal; the prompt 03 spec still needs the matching edit. 2026-10-30 plumbing checklist line added (9:05 PM review): general Plumbing [plumbing] line plus kitchen space line. 2026-10-29 Finding A: frame list carries zoneId and the SEGMENTATION header now says per-zone sums, not a single-frame max — the prompt 03 spec still needs the matching edit.
+ * the specs set the prompt wording). When a prompt file changes, re-copy
  * the template and schema here and bump the date above; the route must
  * never run a stale prompt against a new schema, or vice versa.
  *
@@ -745,7 +745,7 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   });
 }
 
-/** Space-specific extra checks for prompt 03 step 1 (Grok Bot 2026-10-30 proposal). Unknown types get the general checklist only. */
+/** Space-specific extra checks for prompt 03 step 1 (2026-10-30 proposal). Unknown types get the general checklist only. */
 function spaceChecklistFor(spaceType: string): string {
   const map: Record<string, string> = {
     "church sanctuary": "stage edge, baptistry, AV booth, pew or chair rows, platform steps",
@@ -781,7 +781,7 @@ export function buildReasonPrompt(input: ReasonInput): string {
   // No segmentation (the segment step failed): say so explicitly in
   // the SEGMENTATION section, so the model counts from the frames
   // instead of trusting counts that are not there. The template text
-  // itself is Grok Bot's wording and stays untouched; only this
+  // itself is the spec wording and stays untouched; only this
   // placeholder fill changes.
   const segmentationJson = input.segmentation
     ? JSON.stringify(input.segmentation)

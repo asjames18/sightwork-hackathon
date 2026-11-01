@@ -1,6 +1,6 @@
-/** POST /api/plan failed line carries costUsd (Mosheh 2026-10-31 12:15 PM):
+/** POST /api/plan failed line carries costUsd (2026-10-31 12:15 PM):
  * types.ts now takes an optional costUsd on the failed PlanJobStatus
- * line (Grok Bot 12:24 PM), so the route wires the tracker total onto
+ * line (12:24 PM), so the route wires the tracker total onto
  * it. A run that bills ASR and then fails at the reason step streams a
  * failed comparing line with that spend; a run that bills nothing
  * streams a failed line with no costUsd, as before. No live calls:

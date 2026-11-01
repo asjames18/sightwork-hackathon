@@ -1,7 +1,7 @@
 /**
  * SightWork pipeline step: `segment`.
  *
- * Runs the SAM 3.1 concept list from prompt 02 in the planning repo
+ * Runs the SAM 3.1 concept list from the prompt 02 spec
  * over the sampled frames and turns the masks
  * into the segmentation result the reason step consumes. SAM is
  * prompted with short noun phrases, not instructions, so the "prompt"

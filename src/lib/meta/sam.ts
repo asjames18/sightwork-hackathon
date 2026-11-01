@@ -67,7 +67,7 @@ export interface SamSegmentCaller {
 const DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 const DEFAULT_REQUEST_COST_USD = 0.0025;
 
-/** Total attempts for a transient 404 model_not_found, Grok Bot's ask. */
+/** Total attempts for a transient 404 model_not_found, per the Oct 26 review. */
 const MAX_SAM_ATTEMPTS = 3;
 /** Max decoded bytes per frame. Frames are 1024 px JPEGs (tools/frames/sample-frames.mjs), so 5 MB leaves wide headroom while bounding a direct caller that bypasses the segment step, the same shape as the Baseten caller's 5 MB image cap and the ASR caller's 32 MB audio cap. */
 const MAX_SAM_IMAGE_BYTES = 5 * 1024 * 1024;

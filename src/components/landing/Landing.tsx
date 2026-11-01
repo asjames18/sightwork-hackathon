@@ -70,7 +70,7 @@ const secondary = `inline-flex min-h-[44px] items-center justify-center rounded-
 
 /**
  * Landing page at /. Static server component, no client JS.
- * Copy is word for word from the agreed Conclusion in the design handoff: header, hero, how it works,
+ * Copy is word for word from the agreed Conclusion in the design doc: header, hero, how it works,
  * the said-vs-saw band, what you get, who it's for, built on Meta's models, fine print,
  * closing CTA and footer.
  */

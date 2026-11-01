@@ -2,8 +2,8 @@
  * SightWork pipeline step: `transcribe`.
  *
  * Turns the narration WAV from a PlanRequest into the transcript lines
- * the reason step reads (prompt 01 in the planning repo, owned by
- * Grok Bot). When there is no audio, no call is made and the result is
+ * the reason step reads (prompt 01
+ * spec). When there is no audio, no call is made and the result is
  * empty: transcript null, transcriptTurns []. The reason step then
  * runs on frames alone with every issue unmentioned.
  *

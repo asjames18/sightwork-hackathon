@@ -12,7 +12,7 @@
  *   anywhere except the Authorization header of the Meta API call.
  * - This module makes no call on import. No call happens until a caller
  *   returned here is invoked, and tests inject a fake fetch instead.
- * - Shape verified live by the spike (Oct 26, Grok Bot): POST
+ * - Shape verified live by the spike (Oct 26): POST
  *   /v1/asr/transcribe?sessionId=<id>, multipart/form-data with a
  *   `request` JSON part and an `audio` WAV part. The step passes
  *   mode "standard" (non-diarization, non-contributor); the wire mode

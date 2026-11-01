@@ -13,7 +13,7 @@ export type { PlanReview, PlanReviewItem } from "./types";
 /**
  * The reviewer's answer for one problem. "partly": the photos back some of the claim (say a cable on the stage,
  * not down the steps); `supportedScope` says what they do back. Older reviews only send `verified`, read as
- * "verified" or "not_shown". Optional fields proposed in handoffs/grokbot-log.md (Oct 30, 4:30 PM ET).
+ * "verified" or "not_shown". Optional fields proposed in the Oct 30, 4:30 PM ET review.
  */
 export type ReviewVerdict = "verified" | "partly" | "not_shown";
 

@@ -1,4 +1,4 @@
-/** pickReasonFrames zone pass (Grok Bot duration-consistency proposal, 2026-10-31): when zoneIds are given, the reason subset keeps at least one frame per zone, so a long take's areas are not left unseen by the reason step. Flagged swaps still run first, and the zone pass never displaces an endpoint, a flagged frame, or a zone's sole representative. No network. */
+/** pickReasonFrames zone pass (duration-consistency proposal, 2026-10-31): when zoneIds are given, the reason subset keeps at least one frame per zone, so a long take's areas are not left unseen by the reason step. Flagged swaps still run first, and the zone pass never displaces an endpoint, a flagged frame, or a zone's sole representative. No network. */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { pickReasonFrames } from "@/lib/pipeline/runPlan";

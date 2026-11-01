@@ -258,14 +258,14 @@ export async function POST(req: Request): Promise<Response> {
           // Reviewing (prompt 06, 2026-10-30): the reviewer runs on the
           // same provider caller as the reason step (Baseten Muse Spark
           // Open in baseten mode, Meta Muse Spark in meta mode) with
-          // Grok Bot's buildReviewPrompt builder, so a finished plan
+          // the buildReviewPrompt builder, so a finished plan
           // carries plan.review. Reviewing never fails a run: runPlan
           // ships ran:false on any review failure. No timeout is
           // plumbed here: prompt 06 suggests 60 s (measured max 29 s),
           // but the caller interfaces carry no timeout/signal, and
           // racing the call would drop its usage record, so the route
-          // relies on maxDuration above; see mosheh-log for the open
-          // question on plumbing a real timeout.
+          // relies on maxDuration above; plumbing a real timeout is an
+          // open question.
           review: { callSpark: reasonCaller },
           reviewPrompt: buildReviewPrompt,
         };

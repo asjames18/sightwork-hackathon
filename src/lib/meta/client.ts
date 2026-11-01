@@ -60,7 +60,7 @@ export interface SparkCallRequest {
   prompt: string;
   /** Data URLs, attached in order (reason step). Omit for text-only calls. */
   images?: string[];
-  /** Structured-output JSON schema (prompt 03 / 05, owned by Grok Bot). */
+  /** Structured-output JSON schema (prompt 03 / 05 spec). */
   schema: Record<string, unknown>;
   /** Tool list, e.g. [{ type: "web_search" }] for the cost step. */
   tools?: { type: string }[];
