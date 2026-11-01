@@ -8,6 +8,7 @@ import { runCostLine } from "./runCost";
 import { coverageNote, rankedIssues, watchItems, type WatchItem } from "@/lib/planExtras";
 import { walkTextLines } from "./walkTimeline";
 import { calendarSummary } from "./stepCalendar";
+import { noStepsCostLine, noStepsLine } from "./planEmpty";
 
 /**
  * Longest share text we hand to the share sheet or clipboard. Sized for a group text (carriers join SMS up to
@@ -398,6 +399,9 @@ function planTextLines(plan: WorkPlan, opts: PlanTextOptions, trim: ShareTrim): 
     if (progress) lines.push(progress);
     const fixedLine = sample ? null : shareFixedLine(issues, steps, opts.doneSteps ?? []);
     if (fixedLine) lines.push(fixedLine);
+  } else if (!sample && issues.length > 0) {
+    // Same honest line as the plan screen: the problems are real, the step-by-step order just wasn't laid out.
+    lines.push("", noStepsLine(issues.length));
   }
 
   if (plan.materials.length > 0) {
@@ -419,6 +423,9 @@ function planTextLines(plan: WorkPlan, opts: PlanTextOptions, trim: ShareTrim): 
     lines.push("", `Cost: ${usd(c.low)}-${usd(c.high)} for ${clean(c.region)}. ${c.label ?? COST_LABEL}.`);
     const live = livePricesLine(c);
     if (live) lines.push(live);
+  } else {
+    const noStepsCost = sample ? null : noStepsCostLine(steps.length, plan.materials.length);
+    if (noStepsCost) lines.push("", noStepsCost);
   }
 
   const runCost = runCostLine(plan, { sample });
