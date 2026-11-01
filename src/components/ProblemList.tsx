@@ -23,6 +23,7 @@ import { canShareFiles, sharePlanText, type ShareResult } from "@/lib/client/pla
 import { getProofPhoto, withPhotoLine } from "@/lib/client/proofPhoto";
 import { keepInViewDelta, stickyLine } from "@/lib/client/keepInView";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+import { problemsShareTitle, problemsToText, sendShownLabel } from "@/lib/client/problemsText";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -387,7 +388,17 @@ export function ProblemList({
         <p className="mb-4 text-sm text-ink/70">Each problem shows its share of the rough cost. Shared supplies are split, and the shares add up to the total.</p>
       )}
       {fixedTally && <FixedTally tally={fixedTally} />}
-      {filterOptions.length > 0 && <ProblemFilter options={filterOptions} mode={filterMode} onChange={setChosenFilter} />}
+      {filterOptions.length > 0 && (
+        <ProblemFilter options={filterOptions} mode={filterMode} onChange={setChosenFilter}>
+          {filterMode !== "all" && (
+            <SendShownButton
+              count={shown.length}
+              title={problemsShareTitle(filterMode, plan.spaceName)}
+              text={() => problemsToText(shown, filterMode, { total: issues.length, spaceName: plan.spaceName, workOrder: plan.workOrder, sample })}
+            />
+          )}
+        </ProblemFilter>
+      )}
       {showTiers ? (
         <div className="flex flex-col gap-8">
           {groups.map((g) => (
@@ -467,7 +478,7 @@ function FixedTally({ tally }: { tally: ProblemsFixed }) {
  * only the ones not fixed yet by ticked-off work steps. Each narrowing option shows only while it narrows. Buttons
  * with aria-pressed, 44 px tall, hidden in print so a printout always lists every problem.
  */
-function ProblemFilter({ options, mode, onChange }: { options: ProblemFilterOption[]; mode: ProblemFilterMode; onChange: (mode: ProblemFilterMode) => void }) {
+function ProblemFilter({ options, mode, onChange, children }: { options: ProblemFilterOption[]; mode: ProblemFilterMode; onChange: (mode: ProblemFilterMode) => void; children?: React.ReactNode }) {
   const base =
     "inline-flex min-h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-full px-3 text-center text-sm font-semibold leading-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark sm:flex-none sm:px-4";
   const on = "bg-ink text-white";
@@ -490,7 +501,7 @@ function ProblemFilter({ options, mode, onChange }: { options: ProblemFilterOpti
     );
   };
   return (
-    <div ref={ref} className="mb-5 scroll-mt-32 print:hidden" data-testid="unmentioned-filter">
+    <div ref={ref} className="mb-5 scroll-mt-32 sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2 print:hidden" data-testid="unmentioned-filter">
       <div role="group" aria-label="Which problems to show" className="flex w-full gap-1 rounded-full border border-ink/15 bg-white p-1 sm:inline-flex sm:w-auto">
         {options.map((o) => (
           <button key={o.mode} type="button" aria-pressed={mode === o.mode} className={`${base} ${mode === o.mode ? on : off}`} onClick={() => pick(o.mode)} data-filter={o.mode}>
@@ -502,6 +513,52 @@ function ProblemFilter({ options, mode, onChange }: { options: ProblemFilterOpti
       </div>
       <p className="sr-only" aria-live="polite">
         {problemFilterAnnouncement(mode, options)}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Beside the filter (under it on phones) while it narrows the list: sends just the problems it is showing as one short list
+ * (problemsText.ts), by the phone's share sheet, else the clipboard. Hidden in print with the filter.
+ */
+function SendShownButton({ count, title, text }: { count: number; title: string; text: () => string | null }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  async function onSend() {
+    const body = text();
+    if (busy || !body) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(title, body, navigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(SEND_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:mt-0">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        data-testid="send-shown-problems"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        {sendShownLabel(count)}
+        <span className="sr-only"> {count === 1 ? "problem" : "problems"}</span>
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
       </p>
     </div>
   );
