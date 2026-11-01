@@ -1897,6 +1897,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
           schema: REVIEW_SCHEMA,
           callSpark: deps.review.callSpark,
           tracker: deps.tracker,
+          signal: deps.signal,
         },
       );
     } catch (err) {
