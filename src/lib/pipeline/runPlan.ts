@@ -234,14 +234,28 @@ export const REASON_MAX_FRAMES = 8;
  * before a plain frame, displacing the plain, non-endpoint subset
  * member nearest to it. First and last frames are never displaced.
  * A flagged frame is left out only when every subset member is
- * already an endpoint or a flagged frame. Returns original frame
- * indices, ascending. With no cap pressure (frameCount <= maxFrames)
- * the subset is every frame, so the remap below is the identity.
+ * already an endpoint or a flagged frame. When zoneIds is given
+ * (one entry per request frame, from PlanRequest.frames[].zoneId),
+ * a zone pass then runs after the flagged pass: for each zone with
+ * no frame in the subset, its earliest frame is swapped in,
+ * displacing the nearest plain, non-endpoint subset member that is
+ * neither flagged nor the sole representative of its own zone, so a
+ * long take's areas are not left unseen by the reason step
+ * (Grok Bot duration-consistency proposal, 2026-10-31; $0, no
+ * types.ts change — zoneIds already ride on the request). A zone
+ * is left out only when no such member exists, and when zones
+ * outnumber slots the earliest zones win. An absent, short, long,
+ * or invalid zoneIds list disables the zone pass and keeps the
+ * old behavior, so existing 3-argument callers are unchanged.
+ * Returns original frame indices, ascending. With no cap pressure
+ * (frameCount <= maxFrames) the subset is every frame, so the
+ * remap below is the identity.
  */
 export function pickReasonFrames(
   frameCount: number,
   flaggedFrames: number[],
   maxFrames: number,
+  zoneIds?: Array<number | undefined>,
 ): number[] {
   if (frameCount <= 0 || maxFrames <= 0) return [];
   // A cap of 1 would divide by zero in the spacing below
@@ -292,6 +306,52 @@ export function pickReasonFrames(
     inSubset.delete(best);
     inSubset.add(f);
     subset[subset.indexOf(best)] = f;
+  }
+  // Zone pass: at least one frame per zone, when zoneIds is usable.
+  const zonesValid =
+    zoneIds !== undefined &&
+    zoneIds.length === frameCount &&
+    zoneIds.every((z) => z === undefined || (Number.isInteger(z) && z >= 0));
+  if (zonesValid && maxFrames > 1) {
+    const zoneOf = (i: number): number | undefined => (zoneIds as Array<number | undefined>)[i];
+    const firstOfZone = new Map<number, number>();
+    for (let i = 0; i < frameCount; i++) {
+      const z = zoneOf(i);
+      if (z === undefined || firstOfZone.has(z)) continue;
+      firstOfZone.set(z, i);
+    }
+    for (const [zone, first] of firstOfZone) {
+      if (inSubset.has(first)) continue;
+      let represented = false;
+      for (const m of subset) {
+        if (zoneOf(m) === zone) {
+          represented = true;
+          break;
+        }
+      }
+      if (represented) continue;
+      let best: number | null = null;
+      let bestDist = Infinity;
+      for (const m of subset) {
+        if (m === 0 || m === frameCount - 1) continue;
+        if (flaggedSet.has(m)) continue;
+        const mz = zoneOf(m);
+        if (mz !== undefined) {
+          let reps = 0;
+          for (const n of subset) if (zoneOf(n) === mz) reps++;
+          if (reps <= 1) continue;
+        }
+        const dist = Math.abs(m - first);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = m;
+        }
+      }
+      if (best === null) continue;
+      inSubset.delete(best);
+      inSubset.add(first);
+      subset[subset.indexOf(best)] = first;
+    }
   }
   subset.sort((a, b) => a - b);
   return subset;
@@ -1138,6 +1198,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
         request.frames.length,
         segmentation?.flaggedFrames ?? [],
         deps.reasonMaxFrames,
+        request.frames.map((f) => f.zoneId),
       )
     : null;
   // Segmentation indices are subset positions too, so the prompt's
