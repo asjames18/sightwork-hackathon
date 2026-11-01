@@ -1815,11 +1815,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // picturing: render the finished space, or null when skipped/failed.
   // runRenderAfter never throws for a model failure; it returns null
   // with a skip reason, so a failed render still yields a full plan.
+  // An AbortError still propagates, so a stopped run stops instead
+  // of shipping a plan with a silently skipped picture.
   assertNotAborted(deps.signal);
   emit("picturing");
   const rendered = await runRenderAfter(
     { plan: draft, spaceType: request.spaceType },
-    deps.renderAfter,
+    { ...deps.renderAfter, signal: deps.signal },
   );
   // Server log only: why the after picture was skipped, when it was.
   // No plan output, no UI change. The finished plan's meta.skipped
