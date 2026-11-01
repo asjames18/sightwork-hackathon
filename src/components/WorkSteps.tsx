@@ -9,6 +9,7 @@ import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
+import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
@@ -56,6 +57,8 @@ export function WorkSteps({
           <ul className="mt-2 divide-y divide-ink/10">
             {crew.rows.map((row) => {
               const hrs = hoursLabel(row.hours, row.hoursPartial);
+              // Ticks load after mount, so the server render never shows progress.
+              const prog = ready ? crewProgress(row.steps, done) : null;
               return (
                 <li key={row.label} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-4" data-testid="crew-row">
                   <span className="flex min-w-0 items-baseline gap-2">
@@ -73,6 +76,23 @@ export function WorkSteps({
                       {stepsLabel(row.steps)}
                       {hrs && <>, {hrs}</>}
                     </span>
+                    {prog && (
+                      <span
+                        className={`inline-flex min-h-7 items-center gap-1 rounded-full px-2.5 text-sm font-medium tabular-nums ${
+                          prog.next === null ? "bg-safe/10 text-safe-dark" : "bg-ink/[0.06] text-ink/80"
+                        }`}
+                        data-testid="crew-progress"
+                        title={crewProgressDescription(row.label, prog)}
+                      >
+                        {prog.next === null && (
+                          <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3.5 8.5l3 3 6-7" />
+                          </svg>
+                        )}
+                        <span aria-hidden="true">{crewProgressLabel(prog)}</span>
+                        <span className="sr-only">{crewProgressDescription(row.label, prog)}</span>
+                      </span>
+                    )}
                     <CrewSendButton plan={plan} crew={row} />
                     <CrewCalendarButton plan={plan} crew={row} />
                   </span>
