@@ -403,8 +403,8 @@ export function createReasonSparkCaller(client: MetaClient) {
 
 /** Adapter for the cost step's CostCaller (text-only, web_search tool). */
 export function createCostSparkCaller(client: MetaClient) {
-  return (req: { model: string; prompt: string; schema: Record<string, unknown> }) =>
-    client.callSpark({ model: req.model, prompt: req.prompt, schema: req.schema, tools: [{ type: "web_search" }] });
+  return (req: { model: string; prompt: string; schema: Record<string, unknown>; signal?: AbortSignal }) =>
+    client.callSpark({ model: req.model, prompt: req.prompt, schema: req.schema, tools: [{ type: "web_search" }], signal: req.signal });
 }
 
 /**
