@@ -704,6 +704,10 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * item="paint" and item="Paint" twice; they now fail fast too (the
  * comparison is trimmed and lowercased, so case alone cannot make
  * one item look like two lines to price).
+ * Two steps sharing one title apart from case printed verbatim as
+ * title="Fix leak" and title="fix leak" twice; they now fail fast
+ * too (the comparison is trimmed and lowercased, so case alone
+ * cannot make one fix look like two steps to tick).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -772,10 +776,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       throw new Error(`buildCostPrompt: workOrder[${i}].order must be unique`);
     }
     seenOrders.add(s.order);
-    if (seenTitles.has(s.title.trim())) {
+    if (seenTitles.has(s.title.trim().toLowerCase())) {
       throw new Error(`buildCostPrompt: workOrder[${i}].title must be unique`);
     }
-    seenTitles.add(s.title.trim());
+    seenTitles.add(s.title.trim().toLowerCase());
     if (
       s.trade !== undefined &&
       (typeof s.trade !== "string" || s.trade.trim().length === 0)
