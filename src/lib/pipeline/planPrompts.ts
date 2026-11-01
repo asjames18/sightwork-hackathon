@@ -627,6 +627,11 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * would split the prompt line that carries it, so such values now
  * fail fast. The transcript is intentionally unchecked for newlines:
  * it is multi-line by design.
+ * A spaceName containing a double quote printed verbatim would close
+ * the quoted name in the template (called "{{space_name}}" and step
+ * 11's Set spaceName to "{{space_name}}"), so such values now fail
+ * fast too. spaceType is printed unquoted everywhere in this template,
+ * so a quote there is left alone.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -667,6 +672,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     if (typeof v === "string" && /[\r\n]/.test(v)) {
       throw new Error(`buildReasonPrompt: ${field} must not contain a newline`);
     }
+  }
+  if (typeof input.spaceName === "string" && input.spaceName.includes('"')) {
+    throw new Error('buildReasonPrompt: spaceName must not contain a double quote');
   }
   if (
     input.transcript !== null &&
