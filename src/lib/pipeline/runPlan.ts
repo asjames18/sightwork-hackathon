@@ -386,6 +386,31 @@ export function formatReasonSubsetZones(
 }
 
 /**
+ * Server-log-only summary of what the capped reason subset kept of
+ * SAM's flagged frames. Pure, and it changes no plan output: runPlan
+ * logs it on capped runs so a real Large/XL run shows whether the
+ * reason step actually saw every flagged frame (the flagged pass is
+ * best effort too: a flagged frame is left out only when every
+ * subset member is already an endpoint or a flagged frame, which
+ * happens when flagged frames outnumber the free slots). Returns
+ * null when no frame is flagged, so unflagged runs stay quiet.
+ * Frame indices only, nothing user-identifying.
+ */
+export function formatReasonSubsetFlagged(
+  flaggedFrames: number[],
+  subset: number[],
+): string | null {
+  const flagged = [...new Set(flaggedFrames)].filter(
+    (f) => Number.isInteger(f) && f >= 0,
+  );
+  if (flagged.length === 0) return null;
+  const inSubset = new Set(subset);
+  const kept = flagged.filter((f) => inSubset.has(f));
+  const leftOut = flagged.filter((f) => !inSubset.has(f)).sort((a, b) => a - b);
+  return `runPlan: reason subset: flagged ${kept.length}/${flagged.length} kept${leftOut.length ? `, left out: ${leftOut.join(", ")}` : ""}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (Grok Bot, 2026-10-27 11:43 AM). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1239,6 +1264,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       reasonSubset,
     );
     if (subsetZones) console.log(subsetZones);
+    const subsetFlagged = formatReasonSubsetFlagged(
+      segmentation?.flaggedFrames ?? [],
+      reasonSubset,
+    );
+    if (subsetFlagged) console.log(subsetFlagged);
   }
   // Segmentation indices are subset positions too, so the prompt's
   // flaggedFrames, hazardHits, and rawLog stay consistent with the
@@ -1507,4 +1537,5 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   }
   return plan;
 }
+
 
