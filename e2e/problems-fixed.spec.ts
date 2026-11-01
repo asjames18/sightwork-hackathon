@@ -57,7 +57,8 @@ test("Still to fix narrows the problems to the ones not fixed yet, and drops out
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await filter.scrollIntoViewIfNeeded();
+    // Put the filter under the sticky chips, so the walk timeline above scrolls out of view rather than sitting under them.
+    await filter.evaluate((el) => el.scrollIntoView({ block: "start" }));
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `still to fix filter ${width}`);
   }
