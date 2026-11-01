@@ -14,7 +14,7 @@ export interface PlanPdf {
   bytes: number;
 }
 
-export type PdfLabel = Pick<PlanPdfOptions, "sample" | "example" | "since" | "doneSteps">;
+export type PdfLabel = Pick<PlanPdfOptions, "sample" | "example" | "since" | "doneSteps" | "gotMaterials">;
 
 /** Longest side of a picture in the PDF, in pixels: sharp at print size, small enough for a text attachment. */
 const MAX_SIDE = 960;
@@ -100,12 +100,13 @@ export async function makePlanPdf(plan: WorkPlan, label: PdfLabel = {}, date = n
 // tap can hand the file to the share sheet without awaiting anything (iOS only shares inside the tap itself).
 const pending = new WeakMap<WorkPlan, Map<string, Promise<PlanPdf>>>();
 const ready = new WeakMap<WorkPlan, Map<string, PlanPdf>>();
-/** Cache key: the label plus the comparison and ticked steps, so a comparison or a tick after a warm build gets its own file. */
+/** Cache key: the label plus the comparison, ticked steps and items in hand, so a comparison or a tick after a warm build gets its own file. */
 export function pdfKeyOf(label: PdfLabel): string {
   const c = label.since?.comparison;
   const since = c ? [label.since?.when ?? "", ...[c.gone, c.stillThere, c.newOnes].map((g) => g.map((r) => `${r.tier}:${r.title}`).join("~"))].join("|") : "";
   const done = [...new Set(label.doneSteps ?? [])].sort((a, b) => a - b).join(",");
-  return `${label.sample ? 1 : 0}|${label.example?.kind ?? ""}|${since}|${done}`;
+  const got = [...new Set(label.gotMaterials ?? [])].sort((a, b) => a - b).join(",");
+  return `${label.sample ? 1 : 0}|${label.example?.kind ?? ""}|${since}|${done}|${got}`;
 }
 const keyOf = pdfKeyOf;
 

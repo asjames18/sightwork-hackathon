@@ -5,6 +5,7 @@ import type { WorkPlan } from "@/lib/types";
 import type { Example } from "@/lib/examples";
 import { usePlanComparison } from "@/lib/client/usePlanComparison";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
+import { useGotMaterials } from "@/lib/client/useGotMaterials";
 import {
   deliverPlanPdf,
   downloadBlob,
@@ -41,8 +42,12 @@ export function SavePdfButton({ plan, example, sample }: { plan: WorkPlan; examp
   const since = usePlanComparison(plan, !sample && !example && !plan.meta?.isExample);
   // Steps ticked off on this device are marked Done on paper too (real plans only).
   const { done } = useDoneSteps(plan);
-  const doneSteps = !sample && !example && !plan.meta?.isExample ? done : undefined;
-  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps };
+  const real = !sample && !example && !plan.meta?.isExample;
+  const doneSteps = real ? done : undefined;
+  // Shopping list items ticked as in hand are marked on paper too, and drop out of the spend line (real plans only).
+  const { got } = useGotMaterials(plan);
+  const gotMaterials = real ? got : undefined;
+  const label = { sample, example: example ? { kind: example.kind, banner: example.banner } : null, since, doneSteps, gotMaterials };
   const labelKey = `${example?.id ?? ""}|${pdfKeyOf(label)}`;
 
   // A new plan drops a file waiting for a second tap.
