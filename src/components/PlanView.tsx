@@ -7,6 +7,7 @@ import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { WorkSteps } from "./WorkSteps";
 import { FixFirst } from "./FixFirst";
+import { NextUp } from "./NextUp";
 import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
@@ -232,6 +233,7 @@ export function PlanView({
       )}
 
       <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} spaceName={plan.spaceName} />
+      <NextUp plan={plan} />
 
       {!narrated && (
         <p className="mt-4 rounded-xl bg-white p-4 text-sm text-ink/70">
