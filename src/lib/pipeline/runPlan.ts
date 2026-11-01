@@ -585,6 +585,30 @@ export function formatCostPricing(
 }
 
 /**
+ * Server-log-only summary of why the picturing step produced no
+ * after picture. Pure, and it changes no plan output: runPlan logs
+ * it only when renderAfter skipped, so a real run says whether the
+ * after picture was skipped cleanly (no frames, no visible fixes),
+ * failed on the model, or hit the spike cap (the finished plan's
+ * meta.skipped keeps only a boolean, so the reason is otherwise
+ * lost). Returns null when an image was produced and on unknown
+ * reasons, so ordinary and malformed runs stay out of the server
+ * log. The reason string only, nothing user-identifying.
+ */
+export function formatPicturingSkipped(
+  skipped: string | undefined,
+): string | null {
+  if (
+    skipped !== "no-frames" &&
+    skipped !== "no-visible-changes" &&
+    skipped !== "model-failure" &&
+    skipped !== "cap-exceeded"
+  )
+    return null;
+  return `runPlan: picturing skipped: ${skipped}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1673,6 +1697,13 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     { plan: draft, spaceType: request.spaceType },
     deps.renderAfter,
   );
+  // Server log only: why the after picture was skipped, when it was.
+  // No plan output, no UI change. The finished plan's meta.skipped
+  // keeps only a boolean, so without this line a real run never says
+  // whether picturing skipped cleanly, failed on the model, or hit
+  // the spike cap — the cases spike tracking needs apart.
+  const picturingSkipped = formatPicturingSkipped(rendered.skipped);
+  if (picturingSkipped) console.log(picturingSkipped);
 
   const plan: WorkPlan = {
     ...draft,
