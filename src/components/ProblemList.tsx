@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Issue, PlanFrame, PlanReview, WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
@@ -9,6 +9,9 @@ import { PrintOpenDetails } from "./PrintOpenDetails";
 import { fixedInLabel, problemAnchor, stepAnchor, stepsFixing } from "@/lib/client/stepLinks";
 import { allStepsDone } from "@/lib/client/stepProgress";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
+import { problemShareTitle, problemToText } from "@/lib/client/problemText";
+import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -118,6 +121,55 @@ function FixedIn({ orders, done = false }: { orders: number[]; done?: boolean })
   );
 }
 
+const SEND_STATUS: Record<Exclude<ShareResult, "shared">, string> = {
+  copied: "Copied. Paste it into a message.",
+  cancelled: "",
+  failed: "Couldn't share from this browser.",
+};
+
+/**
+ * Sends just this problem (problemText.ts) by the phone's share sheet, else the clipboard, so one problem can go to
+ * the one person who will fix it. Hidden in print.
+ */
+function SendProblemButton({ issue, text }: { issue: Issue; text: () => string }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  async function onSend() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(problemShareTitle(issue), text(), navigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(SEND_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        data-testid="send-problem"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        Send this problem<span className="sr-only"> #{issue.rank}</span>
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </p>
+    </div>
+  );
+}
+
 function IssueCard({
   issue,
   frames,
@@ -129,7 +181,11 @@ function IssueCard({
   fixedIn = [],
   fixedDone = false,
   titleLevel = 4,
+  spaceName,
+  workOrder,
 }: {
+  spaceName?: string;
+  workOrder?: WorkPlan["workOrder"];
   /** Every step that fixes this problem is ticked off in the work order. */
   fixedDone?: boolean;
   titleLevel?: 3 | 4;
@@ -201,7 +257,7 @@ function IssueCard({
             {scope && verdict?.reason ? <span className="mt-0.5 block text-amber-900/80">{verdict.reason}</span> : null}
           </p>
         )}
-
+        <SendProblemButton issue={issue} text={() => problemToText(issue, { narrated, verdict, workOrder, spaceName, sample })} />
       </div>
       {seen && (
         <div className="mt-3 min-w-0 md:mt-0">
@@ -292,7 +348,7 @@ export function ProblemList({
               <p className="-mt-2 mb-3 pl-[1.125rem] text-sm text-ink/65">{TIER_HINT[g.tier]}</p>
               <ol className="flex flex-col gap-3">
                 {g.issues.map((issue) => (
-                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} />
+                  <IssueCard key={issue.rank} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} spaceName={plan.spaceName} workOrder={plan.workOrder} />
                 ))}
               </ol>
             </section>
@@ -301,7 +357,7 @@ export function ProblemList({
       ) : (
         <ol className="flex flex-col gap-3">
           {shown.map((issue) => (
-            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} />
+            <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} spaceName={plan.spaceName} workOrder={plan.workOrder} />
           ))}
         </ol>
       )}
