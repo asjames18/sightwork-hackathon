@@ -12,7 +12,9 @@ import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
 import { stepsWaitingOn, waitersChipLabel, waitersDescription } from "@/lib/client/stepWaiters";
-import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
+import { canShareFiles, sharePlanText, type ShareNavigator } from "@/lib/client/planText";
+import { getProofPhoto, withPhotoLine } from "@/lib/client/proofPhoto";
+import { stepPhotoSource } from "@/lib/client/stepPhoto";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
 import { calendarFileName, calendarSummary, crewCalendarFileName, planCalendar } from "@/lib/client/stepCalendar";
@@ -333,16 +335,41 @@ export function StepSendButton({
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The proof photo of the first problem this step fixes, drawn ahead of the tap (the share sheet needs the tap).
+  const ready = useRef<File | null>(null);
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
+  const photo = stepPhotoSource(plan, step);
+  const photoKey = photo ? `${photo.frame.url.length}:${photo.frame.url.slice(-80)}|${photo.box?.join(",") ?? ""}|${photo.rank}|${photo.title}|${photo.dashed ? 1 : 0}` : "";
+  useEffect(() => {
+    ready.current = null;
+    if (!photo || !prefersShareSheet()) return;
+    const probe = new File([new Uint8Array([255, 216, 255])], "probe.jpg", { type: "image/jpeg" });
+    if (!canShareFiles(navigator, [probe])) return;
+    let live = true;
+    const t = setTimeout(
+      () =>
+        void getProofPhoto(photo.frame, photo.box, { rank: photo.rank, title: photo.title, dashed: photo.dashed }).then((file) => {
+          if (live) ready.current = file;
+        }),
+      900 + step.order * 150,
+    );
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoKey, step.order]);
 
   async function onSend() {
     if (busy) return;
     setBusy(true);
     setStatus("");
     const text = stepToText(plan, step, { sample: plan.meta?.isExample === true, scheduleFrom: new Date(), got });
-    const result = await sharePlanText(stepShareTitle(step), text, navigator as ShareNavigator, prefersShareSheet());
+    const file = ready.current;
+    const attach = file && photo ? { files: [file], text: withPhotoLine(text, Boolean(photo.box), `problem #${photo.rank}`) } : null;
+    const result = await sharePlanText(stepShareTitle(step), text, navigator as ShareNavigator, prefersShareSheet(), attach);
     setBusy(false);
     if (result === "shared") return;
     setStatus(CREW_STATUS[result]);
