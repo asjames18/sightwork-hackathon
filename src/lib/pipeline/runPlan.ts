@@ -682,6 +682,33 @@ export function formatExplainedContractErrors(
 }
 
 /**
+ * Server-log-only summary of a transcription that came back empty
+ * even though audio was supplied. Pure, and it changes no plan
+ * output: runPlan logs it only when the request carried audio, no
+ * pre-supplied transcript, and the transcribe step did not fail,
+ * yet the result has no words — so a real run can tell an empty
+ * ASR result apart from a silent video (the listening check note
+ * reads "No narration in this video" in both cases, and a failed
+ * transcribe already warns separately, so neither of those paths
+ * logs here). Returns null when audio was not supplied, when a
+ * transcript was supplied with the request, when transcribe failed,
+ * when any words came back, and on malformed word counts, so
+ * ordinary runs stay out of the server log. No audio content, no
+ * transcript text, nothing user-identifying.
+ */
+export function formatTranscribeEmpty(
+  audioSupplied: boolean,
+  transcriptSupplied: boolean,
+  transcribeFailed: boolean,
+  words: number,
+): string | null {
+  if (!audioSupplied || transcriptSupplied || transcribeFailed) return null;
+  if (!Number.isInteger(words) || words < 0) return null;
+  if (words > 0) return null;
+  return "runPlan: transcribe returned no words from supplied audio";
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1475,6 +1502,26 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
           ? { ok: true, note: "Transcription unavailable this run" }
           : { ok: true, note: "No narration in this video" },
     );
+  }
+
+  // Server log only: whether supplied audio transcribed to nothing
+  // (see the helper note). No plan output, no UI change: the
+  // listening check above already reports the word count, but it
+  // cannot tell an empty ASR result from a video with no narration.
+  {
+    const hasWords =
+      Boolean(transcript?.trim()) || transcriptTurns.length > 0;
+    const words = hasWords
+      ? transcriptWords({ transcript, transcriptTurns })
+      : 0;
+    const emptyTranscribe = formatTranscribeEmpty(
+      typeof request.audioWavBase64 === "string" &&
+        request.audioWavBase64.length > 0,
+      request.transcript !== undefined,
+      transcribeSkipped,
+      words,
+    );
+    if (emptyTranscribe) console.log(emptyTranscribe);
   }
 
   // looking + counting: SAM hazards and counts on the request frames.
