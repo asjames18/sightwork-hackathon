@@ -30,11 +30,11 @@ const COST = { low: 120, high: 340, currency: "USD" as const, label: COST_LABEL,
 
 test("header: space, city and state, date, and how many problems", () => {
   const t = planToText(plan({ costRange: COST }), { date: DAY });
-  assert.match(t, /^Work plan: Main sanctuary stage\nSebring, FL · Oct 30, 2026\n2 problems, worst first\.\n/);
+  assert.match(t, /^Work plan: Main sanctuary stage\nSebring, FL · Oct 30, 2026\n2 problems, worst first\. 1 of 2 never mentioned on the walk, caught on video\.\n/);
   assert.match(t, /Asked for: Get the stage ready for Sunday\./);
   // No region: just the date.
-  assert.match(planToText(plan(), { date: DAY }), /^Work plan: Main sanctuary stage\nOct 30, 2026\n2 problems, worst first\.\n/);
-  assert.match(planToText(plan({ issues: [plan().issues[1]] }), { date: DAY }), /\n1 problem\.\n/);
+  assert.match(planToText(plan(), { date: DAY }), /^Work plan: Main sanctuary stage\nOct 30, 2026\n2 problems, worst first\. 1 of 2 never mentioned/);
+  assert.match(planToText(plan({ issues: [plan().issues[1]] }), { date: DAY }), /\n1 problem\. Never mentioned on the walk, caught on video\.\n/);
 });
 
 test("problems in plain words, worst first; steps in order; materials", () => {
@@ -87,7 +87,8 @@ test("fits a text message by default; long plans are cut at a line and keep the 
 
 test("a real-sized plan stays short enough for a text", () => {
   const t = planToText(plan({ costRange: COST }));
-  assert.ok(t.length < 700, `length ${t.length}`);
+  // Room for the never-mentioned headline in the header; still well under MAX_SHARE_CHARS.
+  assert.ok(t.length < 760, `length ${t.length}`);
 });
 
 test("share: uses the share sheet when preferred and available", async () => {

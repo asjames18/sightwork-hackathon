@@ -132,6 +132,28 @@ export function problemSummary(count: number): string {
 }
 
 /**
+ * The said-vs-seen headline for the top of the shared text and the PDF: how many of the ranked problems the
+ * video caught that nobody said out loud. "3 of 6 never mentioned on the walk, caught on video."
+ * Null without narration (nothing to compare against) or when every problem was mentioned.
+ */
+export function unmentionedHeadline(issues: readonly Pick<Issue, "unmentioned">[], narrated: boolean): string | null {
+  if (!narrated) return null;
+  const total = issues.length;
+  const n = issues.filter((i) => i.unmentioned === true).length;
+  if (n === 0 || total === 0) return null;
+  if (total === 1) return "Never mentioned on the walk, caught on video.";
+  if (n === total) return `All ${n} never mentioned on the walk, caught on video.`;
+  return `${n} of ${total} never mentioned on the walk, caught on video.`;
+}
+
+/** "Not mentioned: Leaking valve · Peeling paint": the problems the walk never named, worst first. */
+export function unmentionedTitlesLine(issues: readonly Pick<Issue, "unmentioned" | "title">[], narrated: boolean): string | null {
+  if (!narrated) return null;
+  const titles = issues.filter((i) => i.unmentioned === true).map((i) => clean(i.title)).filter(Boolean);
+  return titles.length > 0 ? `Not mentioned: ${titles.join(" \u00B7 ")}` : null;
+}
+
+/**
  * One plain sentence about a problem: priority, then whether it was said and seen, then a missing-photo warning.
  * e.g. "Low priority. Spotted on video, not mentioned on the walk."
  */
@@ -197,7 +219,8 @@ export function planToText(plan: WorkPlan, opts: PlanTextOptions = {}): string {
 
   lines.push(`Work plan: ${clean(plan.spaceName) || "Walkthrough"}`);
   lines.push([location, shareDate(opts.date ?? new Date())].filter(Boolean).join(" · "));
-  lines.push(`${problemSummary(issues.length)}.`);
+  const headline = unmentionedHeadline(issues, narrated);
+  lines.push(headline ? `${problemSummary(issues.length)}. ${headline}` : `${problemSummary(issues.length)}.`);
   if (sample) lines.push("Example plan with sample data, not a real run.");
   if (narrated && plan.transcriptSummary) lines.push(`Asked for: ${clean(plan.transcriptSummary)}`);
 

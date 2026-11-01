@@ -12,7 +12,7 @@ import type { jsPDF as JsPdfDoc } from "jspdf";
 import { AFTER_IMAGE_LABEL, COST_LABEL, masksAvailable, type Box, type WorkPlan } from "@/lib/types";
 import { planReview, verdictFor } from "@/lib/review";
 import { compareSummary, type CompareRow, type PlanComparison } from "./planCompare";
-import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
+import { coverageLine, issueNote, livePricesLine, planLocation, plainReviewLine, problemSummary, SAID_VS_SEEN_HEADING, saidVsSeenLines, shareDate, unmentionedHeadline, unmentionedTitlesLine, WATCH_HEADING, WATCH_HINT, watchLine } from "./planText";
 import { walkShareLines } from "./walkTimeline";
 import { runCostLine } from "./runCost";
 import { rankedIssues, watchItems } from "@/lib/planExtras";
@@ -245,6 +245,12 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
     doc.text(pdfSafe(value), x, y + 44);
   });
   y += 70;
+  const said = unmentionedHeadline(issues, narrated);
+  if (said) {
+    para(said, 11, "bold", ACCENT_DARK, M, W, 2);
+    const titles = unmentionedTitlesLine(issues, narrated);
+    if (titles) para(titles, 9.5, "normal", INK, M, W, 6);
+  }
   if (narrated && plan.transcriptSummary) para(`What you asked for: ${clean(plan.transcriptSummary)}`, 10.5, "normal", INK, M, W, 6);
   if (!narrated) para(noNarrationNote(plan).lead, 9.5, "normal", MUTED, M, W, 6);
 
