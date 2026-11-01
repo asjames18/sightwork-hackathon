@@ -81,6 +81,13 @@ export interface AsrTranscribeCaller {
     mode: "standard";
     audioWavBase64: string;
     keywordBias: string[];
+    /**
+     * Abort signal for a stopped run (2026-11-01): when set, it is
+     * passed to the fetch, and an already-aborted signal throws an
+     * AbortError before any fetch, so a stopped run never starts
+     * a paid ASR call. Omit it and the call runs as before.
+     */
+    signal?: AbortSignal;
   }): Promise<{ turns: AsrTurn[]; latencyMs: number; costUsd: number }>;
 }
 
@@ -239,6 +246,16 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
     ) {
       throw new Error("asr: keywordBias must be an array of non-empty strings");
     }
+    // A stopped run never starts a paid call: an already-aborted
+    // signal throws here, before any fetch, with the same AbortError
+    // name the fetch itself produces mid-flight, so the transcribe
+    // step and runPlan treat both the same (not a step failure). A
+    // signal that aborts mid-flight rejects from the fetch itself.
+    if (req.signal?.aborted) {
+      const err = new Error("asr: aborted");
+      err.name = "AbortError";
+      throw err;
+    }
     const sessionId = `sightwork-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const audioBytes = Buffer.from(req.audioWavBase64, "base64");
     const started = Date.now();
@@ -268,6 +285,7 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
         body: form,
+        signal: req.signal,
       });
       if (res.ok) {
         const latencyMs = Date.now() - started;
