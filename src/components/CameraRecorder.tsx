@@ -29,6 +29,7 @@ import {
   recordingFileName,
   secondsLeft,
   shouldRetryWithoutMic,
+  takeMeter,
   videoOnlyConstraints,
 } from "@/lib/client/recorder";
 
@@ -352,6 +353,7 @@ export function CameraRecorder({
   const resolution = describeResolution(settings);
   const state = elapsedState(elapsed, rules);
   const recording = phase === "recording";
+  const meter = takeMeter(elapsed, rules);
 
   return (
     <div
@@ -382,6 +384,41 @@ export function CameraRecorder({
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-red-500 motion-safe:animate-pulse" />
             {formatDuration(elapsed)}
           </span>
+        )}
+        {recording && (
+          <div
+            className="pointer-events-none absolute inset-x-3 bottom-3 rounded-full bg-black/70 px-3 py-1.5"
+            data-testid="take-meter"
+            data-zone={meter.zone}
+          >
+            <div className="flex items-center gap-2 text-xs font-semibold text-white">
+              <span aria-hidden className="min-w-[5.5rem]">{meter.label}</span>
+              <div
+                role="progressbar"
+                aria-label="Take length"
+                aria-valuemin={0}
+                aria-valuemax={Math.round(rules.hardMaxSec)}
+                aria-valuenow={Math.round(Math.min(elapsed, rules.hardMaxSec))}
+                aria-valuetext={meter.valueText}
+                className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/25"
+              >
+                <span
+                  aria-hidden
+                  data-testid="take-meter-aim"
+                  className="absolute inset-y-0 bg-white/35"
+                  style={{ left: `${meter.aimStartPct}%`, width: `${Math.max(0, meter.aimEndPct - meter.aimStartPct)}%` }}
+                />
+                <span
+                  aria-hidden
+                  className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-200 motion-reduce:transition-none ${
+                    meter.zone === "long" ? "bg-amber-400" : meter.zone === "aim" ? "bg-emerald-400" : "bg-white"
+                  }`}
+                  style={{ width: `${meter.fillPct}%` }}
+                />
+              </div>
+              <span aria-hidden className="tabular-nums text-white/85">{formatDuration(rules.hardMaxSec)}</span>
+            </div>
+          </div>
         )}
         {cameraOpen && hasMic && (
           <span

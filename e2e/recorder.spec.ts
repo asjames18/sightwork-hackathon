@@ -63,9 +63,23 @@ test("Record: in-page camera at the requested size, a 6 s take, then the plan (m
 
   await cam.getByRole("button", { name: "Start recording" }).click();
   await expect(cam.getByTestId("recording-resolution")).toContainText("Recording at 1920×1080");
+  const startedAt = Date.now();
   await page.waitForTimeout(3000);
+  // Take meter on the preview: early in a Medium take it says keep going, with the aim range marked.
+  const meter = cam.getByTestId("take-meter");
+  await expect(meter).toBeVisible();
+  await expect(meter).toHaveAttribute("data-zone", "early");
+  await expect(meter).toContainText("Keep going");
+  await expect(meter).toContainText("2:00");
+  const bar = meter.getByRole("progressbar", { name: "Take length" });
+  await expect(bar).toHaveAttribute("aria-valuemax", "120");
+  await expect(bar).toHaveAttribute("aria-valuetext", /^0:0\d of 2:00\. Keep going\. Aim for 60 to 90 seconds\.$/);
+  expect(await meter.getByTestId("take-meter-aim").evaluate((el) => (el as HTMLElement).style.left)).toBe("50%");
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "recording");
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `recorder-recording-${info.project.name}.png`) });
-  await page.waitForTimeout(3300);
+  // The checks above take time; stop at about 6.3 s from Start either way, so the take reads 0:06.
+  await page.waitForTimeout(Math.max(0, 6300 - (Date.now() - startedAt)));
   await cam.getByRole("button", { name: "Stop recording" }).click();
 
   const card = page.getByRole("group", { name: "Your walkthrough" });

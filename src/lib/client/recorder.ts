@@ -2,7 +2,7 @@
  * Pure helpers behind the in-page camera recorder on the upload screen (no browser globals, so
  * tools/test can check them). The component lives in src/components/CameraRecorder.tsx.
  */
-import { durationRulesFor, type DurationRules } from "./duration";
+import { aimRangeSpoken, durationRulesFor, formatDuration, type DurationRules } from "./duration";
 
 /** About 8 Mbps: a sharp 1080p30 take (phone camera apps use roughly 8 to 17 Mbps at 1080p). */
 export const RECORD_VIDEO_BPS = 8_000_000;
@@ -165,4 +165,42 @@ export function secondsLeft(sec: number, rules: DurationRules = durationRulesFor
 /** Average bitrate of a finished take in bits per second (0 when it can't be worked out). */
 export function averageBitrate(bytes: number, durationSec: number): number {
   return durationSec > 0 && bytes > 0 ? Math.round((bytes * 8) / durationSec) : 0;
+}
+
+export type TakeZone = "early" | "aim" | "long";
+
+export interface TakeMeter {
+  /** How much of the size's cap the take has used, 0..100. */
+  fillPct: number;
+  /** The aim range as a band on the same 0..100 scale (ends at the wrap-up point when that comes first). */
+  aimStartPct: number;
+  aimEndPct: number;
+  /** Before the aim range, inside it, or past the wrap-up point. */
+  zone: TakeZone;
+  /** Short text for the bar: "Keep going", "Good length", "Wrap up". */
+  label: string;
+  /** Full text for screen readers: "1:10 of 2:00. Good length. Aim for 60 to 90 seconds." */
+  valueText: string;
+}
+
+const pct = (sec: number, cap: number) => Math.min(100, Math.max(0, Math.round((sec / cap) * 1000) / 10));
+
+/**
+ * The take meter on the live preview: how far the take is toward the size's automatic stop, with the
+ * size's aim range marked, so a walker can see when the length is right without reading numbers.
+ */
+export function takeMeter(sec: number, rules: DurationRules = durationRulesFor()): TakeMeter {
+  const cap = rules.hardMaxSec > 0 ? rules.hardMaxSec : 1;
+  const s = Number.isFinite(sec) ? Math.max(0, sec) : 0;
+  const aimEnd = Math.min(rules.aimMaxSec, rules.warnAfterSec);
+  const zone: TakeZone = s > rules.warnAfterSec ? "long" : s >= rules.aimMinSec ? "aim" : "early";
+  const label = zone === "long" ? "Wrap up" : zone === "aim" ? "Good length" : "Keep going";
+  return {
+    fillPct: pct(s, cap),
+    aimStartPct: pct(rules.aimMinSec, cap),
+    aimEndPct: pct(aimEnd, cap),
+    zone,
+    label,
+    valueText: `${formatDuration(s)} of ${formatDuration(cap)}. ${label}. Aim for ${aimRangeSpoken(rules)}.`,
+  };
 }
