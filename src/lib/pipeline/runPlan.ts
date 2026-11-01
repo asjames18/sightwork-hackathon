@@ -557,6 +557,34 @@ export function formatReviewCoverage(
 }
 
 /**
+ * Server-log-only summary of whether the cost step priced and
+ * grounded every material. Pure, and it changes no plan output:
+ * runPlan logs it only when at least one material is unpriced or
+ * its price is ungrounded, so a real run shows whether the
+ * region-grounded cost range is fully priced from search-backed
+ * prices or partly estimated (computeCostRange already flags those
+ * cases in costRange.assumptions; this line is the one-line
+ * server-log summary). Returns null when every material is priced
+ * and grounded, when there are no materials, and on malformed
+ * counts (non-integer, negative, priced > total, grounded >
+ * priced), so ordinary and malformed runs stay out of the server
+ * log. Counts only, nothing user-identifying.
+ */
+export function formatCostPricing(
+  totalMaterials: number,
+  pricedMaterials: number,
+  groundedPrices: number,
+): string | null {
+  for (const n of [totalMaterials, pricedMaterials, groundedPrices]) {
+    if (!Number.isInteger(n) || n < 0) return null;
+  }
+  if (totalMaterials === 0) return null;
+  if (pricedMaterials > totalMaterials || groundedPrices > pricedMaterials) return null;
+  if (pricedMaterials === totalMaterials && groundedPrices === pricedMaterials) return null;
+  return `runPlan: cost: ${pricedMaterials}/${totalMaterials} materials priced, ${groundedPrices} grounded`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1565,6 +1593,16 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
         ? { ...deps.cost, prompt: deps.costPrompt(costInput, request.spaceType) }
         : deps.cost;
     cost = await estimateCost(costInput, costDeps);
+    // Server log only: whether the cost step priced and grounded
+    // every material. No plan output, no UI change.
+    if (cost) {
+      const costPricing = formatCostPricing(
+        cost.materials.length,
+        cost.pricedMaterials,
+        cost.groundedPrices,
+      );
+      if (costPricing) console.log(costPricing);
+    }
   } catch (err) {
     if (isAbort(err)) throw err;
     // A cap breach is not a cost failure: stop the run instead of
