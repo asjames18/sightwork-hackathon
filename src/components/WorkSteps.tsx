@@ -7,6 +7,7 @@ import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
+import { stepShareTitle, stepToText } from "@/lib/client/stepText";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
@@ -159,6 +160,7 @@ export function WorkSteps({
                     )}
                   </ul>
                 )}
+                <StepSendButton plan={plan} step={step} />
               </div>
               <label
                 htmlFor={id}
@@ -250,6 +252,52 @@ function FixesChip({ className, fixes, problemRanks }: { className: string; fixe
         </span>
       ))}
     </li>
+  );
+}
+
+/**
+ * Sends just this step (stepText.ts) by the phone's share sheet, else the clipboard, so one step can go to the one
+ * person doing it: when, how long, what it fixes, what to wait for and what to bring. Hidden in print.
+ */
+function StepSendButton({ plan, step }: { plan: WorkPlan; step: WorkPlan["workOrder"][number] }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  async function onSend() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const text = stepToText(plan, step, { sample: plan.meta?.isExample === true, scheduleFrom: new Date() });
+    const result = await sharePlanText(stepShareTitle(step), text, navigator as ShareNavigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(CREW_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        data-testid="send-step"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        Send this step<span className="sr-only"> {step.order}</span>
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </p>
+    </div>
   );
 }
 
