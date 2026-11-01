@@ -1,4 +1,5 @@
 import type { WorkStep } from "@/lib/types";
+import { isVolunteerTrade } from "./crewSummary";
 
 /**
  * Which work step to do next, from the steps ticked off on this device: the lowest step not done yet whose
@@ -63,4 +64,30 @@ export function nextUpHours(hours: WorkStep["hours"]): string | null {
 export function alsoReadyLine(n: number): string {
   if (n <= 0) return "";
   return n === 1 ? "1 other step can start now too." : `${n} other steps can start now too.`;
+}
+
+/**
+ * The "Next up" line for Send to your team and Save PDF, after the progress line, so a teammate reading the
+ * text knows where to pick up: "Next up: step 3, Patch the drywall (Volunteer, about 2 h). 1 other step can
+ * start now too." When every open step waits on another open step it says which one first. Null on an
+ * untouched plan (nothing ticked) and on a finished one (the progress line already says all done).
+ */
+export function nextUpShareLine(
+  workOrder: readonly Pick<WorkStep, "order" | "dependsOn" | "title" | "trade" | "hours">[],
+  done: readonly number[],
+): string | null {
+  const n = nextUp(workOrder, done);
+  if (!n || n.kind !== "next") return null;
+  const step = workOrder.find((s) => s.order === n.order);
+  if (!step) return null;
+  const title = (step.title ?? "").replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
+  const trade = (step.trade ?? "").replace(/\s+/g, " ").trim();
+  // Same words as the card and the step text ("Volunteer" / "Paid: Electrician"), without importing the text module.
+  const who = trade ? (isVolunteerTrade(trade) ? "Volunteer" : `Paid: ${trade}`) : null;
+  const hours = nextUpHours(step.hours);
+  const facts = [who, hours ? hours.charAt(0).toLowerCase() + hours.slice(1) : null].filter(Boolean).join(", ");
+  const head = `Next up: step ${n.order}${title ? `, ${title}` : ""}${facts ? ` (${facts})` : ""}`;
+  if (n.waitingOn != null) return `${head}, once step ${n.waitingOn} is done.`;
+  const also = alsoReadyLine(n.alsoReady);
+  return also ? `${head}. ${also}` : `${head}.`;
 }
