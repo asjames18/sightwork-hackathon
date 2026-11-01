@@ -262,10 +262,12 @@ export async function POST(req: Request): Promise<Response> {
           // carries plan.review. Reviewing never fails a run: runPlan
           // ships ran:false on any review failure. No timeout is
           // plumbed here: prompt 06 suggests 60 s (measured max 29 s),
-          // but the caller interfaces carry no timeout/signal, and
-          // racing the call would drop its usage record, so the route
-          // relies on maxDuration above; plumbing a real timeout is an
-          // open question.
+          // and racing the call would drop its usage record, so the
+          // route relies on maxDuration above; the stop signal IS
+          // plumbed (2026-11-01: every pipeline leg, segment
+          // included, forwards deps.signal to its model calls, and
+          // runPlan rethrows aborts as a stop, not a step failure).
+          // Plumbing a real timeout is an open question.
           review: { callSpark: reasonCaller },
           reviewPrompt: buildReviewPrompt,
         };
