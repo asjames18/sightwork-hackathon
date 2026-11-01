@@ -2,6 +2,7 @@ import type { WorkPlan, WorkStep } from "@/lib/types";
 import { hoursLabel, stepsLabel, type CrewRow } from "./crewSummary";
 import { MAX_SHARE_CHARS, SHARE_SIGNOFF, planLocation, shareDate } from "./planText";
 import { stepWhen } from "./stepCalendar";
+import { stepsWaitingOn, waitersShareLine } from "./stepWaiters";
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`);
@@ -29,7 +30,7 @@ export function crewHandoutTitle(plan: Pick<WorkPlan, "spaceName">, crew: Pick<C
  * Just one crew's part of the plan, as plain text for a group text or email to that crew: their steps in the
  * plan's order with what each fixes, how long, and which other step has to finish first, then the materials for
  * the problems their steps fix. Everything comes from the plan; nothing is invented, and other crews' steps are
- * only named when one of ours waits on them.
+ * only named when one of ours waits on them or they wait on one of ours.
  */
 export function crewHandoutText(plan: WorkPlan, crew: Pick<CrewRow, "label" | "paid" | "steps" | "hours" | "hoursPartial">, opts: CrewHandoutOptions = {}): string {
   const maxChars = opts.maxChars ?? MAX_SHARE_CHARS;
@@ -63,6 +64,14 @@ export function crewHandoutText(plan: WorkPlan, crew: Pick<CrewRow, "label" | "p
       const who = mine.has(dep.order) ? "" : dep.trade?.trim() ? `, ${clean(dep.trade)}` : "";
       lines.push(`   Wait for step ${dep.order} (${clean(dep.title)}${who}) to finish first.`);
     }
+    // Steps that wait on this one; another crew's step also names its trade, so the crew knows whom to tell.
+    const after = waitersShareLine(
+      stepsWaitingOn(plan.workOrder, s.order).map((w) => ({
+        ...w,
+        title: `${clean(w.title)}${!mine.has(w.order) && w.trade?.trim() ? `, ${clean(w.trade)}` : ""}`,
+      })),
+    );
+    if (after) lines.push(`   ${after}`);
   }
 
   const materials = plan.materials.filter((m) => (m.forIssues ?? []).some((r) => fixed.has(r)));
