@@ -717,6 +717,10 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * A material qty with a malformed thousands group printed verbatim as
  * qty="12,34 chairs"; it now fails fast (parseQty would silently read
  * it as 12, dropping the rest, so the spend would understate the need).
+ * A material item, qty or note, or a work step title or trade,
+ * containing a newline printed verbatim would split one prompt line
+ * into two, so the cost model could read a phantom second entry;
+ * such fields now fail fast.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -750,6 +754,14 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       m.qty.trim().length === 0
     ) {
       throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
+    }
+    for (const field of ["item", "qty", "note"] as const) {
+      const value = m[field];
+      if (typeof value === "string" && /[\r\n]/.test(value)) {
+        throw new Error(
+          `buildCostPrompt: materials[${i}].${field} must not contain a newline`,
+        );
+      }
     }
     const qtyMatch = /^\s*(\d+(?:\.\d+)?)/.exec(m.qty);
     if (qtyMatch && Number(qtyMatch[1]) === 0) {
@@ -790,6 +802,14 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       !Number.isFinite(s.order)
     ) {
       throw new Error(`buildCostPrompt: workOrder[${i}] must have a finite order and a non-empty title`);
+    }
+    for (const field of ["title", "trade"] as const) {
+      const value = s[field];
+      if (typeof value === "string" && /[\r\n]/.test(value)) {
+        throw new Error(
+          `buildCostPrompt: workOrder[${i}].${field} must not contain a newline`,
+        );
+      }
     }
     if (!Number.isInteger(s.order) || s.order < 1) {
       throw new Error(`buildCostPrompt: workOrder[${i}].order must be a positive integer`);
@@ -926,6 +946,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
 
