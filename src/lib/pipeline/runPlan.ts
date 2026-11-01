@@ -513,6 +513,50 @@ export function formatReasonRemapDropped(
 }
 
 /**
+ * Server-log-only summary of whether the reviewer saw a proof photo
+ * for every issue. Pure, and it changes no plan output: runPlan
+ * logs it only when at least one issue has no selected proof photo,
+ * so a real run shows whether the 8-photo review cap left an issue
+ * unseen (pickReviewFrames takes each issue's first photo first, so
+ * a left-out issue means more issues than photo slots, not a
+ * missing proof frame). An issue counts as covered when any of its
+ * proof frames was selected, and issues with no usable proof frame
+ * are ignored, so ordinary and malformed runs stay quiet. Frame
+ * indices only, nothing user-identifying.
+ */
+export function formatReviewCoverage(
+  issues: Pick<Issue, "rank" | "frameIndex" | "proofFrames">[],
+  selected: number[],
+): string | null {
+  const chosen = new Set(
+    selected.filter((f) => Number.isInteger(f) && f >= 0),
+  );
+  const withCandidates = issues
+    .map((issue) => {
+      const candidates = [
+        issue.frameIndex,
+        ...(issue.proofFrames ?? []).map((pf) => pf.frameIndex),
+      ].filter((f) => Number.isInteger(f) && f >= 0);
+      return { issue, candidates: [...new Set(candidates)] };
+    })
+    .filter((entry) => entry.candidates.length > 0);
+  if (withCandidates.length === 0) return null;
+  const covered = withCandidates.filter((entry) =>
+    entry.candidates.some((f) => chosen.has(f)),
+  );
+  if (covered.length === withCandidates.length) return null;
+  const leftOut = [
+    ...new Set(
+      withCandidates
+        .filter((entry) => !entry.candidates.some((f) => chosen.has(f)))
+        .map((entry) => entry.issue.frameIndex)
+        .filter((f) => Number.isInteger(f) && f >= 0),
+    ),
+  ].sort((a, b) => a - b);
+  return `runPlan: review: ${covered.length}/${withCandidates.length} issues have a proof photo, left out frames: ${leftOut.join(", ")}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1628,6 +1672,15 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     assertNotAborted(deps.signal);
     emit("reviewing");
     const photos = buildReviewPhotos(plan.issues, plan.frames ?? []);
+    // Server log only: whether the reviewer saw a proof photo for
+    // every issue. No plan output, no UI change. This is the
+    // evidence for whether the 8-photo review cap left an issue
+    // unseen on a real run.
+    const reviewCoverage = formatReviewCoverage(
+      plan.issues,
+      photos.map((photo) => photo.frameIndex),
+    );
+    if (reviewCoverage) console.log(reviewCoverage);
     let review: Awaited<ReturnType<typeof runReview>>;
     try {
       review = await runReview(
