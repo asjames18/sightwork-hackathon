@@ -714,6 +714,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * A material qty starting with a minus sign printed verbatim as
  * qty="-2 gallons"; it now fails fast (a negative qty would price
  * as a credit, not a need).
+ * A material qty with a malformed thousands group printed verbatim as
+ * qty="12,34 chairs"; it now fails fast (parseQty would silently read
+ * it as 12, dropping the rest, so the spend would understate the need).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -754,6 +757,12 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     }
     if (m.qty.trim().startsWith("-")) {
       throw new Error(`buildCostPrompt: materials[${i}].qty must not be negative`);
+    }
+    const commaGroup = /^\s*(\d[\d,]*)/.exec(m.qty);
+    if (commaGroup && commaGroup[1].includes(",")) {
+      if (!/^\d{1,3}(,\d{3})+$/.test(commaGroup[1])) {
+        throw new Error(`buildCostPrompt: materials[${i}].qty has a malformed thousands group`);
+      }
     }
     if (seenMaterials.has(m.item.trim().toLowerCase())) {
       throw new Error(`buildCostPrompt: materials[${i}].item must be unique`);
@@ -917,5 +926,6 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
