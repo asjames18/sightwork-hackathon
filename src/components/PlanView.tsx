@@ -1,3 +1,4 @@
+import { noStepsCostLine, noStepsLine } from "@/lib/client/planEmpty";
 import { WalkTimeline } from "./WalkTimeline";
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
 import { noNarrationNote, noNarrationTag } from "@/lib/client/narrationNote";
@@ -129,6 +130,8 @@ export function PlanView({
   // Without SAM, any box on a proof frame came from the plan step itself, so call it a rough highlight.
   const roughBoxes = !masks && plan.issues.some((i) => i.proofFrames?.[0]?.box);
   const review = planReview(plan);
+  // No work steps means nothing to price (the cost step needs at least one), so say that instead of "try again".
+  const noStepsCost = sample ? null : noStepsCostLine(plan.workOrder.length, plan.materials.length);
   const reviewText = plan.issues.length > 0 ? reviewLine(review) : null;
   const slotFrame = hero ?? frames[plan.issues[0]?.frameIndex ?? 0] ?? frames[0];
   // Hero proof frame for the top of the plan when there's no after picture: the plan's hero frame, else the worst
@@ -363,7 +366,7 @@ export function PlanView({
       </Section>
 
       <Section title="Do the work in this order" id="steps">
-        {plan.workOrder.length === 0 && <Empty>No work steps, since nothing needs fixing.</Empty>}
+        {plan.workOrder.length === 0 && <Empty>{noStepsLine(issues.length)}</Empty>}
         {plan.workOrder.length > 0 && <WorkSteps plan={plan} stepCosts={stepCosts} problemRanks={new Set(issues.map((i) => i.rank))} />}
       </Section>
 
@@ -377,7 +380,9 @@ export function PlanView({
         {!plan.costRange && plan.materials.length > 0 && (
           <Section title="What it might cost">
             <Empty>
-              {plan.meta?.skipped?.cost || (location && !sample)
+              {noStepsCost
+                ? noStepsCost
+                : plan.meta?.skipped?.cost || (location && !sample)
                 ? `The cost range couldn\u2019t be worked out this run. The materials and work steps above are complete; try again to price them for ${location ?? "your area"}.`
                 : sample
                   ? "This sample has no cost range. On a real run with a city or region, SightWork prices the materials and labor for that area."
