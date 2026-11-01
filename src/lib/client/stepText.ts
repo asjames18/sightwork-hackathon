@@ -3,6 +3,7 @@ import { isVolunteerTrade } from "./crewSummary";
 import { SHARE_SIGNOFF } from "./planText";
 import { stepWhen } from "./stepCalendar";
 import { stepMaterialIndexes } from "./stepMaterials";
+import { stepsWaitingOn, waitersShareLine } from "./stepWaiters";
 
 /**
  * One work step as plain text, for handing a single step to a single person (a volunteer, a trade) by share sheet
@@ -15,6 +16,7 @@ import { stepMaterialIndexes } from "./stepMaterials";
  *   <detail>
  *   Fixes: #2 Loose cable across the stage edge
  *   Wait for step 2 (Clear the stage) to finish first.
+ *   When this is done, step 5 (Run the sound check) can start.
  *   Bring:
  *   - Gaffer tape: 2 rolls
  *   - Cable ramp: 1 (in hand)
@@ -68,6 +70,8 @@ export function stepToText(plan: StepPlan, step: WorkStep, opts: StepTextOptions
 
   const dep = step.dependsOn != null ? steps.find((s) => s.order === step.dependsOn) : undefined;
   if (dep && dep.order !== step.order) lines.push(`Wait for step ${dep.order} (${oneLine(dep.title)}) to finish first.`);
+  const after = waitersShareLine(stepsWaitingOn(steps, step.order));
+  if (after) lines.push(after);
 
   const need = stepMaterialIndexes(plan, step);
   if (need.length) {

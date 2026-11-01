@@ -11,6 +11,7 @@ import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel,
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
+import { stepsWaitingOn, waitersChipLabel, waitersDescription } from "@/lib/client/stepWaiters";
 import { sharePlanText, type ShareNavigator } from "@/lib/client/planText";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
@@ -136,6 +137,7 @@ export function WorkSteps({
           const chip = "inline-flex min-h-7 items-center rounded-full px-2.5 text-sm font-medium";
           const id = `step-${step.order}-done`;
           const mats = gotReady ? stepMaterialsState(plan, step, got) : null;
+          const waiting = stepsWaitingOn(plan.workOrder, step.order).map((s) => s.order);
           return (
             <li key={step.order} id={stepAnchor(step.order)} className="relative flex scroll-mt-32 gap-3 py-3">
               {!last && (
@@ -161,7 +163,7 @@ export function WorkSteps({
                   {step.title}
                 </p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                {(step.trade || step.hours || step.dependsOn || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats) && (
+                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats) && (
                   <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
                     {step.trade && (
                       <li
@@ -174,6 +176,16 @@ export function WorkSteps({
                     )}
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
                     {step.dependsOn && <li className={`${chip} bg-ink/[0.06] text-ink/80`}>After step {step.dependsOn}</li>}
+                    {waiting.length > 0 && (
+                      <li
+                        className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`}
+                        data-testid="step-waiters"
+                        title={waitersDescription(waiting)}
+                      >
+                        <span aria-hidden="true">{waitersChipLabel(waiting)}</span>
+                        <span className="sr-only">{waitersDescription(waiting)}</span>
+                      </li>
+                    )}
                     {step.fixes && step.fixes.length > 0 && (
                       <FixesChip className={`${chip} bg-ink/[0.06] text-ink/80`} fixes={step.fixes} problemRanks={problemRanks} />
                     )}
