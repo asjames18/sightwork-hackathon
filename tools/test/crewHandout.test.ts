@@ -43,7 +43,7 @@ test("electrician handout: their steps only, fixes, waits, and only their materi
   assert.match(text, /^Electrician: your part of the work plan for Main sanctuary stage\nAtlanta, GA · Oct 31, 2026\n2 steps, about 2–3 h of work\./);
   assert.match(text, /Step 1\. Reroute the stage cable \(1-2 h\)\n   Run it under the riser\.\n   Fixes: #1 Cable across the steps/);
   assert.match(text, /Step 2\. Replace the exit sign \(1 h\)\n   Fixes: #2 Exit sign dark\n   Wait for step 1 \(Reroute the stage cable\) to finish first\./);
-  assert.ok(!text.includes("Paint the back wall"));
+  assert.ok(!text.includes("Step 3."));
   assert.match(text, /Materials for these steps:\n- Cable cover: 2\n- LED exit sign: 1/);
   assert.ok(!text.includes("Eggshell"));
   assert.match(text, /The full plan has 3 steps; this list is steps 1 and 2 only\./);
