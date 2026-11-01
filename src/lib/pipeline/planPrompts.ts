@@ -684,6 +684,7 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * and a non-string note printed verbatim as note="[object Object]".
  * Region is required here: this builder is only called with a region
  * (runPlan guards the call, estimateCost returns null without one).
+ * A reversed hours pair printed verbatim as hours=[5, 2]; it now fails fast.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -745,6 +746,16 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
         s.hours.some((h) => typeof h !== "number" || !Number.isFinite(h)))
     ) {
       throw new Error(`buildCostPrompt: workOrder[${i}].hours must be [low, high] finite numbers when given`);
+    }
+    if (
+      s.hours !== undefined &&
+      Array.isArray(s.hours) &&
+      s.hours.length === 2 &&
+      typeof s.hours[0] === "number" &&
+      typeof s.hours[1] === "number" &&
+      s.hours[0] > s.hours[1]
+    ) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].hours must be [low, high] with low <= high`);
     }
   });
 }
