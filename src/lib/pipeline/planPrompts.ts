@@ -708,6 +708,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * title="Fix leak" and title="fix leak" twice; they now fail fast
  * too (the comparison is trimmed and lowercased, so case alone
  * cannot make one fix look like two steps to tick).
+ * A material qty starting with zero printed verbatim as qty="0";
+ * it now fails fast (a listed material is needed in some amount, so
+ * a zero qty would price it at nothing and drop it from the spend).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -741,6 +744,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       m.qty.trim().length === 0
     ) {
       throw new Error(`buildCostPrompt: materials[${i}] must have a non-empty item and qty`);
+    }
+    const qtyMatch = /^\s*(\d+(?:\.\d+)?)/.exec(m.qty);
+    if (qtyMatch && Number(qtyMatch[1]) === 0) {
+      throw new Error(`buildCostPrompt: materials[${i}].qty must be greater than zero when it starts with a number`);
     }
     if (seenMaterials.has(m.item.trim().toLowerCase())) {
       throw new Error(`buildCostPrompt: materials[${i}].item must be unique`);
