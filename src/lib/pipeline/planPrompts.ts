@@ -731,6 +731,9 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   if (!Array.isArray(input.workOrder)) {
     throw new Error("buildCostPrompt: workOrder must be an array");
   }
+  if (input.workOrder.length === 0) {
+    throw new Error("buildCostPrompt: workOrder must be non-empty");
+  }
   const seenOrders = new Set<number>();
   input.workOrder.forEach((s, i) => {
     if (
