@@ -397,8 +397,8 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
 
 /** Adapter for the reason step's SparkCaller (frames attached). */
 export function createReasonSparkCaller(client: MetaClient) {
-  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown>; temperature?: number }) =>
-    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema, temperature: req.temperature });
+  return (req: { model: string; prompt: string; images: string[]; schema: Record<string, unknown>; temperature?: number; signal?: AbortSignal }) =>
+    client.callSpark({ model: req.model, prompt: req.prompt, images: req.images, schema: req.schema, temperature: req.temperature, signal: req.signal });
 }
 
 /** Adapter for the cost step's CostCaller (text-only, web_search tool). */
