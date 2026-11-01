@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Issue, PlanFrame, PlanReview, WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
@@ -240,15 +241,43 @@ export function ProblemList({
 }) {
   const frames = plan.frames ?? [];
   const { done } = useDoneSteps(plan);
-  const groups = groupByTier(issues);
+  const [onlyUnmentioned, setOnlyUnmentioned] = useState(false);
+  const unmentionedCount = narrated ? issues.filter((i) => i.unmentioned).length : 0;
+  // The filter only helps when it would actually narrow the list.
+  const canFilter = unmentionedCount > 0 && unmentionedCount < issues.length;
+  const shown = canFilter && onlyUnmentioned ? issues.filter((i) => i.unmentioned) : issues;
+  const groups = groupByTier(shown);
+  // A "#problem-N" link elsewhere on the plan (fix first, work steps, walk timeline) must still land when the filter
+  // hides that card: show every problem again, then jump to it.
+  useEffect(() => {
+    if (!onlyUnmentioned) return;
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.('a[href^="#problem-"]');
+      const id = link?.getAttribute("href")?.slice(1);
+      if (!id || document.getElementById(id)) return;
+      e.preventDefault();
+      setOnlyUnmentioned(false);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          document.getElementById(id)?.scrollIntoView({ block: "start" });
+          history.replaceState(null, "", `#${id}`);
+        }),
+      );
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [onlyUnmentioned]);
   const note = coverageNote(plan);
   // Tier headings only help once there is more than one problem; a single card reads fine alone.
-  const showTiers = issues.length > 1;
+  const showTiers = shown.length > 1;
   const showChecklist = [...issues, ...watch].some((i) => typeof (i as { checklistKey?: unknown }).checklistKey === "string");
   return (
     <>
       {issueCosts && (
         <p className="mb-4 text-sm text-ink/70">Each problem shows its share of the rough cost. Shared supplies are split, and the shares add up to the total.</p>
+      )}
+      {canFilter && (
+        <UnmentionedFilter all={issues.length} unmentioned={unmentionedCount} only={onlyUnmentioned} onChange={setOnlyUnmentioned} />
       )}
       {showTiers ? (
         <div className="flex flex-col gap-8">
@@ -271,7 +300,7 @@ export function ProblemList({
         </div>
       ) : (
         <ol className="flex flex-col gap-3">
-          {issues.map((issue) => (
+          {shown.map((issue) => (
             <IssueCard key={issue.rank} titleLevel={3} issue={issue} frames={frames} narrated={narrated} review={review} masks={masks} sample={sample} cost={issueCosts?.get(issue.rank)} fixedIn={stepsFixing(plan.workOrder, issue.rank)} fixedDone={allStepsDone(stepsFixing(plan.workOrder, issue.rank), done)} />
           ))}
         </ol>
@@ -293,6 +322,32 @@ export function ProblemList({
       {watch.length > 0 && <WatchList items={watch} frames={frames} masks={masks} sample={sample} />}
       {showChecklist && <Checklist issues={issues} watch={watch} />}
     </>
+  );
+}
+
+/**
+ * Two-option toggle above the problems: every problem, or only the ones the video showed and the narration never
+ * mentioned. Buttons with aria-pressed, 44 px tall, hidden in print so a printout always lists every problem.
+ */
+function UnmentionedFilter({ all, unmentioned, only, onChange }: { all: number; unmentioned: number; only: boolean; onChange: (only: boolean) => void }) {
+  const base =
+    "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark sm:flex-none";
+  const on = "bg-ink text-white";
+  const off = "text-ink/75 hover:bg-ink/5";
+  return (
+    <div className="mb-5 print:hidden" data-testid="unmentioned-filter">
+      <div role="group" aria-label="Which problems to show" className="flex w-full gap-1 rounded-full border border-ink/15 bg-white p-1 sm:inline-flex sm:w-auto">
+        <button type="button" aria-pressed={!only} className={`${base} ${only ? off : on}`} onClick={() => onChange(false)}>
+          All <span className="tabular-nums">{all}</span>
+        </button>
+        <button type="button" aria-pressed={only} className={`${base} ${only ? on : off}`} onClick={() => onChange(true)}>
+          You didn&apos;t mention <span className="tabular-nums">{unmentioned}</span>
+        </button>
+      </div>
+      <p className="sr-only" aria-live="polite">
+        {only ? `Showing ${unmentioned} of ${all} problems: the ones you didn't mention.` : `Showing all ${all} problems.`}
+      </p>
+    </div>
   );
 }
 
