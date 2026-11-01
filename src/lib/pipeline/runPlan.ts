@@ -1734,8 +1734,8 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     };
     const costDeps: CostDeps =
       deps.costPrompt && request.region?.trim()
-        ? { ...deps.cost, prompt: deps.costPrompt(costInput, request.spaceType) }
-        : deps.cost;
+        ? { ...deps.cost, prompt: deps.costPrompt(costInput, request.spaceType), signal: deps.signal }
+        : { ...deps.cost, signal: deps.signal };
     cost = await estimateCost(costInput, costDeps);
     // Server log only: whether the cost step priced and grounded
     // every material. No plan output, no UI change.
