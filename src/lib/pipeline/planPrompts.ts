@@ -689,6 +689,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * order=0; it now fails fast (WorkStep order is 1-based).
  * Negative hours printed verbatim as hours=[-2, 3]; they now fail
  * fast (labor hours are never negative).
+ * Two steps sharing one order printed verbatim as order=1 twice; they now
+ * fail fast (each work step has its own 1-based order).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -729,6 +731,7 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   if (!Array.isArray(input.workOrder)) {
     throw new Error("buildCostPrompt: workOrder must be an array");
   }
+  const seenOrders = new Set<number>();
   input.workOrder.forEach((s, i) => {
     if (
       !s ||
@@ -743,6 +746,10 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     if (!Number.isInteger(s.order) || s.order < 1) {
       throw new Error(`buildCostPrompt: workOrder[${i}].order must be a positive integer`);
     }
+    if (seenOrders.has(s.order)) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].order must be unique`);
+    }
+    seenOrders.add(s.order);
     if (
       s.trade !== undefined &&
       (typeof s.trade !== "string" || s.trade.trim().length === 0)
