@@ -144,6 +144,13 @@ export interface SegmentCaller {
     frameIndex: number;
     /** Data URL of the still image. */
     dataUrl: string;
+    /**
+     * Abort signal for a stopped run (2026-11-01): when set, the
+     * SAM caller passes it to its fetch, and an already-aborted
+     * signal throws an AbortError before any fetch, so a stopped
+     * run never starts (or pays for) a SAM call it no longer needs.
+     */
+    signal?: AbortSignal;
   }): Promise<{ instances: unknown; latencyMs: number; costUsd: number }>;
 }
 
@@ -206,6 +213,11 @@ export interface SegmentOutput extends SegmentationResult {
 export interface SegmentDeps {
   callSegment: SegmentCaller;
   tracker: UsageTracker;
+  /**
+   * Abort signal for a stopped run, forwarded to every SAM call,
+   * same shape as the transcribe/reason/cost/review/picturing legs.
+   */
+  signal?: AbortSignal;
 }
 
 /** Validate raw SAM output into instances, dropping nothing here (threshold applied by callers). */
@@ -729,6 +741,7 @@ export async function runSegment(
         concept,
         frameIndex,
         dataUrl: input.frames[frameIndex].dataUrl,
+        signal: deps.signal,
       });
     } catch (err) {
       // A billed-but-failed SAM call still spent money (e.g. MetaCallError
