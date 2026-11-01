@@ -66,6 +66,16 @@ export interface SparkCallRequest {
   tools?: { type: string }[];
   /** Sampling temperature, sent verbatim when set. Reason/review pass 0.2; other steps omit it. */
   temperature?: number;
+  /**
+   * Abort signal for a stopped run (2026-11-01): when set, it is
+   * passed to the fetch, so stopping a run can cut the in-flight
+   * Spark call short instead of only stopping before the next
+   * step. An already-aborted signal throws an AbortError before
+   * any fetch, so it spends nothing. Until the pipeline steps
+   * pass their run signal through here, callers that omit it
+   * behave exactly as before.
+   */
+  signal?: AbortSignal;
 }
 
 export interface SparkCallResult {
@@ -291,6 +301,18 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
         ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       };
 
+      // A stopped run must not start (or pay for) a call it no
+      // longer needs: an already-aborted signal throws here,
+      // before any fetch, with the same AbortError name the
+      // pipeline runner uses, so the route treats it as a stop,
+      // not a step failure. A signal that aborts mid-flight
+      // rejects the fetch below, which propagates unchanged
+      // (it is not a transient 404, so no retry follows it).
+      if (req.signal?.aborted) {
+        const err = new Error("meta: aborted");
+        err.name = "AbortError";
+        throw err;
+      }
       const started = Date.now();
       let parsed: Record<string, unknown> | null = null;
       let lastStatus = 0;
@@ -300,6 +322,7 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: req.signal,
         });
         if (res.ok) {
           // A 200 body that is not JSON carries no usage tokens to
