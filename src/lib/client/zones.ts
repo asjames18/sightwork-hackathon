@@ -37,6 +37,12 @@ export interface ZoneOptions {
   maxZones?: number;
   /** Last frames of the current visit that a cut can't match (about 6 s at one frame per 2 s). Default 3. */
   recentFrames?: number;
+  /**
+   * Typical seconds between the frames (median gap). Defaults to 2, the spacing the thresholds were
+   * tuned at. From FOLD_ALL_BELOW_SEC apart, a one-frame run can be a whole stretch of the walk rather
+   * than a glance, so it is folded only when it looks like a neighbouring frame.
+   */
+  frameSpacingSec?: number;
 }
 
 /*
@@ -49,12 +55,24 @@ export interface ZoneOptions {
  * back under a new id is counted again (tools/test/zoneCounting.test.ts, "known limit"); totals are a
  * floor-plus-overlap estimate, not exact.
  */
+/*
+ * Wide spacing (2026-10-31): a long take sends at most 48 frames, so a Large or Extra large walk has
+ * frames 4-6.3 s apart, and folding every one-frame run merged real areas (the 167 s five-clip
+ * sanctuary take fell from 6 areas at 2 s to 3 at 6.25 s). Measured on that take at 4, 5 and 6.25 s
+ * spacing and four sampling offsets each, against its 1 s grouping: folding a lone frame only when its
+ * combined distance to a neighbour is under FOLD_NEAR_BAR matched as well or better in all 12 cases
+ * (pair agreement 0.73 to 0.83 at 6.25 s, offset 0) and kept 5-7 areas. Spacing under 4 s is unchanged.
+ */
+export const FOLD_ALL_BELOW_SEC = 4;
+export const FOLD_NEAR_BAR = 0.3;
+
 const ZONE_DEFAULTS: Required<ZoneOptions> = {
   cutThreshold: 0.25,
   driftThreshold: 0.4,
   revisitThreshold: 0.18,
   maxZones: 8,
   recentFrames: 3,
+  frameSpacingSec: 2,
 };
 
 /**
@@ -124,7 +142,7 @@ export function signatureDistance(a: FrameSignature, b: FrameSignature): number 
  * One zone id per signature, in the same order. Empty in, empty out. See the module comment for
  * the rules. A run of one frame (a glance away, a blurred step) is folded into the run before it,
  * or the run after it when it opens the take, so every zone has at least two frames when the take
- * has at least two.
+ * has at least two (frames under FOLD_ALL_BELOW_SEC apart; wider, see foldShortRuns).
  */
 export function assignZones(signatures: FrameSignature[], options: ZoneOptions = {}): number[] {
   const o = { ...ZONE_DEFAULTS, ...options };
@@ -160,19 +178,42 @@ export function assignZones(signatures: FrameSignature[], options: ZoneOptions =
     ids.push(next);
     visitStart = i;
   }
-  return renumber(foldShortRuns(ids));
+  const spacing = Number.isFinite(o.frameSpacingSec) && o.frameSpacingSec > 0 ? o.frameSpacingSec : 2;
+  return renumber(foldShortRuns(ids, spacing < FOLD_ALL_BELOW_SEC ? null : signatures));
 }
 
-/** Merges runs of a single frame into a neighbouring run (the one before, else the one after). */
-function foldShortRuns(ids: number[]): number[] {
+/**
+ * Merges runs of a single frame into a neighbouring run (the one before, else the one after). With
+ * signatures (wide spacing), only a lone frame within FOLD_NEAR_BAR of a neighbouring frame is merged,
+ * into the nearer neighbour's run; one that looks like neither keeps its own area.
+ */
+function foldShortRuns(ids: number[], signatures: FrameSignature[] | null = null): number[] {
   const out = ids.slice();
   if (out.length < 2) return out;
   for (let i = 0; i < out.length; i++) {
     const startsRun = i === 0 || out[i] !== out[i - 1];
     const endsRun = i === out.length - 1 || out[i] !== out[i + 1];
-    if (startsRun && endsRun) out[i] = i > 0 ? out[i - 1] : out[i + 1];
+    if (!(startsRun && endsRun)) continue;
+    if (!signatures) {
+      out[i] = i > 0 ? out[i - 1] : out[i + 1];
+      continue;
+    }
+    const dPrev = i > 0 ? signatureDistance(signatures[i], signatures[i - 1]) : Infinity;
+    const dNext = i < out.length - 1 ? signatureDistance(signatures[i], signatures[i + 1]) : Infinity;
+    if (Math.min(dPrev, dNext) < FOLD_NEAR_BAR) out[i] = dPrev <= dNext ? out[i - 1] : out[i + 1];
   }
   return out;
+}
+
+/** Median gap in seconds between consecutive frame times (sorted), or undefined with fewer than two. */
+export function medianSpacingSec(times: number[]): number | undefined {
+  const t = times.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < t.length; i++) if (t[i] > t[i - 1]) gaps.push(t[i] - t[i - 1]);
+  if (gaps.length === 0) return undefined;
+  gaps.sort((a, b) => a - b);
+  const m = gaps.length >> 1;
+  return gaps.length % 2 ? gaps[m] : (gaps[m - 1] + gaps[m]) / 2;
 }
 
 /** Relabels ids 0, 1, 2... in order of first appearance (gaps left by folded detours close up). */
