@@ -411,6 +411,42 @@ export function formatReasonSubsetFlagged(
 }
 
 /**
+ * Server-log-only summary of the widest time gap between consecutive
+ * frames in the capped reason subset. Pure, and it changes no plan
+ * output: runPlan logs it on capped runs so a real Large/XL run
+ * shows whether the reason step's frames are evenly spread or leave
+ * a long stretch of the walk unseen in time. Returns null when the
+ * subset has fewer than two frames or any referenced time is not a
+ * finite, non-decreasing value, so uncapped and malformed runs stay
+ * quiet. Frame indices and seconds only, nothing user-identifying.
+ */
+export function formatReasonSubsetSpacing(
+  tSecs: number[],
+  subset: number[],
+): string | null {
+  if (subset.length < 2) return null;
+  const ordered = [...subset].sort((a, b) => a - b);
+  let maxGap = -1;
+  let maxPair: [number, number] | null = null;
+  let prev: number | null = null;
+  for (const i of ordered) {
+    const t = tSecs[i];
+    if (typeof t !== "number" || !Number.isFinite(t)) return null;
+    if (prev !== null) {
+      const gap = t - prev.t;
+      if (gap < 0) return null;
+      if (gap > maxGap) {
+        maxGap = gap;
+        maxPair = [prev.i, i];
+      }
+    }
+    prev = { i, t };
+  }
+  if (maxPair === null) return null;
+  return `runPlan: reason subset: max gap ${maxGap.toFixed(1)}s between frames ${maxPair[0]} and ${maxPair[1]}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1269,6 +1305,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
       reasonSubset,
     );
     if (subsetFlagged) console.log(subsetFlagged);
+    const subsetSpacing = formatReasonSubsetSpacing(
+      request.frames.map((f) => f.tSec),
+      reasonSubset,
+    );
+    if (subsetSpacing) console.log(subsetSpacing);
   }
   // Segmentation indices are subset positions too, so the prompt's
   // flaggedFrames, hazardHits, and rawLog stay consistent with the
