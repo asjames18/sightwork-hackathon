@@ -126,6 +126,12 @@ export interface SparkCaller {
     schema: Record<string, unknown>;
     /** Sampling temperature, forwarded verbatim when set. */
     temperature?: number;
+    /**
+     * Abort signal for a stopped run (2026-11-01): forwarded to the
+     * model caller so stopping a run can cut the in-flight reason
+     * call short. Omit it and the call behaves exactly as before.
+     */
+    signal?: AbortSignal;
   }): Promise<{
     json: unknown;
     latencyMs: number;
@@ -142,6 +148,8 @@ export interface ReasonDeps {
   schema: Record<string, unknown>;
   callSpark: SparkCaller;
   tracker: UsageTracker;
+  /** Abort signal from runPlan (the route's request signal), forwarded to callSpark. */
+  signal?: AbortSignal;
 }
 
 const SPARK_MODEL = "muse-spark-1.3";
@@ -598,7 +606,7 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
     // the success path. No retry: a throw is not a shape failure.
     let res: Awaited<ReturnType<typeof deps.callSpark>>;
     try {
-      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE });
+      res = await deps.callSpark({ model: SPARK_MODEL, prompt, images, schema, temperature: SPARK_TEMPERATURE, signal: deps.signal });
     } catch (err) {
       recordFailedCall(deps.tracker, failedCallModel(err, SPARK_MODEL), "reason", err);
       throw err;
