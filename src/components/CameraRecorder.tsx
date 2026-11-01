@@ -30,6 +30,7 @@ import {
   secondsLeft,
   shouldRetryWithoutMic,
   takeMeter,
+  type TakeInterruption,
   videoOnlyConstraints,
 } from "@/lib/client/recorder";
 
@@ -43,6 +44,8 @@ export interface RecordingInfo {
   /** Average bits per second of the finished file, audio included. */
   bitsPerSecond: number;
   durationSec: number;
+  /** Set when the take stopped on its own before Stop was tapped (page went to the background, camera turned off). */
+  interruptedBy?: TakeInterruption | null;
 }
 
 /** True when this browser can open the camera and record in the page. */
@@ -83,6 +86,8 @@ export function CameraRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const discardRef = useRef(false);
+  // Why the take stopped, when it wasn't the Stop button or the size's cap.
+  const interruptRef = useRef<TakeInterruption | null>(null);
   const startedAtRef = useRef(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterRef = useRef<MicMeter | null>(null);
@@ -217,6 +222,7 @@ export function CameraRecorder({
     }
     const chunks: Blob[] = [];
     discardRef.current = false;
+    interruptRef.current = null;
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
     };
@@ -237,6 +243,7 @@ export function CameraRecorder({
         mimeType: type,
         bitsPerSecond: averageBitrate(blob.size, durationSec),
         durationSec,
+        interruptedBy: interruptRef.current,
       });
     };
     recorderRef.current = rec;
@@ -251,6 +258,32 @@ export function CameraRecorder({
       if (elapsedState(sec, rulesRef.current) === "max") stop();
     }, 250);
   }, [settings, stop, stopTracks]);
+
+  // A call, an app switch or a locked screen sends the page to the background, and phone browsers pause or
+  // cut the camera there. Stop the take at that point and keep what was recorded, rather than lose the walk.
+  // The same when the camera track ends under the take (another app took it, or it was unplugged).
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const interrupt = (reason: TakeInterruption) => {
+      if (phaseRef.current !== "recording") return;
+      interruptRef.current = reason;
+      stop();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") interrupt("hidden");
+    };
+    const onPageHide = () => interrupt("hidden");
+    const onEnded = () => interrupt("camera-ended");
+    const track = streamRef.current?.getVideoTracks()[0];
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    track?.addEventListener("ended", onEnded);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      track?.removeEventListener("ended", onEnded);
+    };
+  }, [phase, stop]);
 
   // Once the camera is live, bring the whole card (preview and Start) into view under the sticky header,
   // so a small or sideways phone doesn't leave Start below the fold. Focus goes to Start without a second scroll.

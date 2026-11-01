@@ -11,6 +11,7 @@ import { loadRoomSize, saveRoomSize } from "@/lib/client/roomSize";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
 import { lightMessage, lightVerdict, type LightVerdict } from "@/lib/client/lightCheck";
 import { sampleVideoLuma } from "@/lib/client/sampleVideoLuma";
+import { interruptedTakeNote } from "@/lib/client/recorder";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
 import { SpacePicker } from "./SpacePicker";
 import { RoomSizePicker } from "./RoomSizePicker";
@@ -184,6 +185,13 @@ export function UploadStep({
 
   // Record: the in-page camera when this browser has it, otherwise straight to the phone's camera app
   // (still inside the tap, so the browser allows opening the picker).
+  // Back to the live camera from a take that stopped on its own; the old take is dropped.
+  const recordAgain = () => {
+    setPreview(null);
+    setRecorded(null);
+    setLen({ state: "reading" });
+    startRecord();
+  };
   const startRecord = () => {
     setCameraNote(null);
     if (canRecordInPage()) setRecording(true);
@@ -199,6 +207,10 @@ export function UploadStep({
   };
 
   const durationSec = check.kind === "ok" || check.kind === "warn" ? check.durationSec : null;
+  // A take that stopped on its own (page went to the background, camera turned off): say why and what was kept.
+  const interruptedNote = recorded?.interruptedBy
+    ? interruptedTakeNote(recorded.interruptedBy, len.state === "known" ? len.sec : recorded.durationSec, rules)
+    : null;
   // Light check: once the length is known, measure a few frames on the device and warn (softly)
   // about a take too dark to show damage, before a real run spends anything on it.
   const [light, setLight] = useState<{ url: string; verdict: LightVerdict } | null>(null);
@@ -367,6 +379,14 @@ export function UploadStep({
               Change
             </button>
           </div>
+          {interruptedNote && (
+            <div role="status" data-testid="take-interrupted" className="mx-4 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p>{interruptedNote}</p>
+              <button type="button" onClick={recordAgain} className="btn-secondary mt-2 w-full text-sm sm:w-auto">
+                Record again
+              </button>
+            </div>
+          )}
           {(check.kind === "warn" || check.kind === "block") && (
             <p
               role={check.kind === "block" ? "alert" : "status"}

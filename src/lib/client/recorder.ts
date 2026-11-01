@@ -204,3 +204,28 @@ export function takeMeter(sec: number, rules: DurationRules = durationRulesFor()
     valueText: `${formatDuration(s)} of ${formatDuration(cap)}. ${label}. Aim for ${aimRangeSpoken(rules)}.`,
   };
 }
+
+/** Why a take stopped before Stop was tapped: the page went to the background, or the camera track ended. */
+export type TakeInterruption = "hidden" | "camera-ended";
+
+/**
+ * Note for the take card when a recording stopped on its own mid-walk (a call came in, the walker switched
+ * apps, or another app took the camera). What was recorded is kept, so the note says why it stopped and
+ * whether the kept part is long enough to use. Null when the take wasn't interrupted.
+ */
+export function interruptedTakeNote(
+  reason: TakeInterruption | null | undefined,
+  sec: number,
+  rules: DurationRules = durationRulesFor(),
+): string | null {
+  if (reason !== "hidden" && reason !== "camera-ended") return null;
+  const lead =
+    reason === "hidden" ? "Recording stopped when you left the page." : "Recording stopped because the camera turned off.";
+  const s = Number.isFinite(sec) ? Math.max(0, sec) : 0;
+  const len = formatDuration(s);
+  if (s < rules.minSec) return `${lead} Only ${len} was recorded, too short for a plan.`;
+  if (s < rules.aimMinSec) {
+    return `${lead} We kept the ${len} you recorded. That's short for a ${rules.label.toLowerCase()} space (aim for ${aimRangeSpoken(rules)}), so record again if you missed part of it.`;
+  }
+  return `${lead} We kept the ${len} you recorded, which is enough to make your plan.`;
+}

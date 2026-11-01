@@ -373,3 +373,58 @@ test("Record in a dark room: a live 'it's dark here' hint shows while recording;
   await cam.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("group", { name: "Camera" })).toHaveCount(0);
 });
+
+test("Record, then the page goes to the background mid-take: the take is kept with a note, and Record again works", async ({ page }, info) => {
+  await page.addInitScript(trackStreams);
+  await page.goto("/start");
+  await page.getByRole("button", { name: "Record a walkthrough" }).click();
+  let cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await expect(cam).toHaveAttribute("data-phase", "recording");
+  await page.waitForTimeout(6300);
+  // What a phone does on a call or an app switch: the page turns hidden.
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  const card = page.getByRole("group", { name: "Your walkthrough" });
+  await expect(card).toContainText(/walkthrough-\d{4}-\d{2}-\d{2}-\d{4}\.(webm|mp4)/);
+  await page.evaluate(() => {
+    delete (document as unknown as { visibilityState?: string }).visibilityState;
+  });
+  const note = card.getByTestId("take-interrupted");
+  await expect(note).toHaveAttribute("role", "status");
+  await expect(note).toContainText(/^Recording stopped when you left the page\. We kept the 0:0[67] you recorded\. That's short for a medium space/);
+  expect(await page.evaluate(liveTrackCount), "camera and mic are released").toBe(0);
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "interrupted take");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `recorder-interrupted-${info.project.name}.png`) });
+
+  // Record again: back to the live camera, old take gone.
+  await note.getByRole("button", { name: "Record again" }).click();
+  cam = page.getByRole("group", { name: "Camera" });
+  await expect(cam).toHaveAttribute("data-phase", "ready");
+  await expect(page.getByRole("group", { name: "Your walkthrough" })).toHaveCount(0);
+
+  // The camera turning off under a take does the same, with its own reason.
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await expect(cam).toHaveAttribute("data-phase", "recording");
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const streams = (window as unknown as { __streams: MediaStream[] }).__streams;
+    streams.at(-1)!.getVideoTracks()[0].dispatchEvent(new Event("ended"));
+  });
+  await expect(page.getByRole("group", { name: "Your walkthrough" }).getByTestId("take-interrupted").locator("p")).toHaveText(
+    /^Recording stopped because the camera turned off\. Only 0:0[12] was recorded, too short for a plan\.$/,
+  );
+
+  // A take stopped with the Stop button gets no note.
+  await page.getByRole("button", { name: "Record again" }).click();
+  cam = page.getByRole("group", { name: "Camera" });
+  await cam.getByRole("button", { name: "Start recording" }).click();
+  await page.waitForTimeout(1200);
+  await cam.getByRole("button", { name: "Stop recording" }).click();
+  await expect(page.getByRole("group", { name: "Your walkthrough" })).toBeVisible();
+  await expect(page.getByTestId("take-interrupted")).toHaveCount(0);
+});
