@@ -623,6 +623,10 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * frame list prints t only) and the scalar fields. dataUrl is
  * intentionally unchecked here — runReason validates it before the
  * model call, and this builder never prints it.
+ * A spaceName or spaceType containing a newline printed verbatim
+ * would split the prompt line that carries it, so such values now
+ * fail fast. The transcript is intentionally unchecked for newlines:
+ * it is multi-line by design.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -659,6 +663,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     const v = input[field];
     if (v !== undefined && typeof v !== "string") {
       throw new Error(`buildReasonPrompt: ${field} must be a string when given`);
+    }
+    if (typeof v === "string" && /[\r\n]/.test(v)) {
+      throw new Error(`buildReasonPrompt: ${field} must not contain a newline`);
     }
   }
   if (
