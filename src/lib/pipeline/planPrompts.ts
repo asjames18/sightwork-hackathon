@@ -685,6 +685,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * Region is required here: this builder is only called with a region
  * (runPlan guards the call, estimateCost returns null without one).
  * A reversed hours pair printed verbatim as hours=[5, 2]; it now fails fast.
+ * A step order of 0, a negative, or a fraction printed verbatim as
+ * order=0; it now fails fast (WorkStep order is 1-based).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -735,6 +737,9 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       !Number.isFinite(s.order)
     ) {
       throw new Error(`buildCostPrompt: workOrder[${i}] must have a finite order and a non-empty title`);
+    }
+    if (!Number.isInteger(s.order) || s.order < 1) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].order must be a positive integer`);
     }
     if (s.trade !== undefined && typeof s.trade !== "string") {
       throw new Error(`buildCostPrompt: workOrder[${i}].trade must be a string when given`);
