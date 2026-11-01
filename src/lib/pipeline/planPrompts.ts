@@ -743,8 +743,13 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
     if (!Number.isInteger(s.order) || s.order < 1) {
       throw new Error(`buildCostPrompt: workOrder[${i}].order must be a positive integer`);
     }
-    if (s.trade !== undefined && typeof s.trade !== "string") {
-      throw new Error(`buildCostPrompt: workOrder[${i}].trade must be a string when given`);
+    if (
+      s.trade !== undefined &&
+      (typeof s.trade !== "string" || s.trade.trim().length === 0)
+    ) {
+      throw new Error(
+        `buildCostPrompt: workOrder[${i}].trade must be a non-empty string when given`,
+      );
     }
     if (
       s.hours !== undefined &&
