@@ -358,6 +358,34 @@ export function pickReasonFrames(
 }
 
 /**
+ * Server-log-only summary of what the capped reason subset covers,
+ * zone-wise. Pure, and it changes no plan output: runPlan logs it
+ * on capped runs so the next real Large/XL run shows whether the
+ * reason step actually saw every area (the zone pass is best
+ * effort: a zone is left out when every subset member is an
+ * endpoint, a flagged frame, or its own zone's sole representative,
+ * and when zones outnumber slots the earliest zones win). Returns
+ * null when no frame carries a zoneId, so uncapped and unzoned runs
+ * stay quiet. Frame indices and zone numbers only, nothing
+ * user-identifying.
+ */
+export function formatReasonSubsetZones(
+  zoneIds: Array<number | undefined>,
+  subset: number[],
+): string | null {
+  const zones = new Set<number>();
+  for (const z of zoneIds) if (z !== undefined) zones.add(z);
+  if (zones.size === 0) return null;
+  const covered = new Set<number>();
+  for (const i of subset) {
+    const z = zoneIds[i];
+    if (z !== undefined) covered.add(z);
+  }
+  const leftOut = [...zones].filter((z) => !covered.has(z)).sort((a, b) => a - b);
+  return `runPlan: reason subset: ${subset.length}/${zoneIds.length} frames, zones ${covered.size}/${zones.size} covered${leftOut.length ? `, left out: ${leftOut.join(", ")}` : ""}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (Grok Bot, 2026-10-27 11:43 AM). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1201,6 +1229,17 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
         request.frames.map((f) => f.zoneId),
       )
     : null;
+  // Server log only: whether the capped reason subset actually saw
+  // every area. No plan output, no UI change. This is the evidence
+  // the held SAM-cap decision needs from the next real Large/XL run:
+  // if zones are left out here, the reason step never saw them.
+  if (reasonSubset) {
+    const subsetZones = formatReasonSubsetZones(
+      request.frames.map((f) => f.zoneId),
+      reasonSubset,
+    );
+    if (subsetZones) console.log(subsetZones);
+  }
   // Segmentation indices are subset positions too, so the prompt's
   // flaggedFrames, hazardHits, and rawLog stay consistent with the
   // subset frame list; entries outside the subset are dropped.
