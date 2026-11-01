@@ -88,12 +88,28 @@ export interface TranscribeCaller {
     mode: "standard";
     audioWavBase64: string;
     keywordBias: string[];
+    /**
+     * Abort signal for a stopped run; the Meta ASR caller passes it
+     * to its fetch, so a stopped run stops mid-transcription instead
+     * of billing the whole ASR call. Omit it and the call runs as
+     * before.
+     */
+    signal?: AbortSignal;
   }): Promise<{ turns: unknown; latencyMs: number; costUsd: number }>;
 }
 
 /** Optional Spark cleanup caller; omitted means no cleanup pass. */
 export interface CleanupCaller {
-  (req: { model: string; prompt: string }): Promise<{
+  (req: {
+    model: string;
+    prompt: string;
+    /**
+     * Abort signal for a stopped run; the Spark cleanup caller
+     * passes it to its fetch, same shape as the ASR caller's signal
+     * above. Omit it and the call runs as before.
+     */
+    signal?: AbortSignal;
+  }): Promise<{
     text: string;
     latencyMs: number;
     costUsd: number;
@@ -115,6 +131,12 @@ export interface TranscribeOutput {
 export interface TranscribeDeps {
   callTranscribe: TranscribeCaller;
   tracker: UsageTracker;
+  /**
+   * Abort signal for a stopped run, forwarded to the ASR call and
+   * the cleanup call below, matching the reason/cost/review legs.
+   * Omit it and both calls run as before.
+   */
+  signal?: AbortSignal;
   keywordBias?: string[];
   /**
    * Cleanup prompt template with {{raw_turns}}, {{space_type}} and
@@ -443,6 +465,7 @@ export async function runTranscribe(
       mode: "standard",
       audioWavBase64: input.audioWavBase64,
       keywordBias: deps.keywordBias ?? DEFAULT_KEYWORD_BIAS,
+      signal: deps.signal,
     });
   } catch (err) {
     // A billed-but-failed ASR call still spent money (e.g. MetaCallError
@@ -475,7 +498,7 @@ export async function runTranscribe(
       .replaceAll("{{keyword_bias}}", (deps.keywordBias ?? DEFAULT_KEYWORD_BIAS).join(", "));
     let cleaned: Awaited<ReturnType<CleanupCaller>>;
     try {
-      cleaned = await deps.callCleanup({ model: CLEANUP_MODEL, prompt });
+      cleaned = await deps.callCleanup({ model: CLEANUP_MODEL, prompt, signal: deps.signal });
     } catch (err) {
       // Same as the ASR call above: a billed-but-failed cleanup call
       // is recorded before rethrowing, so the route total counts it;
