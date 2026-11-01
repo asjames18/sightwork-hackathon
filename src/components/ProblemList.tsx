@@ -8,6 +8,7 @@ import { shareLabel, type CostShare } from "@/lib/costShares";
 import { PrintOpenDetails } from "./PrintOpenDetails";
 import { fixedInLabel, problemAnchor, stepAnchor, stepsFixing } from "@/lib/client/stepLinks";
 import { allStepsDone } from "@/lib/client/stepProgress";
+import { problemsFixed, type ProblemsFixed } from "@/lib/client/problemsFixed";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { problemShareTitle, problemToText } from "@/lib/client/problemText";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
@@ -325,6 +326,7 @@ export function ProblemList({
     return () => document.removeEventListener("click", onClick, true);
   }, [onlyUnmentioned]);
   const note = coverageNote(plan);
+  const fixedTally = problemsFixed(issues, plan.workOrder, done);
   // Tier headings only help once there is more than one problem; a single card reads fine alone.
   const showTiers = shown.length > 1;
   const showChecklist = [...issues, ...watch].some((i) => typeof (i as { checklistKey?: unknown }).checklistKey === "string");
@@ -333,6 +335,7 @@ export function ProblemList({
       {issueCosts && (
         <p className="mb-4 text-sm text-ink/70">Each problem shows its share of the rough cost. Shared supplies are split, and the shares add up to the total.</p>
       )}
+      {fixedTally && <FixedTally tally={fixedTally} />}
       {canFilter && (
         <UnmentionedFilter all={issues.length} unmentioned={unmentionedCount} only={onlyUnmentioned} onChange={setOnlyUnmentioned} />
       )}
@@ -379,6 +382,34 @@ export function ProblemList({
       {watch.length > 0 && <WatchList items={watch} frames={frames} masks={masks} sample={sample} />}
       {showChecklist && <Checklist issues={issues} watch={watch} />}
     </>
+  );
+}
+
+/**
+ * "2 of 5 problems fixed" with a bar, above the problems once any work step is ticked off, so the list says how far
+ * the work has come. Follows the ticks live (useDoneSteps). Problems no step fixes are named in a quieter note.
+ */
+function FixedTally({ tally }: { tally: ProblemsFixed }) {
+  const all = tally.fixed === tally.total;
+  return (
+    <div className="mb-5 rounded-2xl bg-white p-4" data-testid="problems-fixed">
+      <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+        <span className={`font-semibold tabular-nums ${all ? "text-safe-dark" : "text-ink"}`}>{tally.line}</span>
+        <span className="text-ink/65">
+          {all ? "Every step that fixes them is done." : "A problem is fixed once every step that fixes it is done."}
+        </span>
+      </p>
+      <div aria-hidden className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-ink/10">
+        <div className="h-full rounded-full bg-safe-dark transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${tally.percent}%` }} />
+      </div>
+      {tally.untracked > 0 && (
+        <p className="mt-2 text-xs text-ink/65" data-testid="problems-fixed-untracked">
+          {tally.untracked === 1
+            ? "1 problem isn’t in a work step, so it can’t be ticked off here."
+            : `${tally.untracked} problems aren’t in a work step, so they can’t be ticked off here.`}
+        </p>
+      )}
+    </div>
   );
 }
 
