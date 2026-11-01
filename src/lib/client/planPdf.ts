@@ -27,6 +27,7 @@ import { shareProgressLine } from "./stepProgress";
 import { nextUpShareLine } from "./nextUp";
 import { problemFixTag, shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
+import { stepsWaitingOn, waitersChipLabel } from "./stepWaiters";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -580,6 +581,9 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
       if (extra) para(extra, 9, "normal", MUTED, M + 24, W - 24, 0);
       const at = when.get(s.order);
       if (at) para(`When: ${at}`, 9, "normal", MUTED, M + 24, W - 24, 0);
+      // Same "Step N waits on this" chip as the plan screen, so whoever has the paper knows who to tell when done.
+      const waiters = isDone ? "" : waitersChipLabel(stepsWaitingOn(steps, s.order).map((w) => w.order));
+      if (waiters) para(`${waiters}.`, 9, "bold", INK, M + 24, W - 24, 0);
       y += 8;
     }
   } else if (!sample && issues.length > 0) {
