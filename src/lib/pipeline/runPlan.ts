@@ -447,6 +447,41 @@ export function formatReasonSubsetSpacing(
 }
 
 /**
+ * Server-log-only summary of whether the SAM request cap bit on
+ * the segment step. Pure, and it changes no plan output: runPlan
+ * logs it only when the cap dropped labels or the budget was
+ * exceeded, so a real Large/XL run shows whether the 300-request
+ * cap is the binding constraint (the held SAM-cap scaling decision
+ * needs exactly this: if the cap already bites, 450 buys coverage;
+ * if it never bites, the reason-subset lines bind instead).
+ * Returns null on quiet runs and malformed counts, so ordinary
+ * runs stay out of the server log. Counts and label names only,
+ * nothing user-identifying.
+ */
+export function formatSegmentBudget(
+  frameCount: number,
+  requestsMade: number,
+  flaggedCount: number,
+  budgetExceeded: boolean,
+  droppedLabels: string[],
+): string | null {
+  const labels = droppedLabels.filter(
+    (l) => typeof l === "string" && l.length > 0,
+  );
+  if (!budgetExceeded && labels.length === 0) return null;
+  if (
+    !Number.isInteger(frameCount) ||
+    frameCount < 0 ||
+    !Number.isInteger(requestsMade) ||
+    requestsMade < 0 ||
+    !Number.isInteger(flaggedCount) ||
+    flaggedCount < 0
+  )
+    return null;
+  return `runPlan: segment: cap bit: ${requestsMade} SAM requests on ${frameCount} frames, ${flaggedCount} flagged${labels.length ? `, dropped labels: ${labels.join(", ")}` : ""}`;
+}
+
+/**
  * Remap a reason result from subset positions back to plan-frame
  * indices (2026-10-27 11:43 AM review). `subset` maps a subset
  * position to its original frame index; frameTimeSec values need no
@@ -1273,6 +1308,20 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     // The segment stage covers both UI steps, so both read as
     // skipped from here on; the next running line carries them.
     skippedSteps.push("looking", "counting");
+  }
+
+  // Server log only: whether the SAM request cap bit on this run.
+  // No plan output, no UI change. This is the evidence the held
+  // SAM-cap decision needs from the next real Large/XL run.
+  if (segmentation) {
+    const segmentBudget = formatSegmentBudget(
+      request.frames.length,
+      segmentation.requestsMade,
+      segmentation.flaggedFrames.length,
+      segmentation.budgetExceeded,
+      segmentation.droppedLabels,
+    );
+    if (segmentBudget) console.log(segmentBudget);
   }
 
   // comparing: Spark turns frames + segmentation + transcript into
