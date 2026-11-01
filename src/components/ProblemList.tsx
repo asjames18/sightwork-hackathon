@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Issue, PlanFrame, PlanReview, WorkPlan } from "@/lib/types";
+import type { Box, Issue, PlanFrame, PlanReview, WorkPlan } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
 import { boxSource, coverageNote, groupByTier, issueExtras, issueTier, TIER_HINT, TIER_LABEL, type Tier, type WatchItem } from "@/lib/planExtras";
@@ -19,7 +19,8 @@ import {
 } from "@/lib/client/problemFilter";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { problemShareTitle, problemToText } from "@/lib/client/problemText";
-import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { canShareFiles, sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { getProofPhoto, withPhotoLine } from "@/lib/client/proofPhoto";
 import { keepInViewDelta, stickyLine } from "@/lib/client/keepInView";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 
@@ -137,22 +138,53 @@ const SEND_STATUS: Record<Exclude<ShareResult, "shared">, string> = {
   failed: "Couldn't share from this browser.",
 };
 
+/** What "Send this problem" can attach: the proof frame and its outline, drawn as on screen. */
+interface ProblemPhoto {
+  frame: PlanFrame | undefined;
+  box: Box | undefined;
+  dashed: boolean;
+}
+
 /**
  * Sends just this problem (problemText.ts) by the phone's share sheet, else the clipboard, so one problem can go to
- * the one person who will fix it. Hidden in print.
+ * the one person who will fix it. When the share sheet takes files, the proof photo goes along with the problem
+ * outlined (proofPhoto.ts), built ahead of the tap. Hidden in print.
  */
-function SendProblemButton({ issue, text }: { issue: Issue; text: () => string }) {
+function SendProblemButton({ issue, text, photo }: { issue: Issue; text: () => string; photo?: ProblemPhoto }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ready = useRef<File | null>(null);
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
+  const frameUrl = photo?.frame?.url;
+  const boxKey = photo?.box?.join(",") ?? "";
+  useEffect(() => {
+    ready.current = null;
+    if (!photo?.frame || !prefersShareSheet()) return;
+    const probe = new File([new Uint8Array([255, 216, 255])], "probe.jpg", { type: "image/jpeg" });
+    if (!canShareFiles(navigator, [probe])) return;
+    let live = true;
+    const run = () =>
+      void getProofPhoto(photo.frame, photo.box, { rank: issue.rank, title: issue.title, dashed: photo.dashed }).then((file) => {
+        if (live) ready.current = file;
+      });
+    const t = setTimeout(run, 600 + issue.rank * 150);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameUrl, boxKey, photo?.dashed, issue.rank, issue.title]);
   async function onSend() {
     if (busy) return;
     setBusy(true);
     setStatus("");
-    const result = await sharePlanText(problemShareTitle(issue), text(), navigator, prefersShareSheet());
+    const body = text();
+    const file = ready.current;
+    const attach = file ? { files: [file], text: withPhotoLine(body, Boolean(photo?.box)) } : null;
+    const result = await sharePlanText(problemShareTitle(issue), body, navigator, prefersShareSheet(), attach);
     setBusy(false);
     if (result === "shared") return;
     setStatus(SEND_STATUS[result]);
@@ -267,7 +299,15 @@ function IssueCard({
             {scope && verdict?.reason ? <span className="mt-0.5 block text-amber-900/80">{verdict.reason}</span> : null}
           </p>
         )}
-        <SendProblemButton issue={issue} text={() => problemToText(issue, { narrated, verdict, workOrder, spaceName, sample })} />
+        <SendProblemButton
+          issue={issue}
+          text={() => problemToText(issue, { narrated, verdict, workOrder, spaceName, sample })}
+          photo={
+            seen
+              ? { frame: frames[proof?.frameIndex ?? issue.frameIndex], box: proof?.box, dashed: !masks && boxSource(proof) !== "sam" }
+              : undefined
+          }
+        />
       </div>
       {seen && (
         <div className="mt-3 min-w-0 md:mt-0">
