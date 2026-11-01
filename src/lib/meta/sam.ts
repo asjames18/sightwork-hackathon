@@ -61,6 +61,13 @@ export interface SamSegmentCaller {
     frameIndex: number;
     /** Data URL of the still image. */
     dataUrl: string;
+    /**
+     * Abort signal for a stopped run (2026-11-01): when set, it is
+     * passed to the fetch, and an already-aborted signal throws an
+     * AbortError before any fetch, so a stopped run never starts
+     * (or pays for) a SAM call it no longer needs.
+     */
+    signal?: AbortSignal;
   }): Promise<{ instances: SamInstance[]; latencyMs: number; costUsd: number }>;
 }
 
@@ -290,6 +297,18 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
         );
       }
     }
+    // A stopped run must not start (or pay for) a call it no
+    // longer needs: an already-aborted signal throws here,
+    // before any fetch, with the same AbortError name the
+    // pipeline runner uses, so the route treats it as a stop,
+    // not a step failure. A signal that aborts mid-flight
+    // rejects the fetch below, which propagates unchanged
+    // (it is not a transient 404, so no retry follows it).
+    if (req.signal?.aborted) {
+      const err = new Error("sam: aborted");
+      err.name = "AbortError";
+      throw err;
+    }
     const body: Record<string, unknown> = {
       model: req.model,
       input: [
@@ -312,6 +331,7 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: req.signal,
       });
       if (res.ok) {
         const latencyMs = Date.now() - started;
