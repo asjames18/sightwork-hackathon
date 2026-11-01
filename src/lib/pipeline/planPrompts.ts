@@ -721,6 +721,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * containing a newline printed verbatim would split one prompt line
  * into two, so the cost model could read a phantom second entry;
  * such fields now fail fast.
+ * A region or space type containing a newline printed verbatim would
+ * split the prompt line that carries it, so the cost model could read
+ * a phantom line; such values now fail fast too.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -729,8 +732,14 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   if (typeof input.region !== "string" || input.region.trim().length === 0) {
     throw new Error("buildCostPrompt: region must be a non-empty string");
   }
+  if (/[\r\n]/.test(input.region)) {
+    throw new Error("buildCostPrompt: region must not contain a newline");
+  }
   if (spaceType !== undefined && typeof spaceType !== "string") {
     throw new Error("buildCostPrompt: spaceType must be a string when given");
+  }
+  if (typeof spaceType === "string" && /[\r\n]/.test(spaceType)) {
+    throw new Error("buildCostPrompt: spaceType must not contain a newline");
   }
   if (
     input.laborBasis !== undefined &&
@@ -946,6 +955,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
 
