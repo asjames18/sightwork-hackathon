@@ -687,6 +687,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * A reversed hours pair printed verbatim as hours=[5, 2]; it now fails fast.
  * A step order of 0, a negative, or a fraction printed verbatim as
  * order=0; it now fails fast (WorkStep order is 1-based).
+ * Negative hours printed verbatim as hours=[-2, 3]; they now fail
+ * fast (labor hours are never negative).
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -761,6 +763,15 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       s.hours[0] > s.hours[1]
     ) {
       throw new Error(`buildCostPrompt: workOrder[${i}].hours must be [low, high] with low <= high`);
+    }
+    if (
+      s.hours !== undefined &&
+      Array.isArray(s.hours) &&
+      s.hours.length === 2 &&
+      typeof s.hours[0] === "number" &&
+      s.hours[0] < 0
+    ) {
+      throw new Error(`buildCostPrompt: workOrder[${i}].hours must be >= 0`);
     }
   });
 }
