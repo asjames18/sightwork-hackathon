@@ -53,3 +53,32 @@ test("a problem link elsewhere on the plan still lands when the filter hides tha
   await expect(page.locator(`#${hidden}`)).toBeInViewport();
   await expect(page).toHaveURL(new RegExp(`#${hidden}$`));
 });
+
+test("switching the filter from far down the list keeps it in view under the sticky chips", async ({ page }) => {
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/start?view=example&ex=kitchen");
+    const filter = page.getByTestId("unmentioned-filter");
+    const only = filter.getByRole("button", { name: /^You didn.t mention/ });
+    const all = filter.getByRole("button", { name: /^All/ });
+    const cards = page.locator('li[id^="problem-"]');
+    // Scroll so the filter sits just under the header, half-covered by the chips, then switch.
+    for (const target of [only, all]) {
+      await cards.last().scrollIntoViewIfNeeded();
+      await filter.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 90));
+      await target.evaluate((el) => (el as HTMLButtonElement).click());
+      await expect(target).toHaveAttribute("aria-pressed", "true");
+      await expect
+        .poll(async () =>
+          page.evaluate(() => {
+            const f = document.querySelector('[data-testid="unmentioned-filter"]')!.getBoundingClientRect();
+            const nav = document.querySelector('[data-testid="section-nav"]')!.getBoundingClientRect();
+            return f.top >= nav.bottom && f.bottom <= window.innerHeight;
+          }),
+        )
+        .toBe(true);
+    }
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `filter kept in view ${width}`);
+  }
+});

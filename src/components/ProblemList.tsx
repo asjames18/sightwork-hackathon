@@ -11,6 +11,7 @@ import { allStepsDone } from "@/lib/client/stepProgress";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { problemShareTitle, problemToText } from "@/lib/client/problemText";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { keepInViewDelta, stickyLine } from "@/lib/client/keepInView";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 
 /**
@@ -390,13 +391,30 @@ function UnmentionedFilter({ all, unmentioned, only, onChange }: { all: number; 
     "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark sm:flex-none";
   const on = "bg-ink text-white";
   const off = "text-ink/75 hover:bg-ink/5";
+  // Switching can shrink or grow the list by many cards. Keep the filter where the reader can see it: just under the
+  // sticky header and chips, never half-covered by them and never left far above or below the window.
+  const ref = useRef<HTMLDivElement>(null);
+  const pick = (next: boolean) => {
+    if (next === only) return;
+    onChange(next);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = ref.current;
+        if (!el) return;
+        const delta = keepInViewDelta(el.getBoundingClientRect(), stickyLine(), window.innerHeight);
+        if (delta === 0) return;
+        const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        window.scrollBy({ top: delta, behavior: reduce ? "auto" : "smooth" });
+      }),
+    );
+  };
   return (
-    <div className="mb-5 print:hidden" data-testid="unmentioned-filter">
+    <div ref={ref} className="mb-5 scroll-mt-32 print:hidden" data-testid="unmentioned-filter">
       <div role="group" aria-label="Which problems to show" className="flex w-full gap-1 rounded-full border border-ink/15 bg-white p-1 sm:inline-flex sm:w-auto">
-        <button type="button" aria-pressed={!only} className={`${base} ${only ? off : on}`} onClick={() => onChange(false)}>
+        <button type="button" aria-pressed={!only} className={`${base} ${only ? off : on}`} onClick={() => pick(false)}>
           All <span className="tabular-nums">{all}</span>
         </button>
-        <button type="button" aria-pressed={only} className={`${base} ${only ? on : off}`} onClick={() => onChange(true)}>
+        <button type="button" aria-pressed={only} className={`${base} ${only ? on : off}`} onClick={() => pick(true)}>
           You didn&apos;t mention <span className="tabular-nums">{unmentioned}</span>
         </button>
       </div>
