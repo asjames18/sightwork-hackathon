@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import {
+  canHideGot,
   gotLine,
+  hiddenGotLine,
+  hideGotLabel,
   loadGotMaterials,
   materialsSpend,
   saveGotMaterials,
@@ -38,6 +41,7 @@ export function MaterialsList({
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hideGot, setHideGot] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const total = plan.materials.length;
   // Dates depend on today, so they are worked out only after mount (the server render has none).
@@ -81,6 +85,10 @@ export function MaterialsList({
   const allGot = total > 0 && got.length >= total;
   const spend = ready && !allGot ? spendLine(materialsSpend(plan, got), { started: got.length > 0 }) : "";
   const buyFirst = ready && !allGot ? firstNeededLine(neededBy, got) : "";
+  const showHide = ready && canHideGot(got.length, total);
+  // Hiding only applies while there is something to hide and something left; paper always lists everything.
+  const hiding = hideGot && showHide;
+  const hiddenLine = hiddenGotLine(got.length, hiding);
 
   return (
     <>
@@ -89,6 +97,18 @@ export function MaterialsList({
           {ready && line ? line : "Tick items off as you get them. Saved on this device."}
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          {showHide && (
+            <button
+              type="button"
+              onClick={() => setHideGot((h) => !h)}
+              aria-pressed={hiding}
+              aria-controls="materials-list"
+              data-testid="materials-hide-got"
+              className="btn-tertiary text-sm"
+            >
+              {hideGotLabel(got.length, hiding)}
+            </button>
+          )}
           <ClearTicksButton ticked={got} noun="item" onChange={setTicks} />
           <button
             type="button"
@@ -122,12 +142,21 @@ export function MaterialsList({
           <span>{buyFirst}</span>
         </p>
       )}
-      <ul className="divide-y divide-ink/10 rounded-2xl bg-white">
+      {hiddenLine && (
+        <p data-testid="materials-hidden-line" className="mb-2 text-sm text-ink/70 print:hidden">
+          {hiddenLine}
+        </p>
+      )}
+      <ul id="materials-list" className="divide-y divide-ink/10 rounded-2xl bg-white">
         {plan.materials.map((m, i) => {
           const isGot = got.includes(i);
           const id = `material-${i}-got`;
           return (
-            <li key={`${i}:${m.item}`} className="flex items-start gap-3 p-3 text-sm">
+            <li
+              key={`${i}:${m.item}`}
+              data-got={isGot ? "true" : undefined}
+              className={`items-start gap-3 p-3 text-sm ${hiding && isGot ? "hidden print:flex" : "flex"}`}
+            >
               <label
                 htmlFor={id}
                 className="-my-1 -ml-1 flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl hover:bg-ink/[0.04] print:hidden"

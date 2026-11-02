@@ -190,3 +190,20 @@ export function shoppingListText(
   lines.push("", need.some(({ m }) => m.unitCost) ? "Prices are rough estimates, not quotes. Made with SightWork." : "Made with SightWork.");
   return lines.join("\n");
 }
+
+/** Label for the toggle that hides items already in hand, so a long list in a store shows only what's left. */
+export function hideGotLabel(got: number, hidden: boolean): string {
+  if (hidden) return "Show all items";
+  return got === 1 ? "Hide the 1 in hand" : `Hide the ${got} in hand`;
+}
+
+/** Whether the "hide in hand" toggle is worth showing: something is ticked and something is still left. */
+export function canHideGot(got: number, total: number): boolean {
+  return total > 1 && got > 0 && got < total;
+}
+
+/** Short note shown while items in hand are hidden ("2 in hand hidden."), or "" when nothing is hidden. */
+export function hiddenGotLine(got: number, hidden: boolean): string {
+  if (!hidden || got <= 0) return "";
+  return `${got} in hand hidden.`;
+}
