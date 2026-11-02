@@ -382,7 +382,11 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
  * null with a raw TypeError and no step named. A non-array proofFrames
  * on an issues entry is the same fail-fast: it used to pass here and
  * only fail later in buildVisibleChanges, calling .some off a
- * non-array with a raw TypeError and no issue named.
+ * non-array with a raw TypeError and no issue named. A non-array fixes
+ * on a work-order entry is the same fail-fast: it used to pass here
+ * and only fail later in buildVisibleChanges (and the hero pick),
+ * calling .includes off a non-array with a raw TypeError and no step
+ * named — or, for a string fixes, silently matching by substring.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -493,6 +497,16 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
       !isHiddenStep(s)
     ) {
       throw new Error(`renderAfter: plan.workOrder[${i}].title must not contain a newline`);
+    }
+    // Parity with the issues-entry proofFrames guard: a non-array
+    // fixes used to pass this validator and only fail later in
+    // buildVisibleChanges (and the hero pick), calling .includes off
+    // a non-array with a raw TypeError and no step named — or, for a
+    // string fixes, silently matching by substring. Fail fast here,
+    // with the index named. Omitted fixes still pass: a step that
+    // fixes nothing is listed, just never matched to an issue.
+    if (s.fixes !== undefined && !Array.isArray(s.fixes)) {
+      throw new Error(`renderAfter: plan.workOrder[${i}].fixes must be an array when given`);
     }
   });
   // Parity with buildRenderAfterPrompt (prompt 04): a newline in the
