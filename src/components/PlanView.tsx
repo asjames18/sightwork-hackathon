@@ -12,6 +12,7 @@ import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import { SectionNav } from "./SectionNav";
+import { SendCostButton } from "@/components/SendCostButton";
 import { SendCountsButton } from "./SendCountsButton";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictKind } from "@/lib/review";
@@ -447,6 +448,7 @@ export function PlanView({
                   </p>
                 )}
               </details>
+              <SendCostButton plan={plan} sample={sample || !!example || plan.meta?.isExample === true} />
             </div>
           </Section>
         )}
