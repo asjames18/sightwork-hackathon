@@ -489,6 +489,19 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       throw new Error(`reason: filterAndRenumber output.issues[${i}].confidence must be a finite number`);
     }
   });
+  // Issues are renumbered below through a remap keyed on rank, so a
+  // non-number rank used to silently break every rank reference to
+  // that issue: a string key never matches a numeric forIssues/fixes
+  // entry, so the reference was dropped by the remap lookup with no
+  // entry named, while the kept issue itself was renumbered anyway.
+  // Guard it the same way: rank is required, so anything but a
+  // finite number throws a named error.
+  output.issues.forEach((issue, i) => {
+    const rank = (issue as { rank?: unknown }).rank;
+    if (typeof rank !== "number" || !Number.isFinite(rank)) {
+      throw new Error(`reason: filterAndRenumber output.issues[${i}].rank must be a finite number`);
+    }
+  });
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
