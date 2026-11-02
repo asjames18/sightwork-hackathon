@@ -1,11 +1,61 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { Issue, WorkStep } from "@/lib/types";
 import type { CostShare } from "@/lib/costShares";
 import { fixFirst, fixFirstCostLabel } from "@/lib/client/fixFirst";
 import { problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
 import { subsetProgressLine } from "@/lib/client/stepProgress";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
+import { fixFirstShareTitle, fixFirstToText, SEND_FIX_FIRST_LABEL } from "@/lib/client/fixFirstText";
+import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+
+const SEND_STATUS: Record<Exclude<ShareResult, "shared">, string> = {
+  copied: "Copied. Paste it into a message.",
+  cancelled: "",
+  failed: "Couldn't share from this browser.",
+};
+
+/** Sends just this card (fixFirstText.ts) by the phone's share sheet, else the clipboard. Hidden in print. */
+function SendFixFirstButton({ text, spaceName }: { text: string; spaceName?: string }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  async function onSend() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(fixFirstShareTitle(spaceName), text, navigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(SEND_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        data-testid="send-fix-first"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        {SEND_FIX_FIRST_LABEL}
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </p>
+    </div>
+  );
+}
 
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -19,7 +69,10 @@ export function FixFirst({
   stepCosts,
   issueCosts,
   spaceName,
+  sample,
 }: {
+  /** Example or sample plan: the sent text says so. */
+  sample?: boolean;
   /** With the space name, steps ticked off in the work order show as done here too. */
   spaceName?: string;
   issues: Issue[];
@@ -40,6 +93,7 @@ export function FixFirst({
     f.trades.length > 0 && f.trades.join(", "),
     f.cost && `${sentence(fixFirstCostLabel(f.cost))} of the estimate`,
   ].filter(Boolean) as string[];
+  const sendText = fixFirstToText(issues, workOrder, { stepCosts, issueCosts, done, spaceName, sample });
   const waitsOn = (order: number) =>
     workOrder
       .filter((s) => s.dependsOn === order && f.steps.includes(s.order))
@@ -127,6 +181,7 @@ export function FixFirst({
           The other {rest === 1 ? "step" : `${rest} steps`} can follow once these are done.
         </p>
       )}
+      {sendText && <SendFixFirstButton text={sendText} spaceName={spaceName} />}
     </section>
   );
 }

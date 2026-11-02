@@ -23,7 +23,8 @@ test("Start here fits and passes axe at 375, 768 and 1280", async ({ page }) => 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/start?view=example&ex=sanctuary");
-    await page.getByTestId("fix-first").scrollIntoViewIfNeeded();
+    // The card's last control (Send Start here), so the whole card is on screen under the sticky section nav.
+    await page.getByTestId("send-fix-first").scrollIntoViewIfNeeded();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `start here ${width}`);
   }

@@ -233,7 +233,7 @@ export function PlanView({
         </a>
       )}
 
-      <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} spaceName={plan.spaceName} />
+      <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} spaceName={plan.spaceName} sample={sample || !!example || plan.meta?.isExample === true} />
       <NextUp plan={plan} />
 
       {!narrated && (
