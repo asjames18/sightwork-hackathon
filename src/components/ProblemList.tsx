@@ -323,6 +323,7 @@ function IssueCard({
             caption={proof?.caption}
             outlineUnavailable={!masks}
             frameOnlyLabel={sample ? "Frame only" : undefined}
+            group="problems"
           />
         </div>
       )}
@@ -666,6 +667,7 @@ function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchIt
                   outlineUnavailable={!masks}
                   frameOnlyLabel={sample ? "Frame only" : undefined}
                   compact
+                  group="watch"
                 />
               </div>
             </li>

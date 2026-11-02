@@ -4,6 +4,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import type { Box, PlanFrame } from "@/lib/types";
 import { canToggleOutline, outlineToggleLabel, outlineToggleStatus } from "@/lib/client/outlineToggle";
 import { proofZoom, proofZoomLabel, proofZoomStatus, proofZoomStyle } from "@/lib/client/proofZoom";
+import { proofNavLabel, proofNavPos, proofNavTarget, proofTriggers, type ProofNavPos } from "@/lib/client/proofNav";
 
 /**
  * A proof frame with an optional normalized (0-1000) box drawn on top.
@@ -24,6 +25,8 @@ import { proofZoom, proofZoomLabel, proofZoomStatus, proofZoomStyle } from "@/li
  * it, and focus returns to the photo. When the photo has a box, a "Hide outline" toggle in the dialog
  * shows what is under it; the outline comes back each time the dialog opens. "Zoom in" enlarges the photo
  * around the outline (or the middle, with no box) so a small problem can be checked on a phone; it resets on open.
+ * With a `group`, Previous / Next (and the arrow keys) step to the photo before or after it in the same list
+ * (proofNav.ts) without closing, and "Photo 2 of 5" says where you are.
  */
 function OutlineBox({ box, dashed }: { box: Box; dashed: boolean }) {
   return (
@@ -49,6 +52,7 @@ export function ProofFrame({
   frameOnlyLabel = "Frame only, outlines off this run",
   boxSource,
   compact = false,
+  group,
 }: {
   frame: PlanFrame | undefined;
   box?: Box;
@@ -61,11 +65,15 @@ export function ProofFrame({
   boxSource?: "sam" | "model";
   /** Small thumbnail (the "Worth a closer look" list): no corner badges. */
   compact?: boolean;
+  /** Photos sharing a group (one list) get Previous / Next in the full-size view. */
+  group?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [outlineHidden, setOutlineHidden] = useState(false);
   const [outlineStatus, setOutlineStatus] = useState("");
   const [zoomed, setZoomed] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [navPos, setNavPos] = useState<ProofNavPos | null>(null);
   if (!frame)
     return (
       <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/70">
@@ -81,7 +89,20 @@ export function ProofFrame({
     setOutlineHidden(false);
     setOutlineStatus("");
     setZoomed(false);
+    setNavPos(group ? proofNavPos(proofTriggers(group), triggerRef.current) : null);
     dialogRef.current?.showModal();
+  }
+  function step(dir: -1 | 1) {
+    if (!group) return;
+    // Re-read the list at tap time, so a problem filtered out meanwhile is skipped.
+    const triggers = proofTriggers(group);
+    const target = proofNavTarget(proofNavPos(triggers, triggerRef.current), dir);
+    if (target === null) return;
+    const next = triggers[target];
+    dialogRef.current?.close();
+    // Focus first, so closing the next photo returns focus (and the page) to its own card.
+    next.focus();
+    next.click();
   }
   function toggleOutline() {
     const next = !outlineHidden;
@@ -98,8 +119,10 @@ export function ProofFrame({
     <figure className="overflow-hidden rounded-xl bg-black">
       <button
         type="button"
+        ref={triggerRef}
         onClick={openFull}
         aria-haspopup="dialog"
+        data-proof-group={group}
         className={`group block cursor-zoom-in focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-accent ${
           sized
             ? "relative mx-auto w-[min(100%,calc(60vh*var(--ar)))] lg:w-[min(100%,calc(45vh*var(--ar)))]"
@@ -148,6 +171,13 @@ export function ProofFrame({
         aria-label={`Proof photo: ${label}`}
         onClick={(e) => {
           if (e.target === e.currentTarget) dialogRef.current?.close();
+        }}
+        onKeyDown={(e) => {
+          if (!navPos || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            e.preventDefault();
+            step(e.key === "ArrowLeft" ? -1 : 1);
+          }
         }}
         className="m-auto max-h-[100dvh] max-w-[100vw] overflow-visible bg-transparent p-3 backdrop:bg-black/85 sm:p-6"
       >
@@ -230,6 +260,39 @@ export function ProofFrame({
             <span>{caption ?? "Proof frame"}</span>
             <span className="shrink-0 tabular-nums">{frame.tSec.toFixed(1)} s</span>
           </p>
+          {navPos && (
+            <div className="flex w-full items-center justify-between gap-2" data-testid="proof-nav">
+              <button
+                type="button"
+                onClick={() => step(-1)}
+                disabled={proofNavTarget(navPos, -1) === null}
+                aria-label="Previous photo"
+                data-testid="proof-nav-prev"
+                className="flex min-h-11 items-center gap-1 rounded-full border border-white/40 bg-black/60 px-4 text-sm font-semibold text-white shadow backdrop-blur-sm hover:bg-black/80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
+              >
+                <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12.5 4.5 7 10l5.5 5.5" />
+                </svg>
+                Previous
+              </button>
+              <span className="text-sm font-medium tabular-nums text-white/90" data-testid="proof-nav-pos">
+                {proofNavLabel(navPos)}
+              </span>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                disabled={proofNavTarget(navPos, 1) === null}
+                aria-label="Next photo"
+                data-testid="proof-nav-next"
+                className="flex min-h-11 items-center gap-1 rounded-full border border-white/40 bg-black/60 px-4 text-sm font-semibold text-white shadow backdrop-blur-sm hover:bg-black/80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
+              >
+                Next
+                <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7.5 4.5 13 10l-5.5 5.5" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </dialog>
     </figure>
