@@ -457,6 +457,19 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
     if (issue.proofFrames !== undefined && !Array.isArray(issue.proofFrames)) {
       throw new Error(`renderAfter: plan.issues[${i}].proofFrames must be an array when given`);
     }
+    // Parity with the proofFrames-array guard: a non-object entry
+    // used to pass this validator and only fail later in
+    // buildVisibleChanges, reading frameIndex off null with a raw
+    // TypeError and no issue named (when the hero differs from the
+    // issue's frameIndex, so the proof-frames check actually runs).
+    // Fail fast here, with both indices named.
+    if (Array.isArray(issue.proofFrames)) {
+      issue.proofFrames.forEach((p, j) => {
+        if (!p || typeof p !== "object") {
+          throw new Error(`renderAfter: plan.issues[${i}].proofFrames[${j}] must be an object`);
+        }
+      });
+    }
   });
   if (!Array.isArray(plan.workOrder)) {
     throw new Error("renderAfter: plan.workOrder must be an array");
