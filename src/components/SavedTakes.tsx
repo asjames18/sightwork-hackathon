@@ -18,10 +18,12 @@ import { listRecentPlans, listRecentPlansOnServer, openRecentPlan, subscribeRece
 import type { SavedPlan } from "@/lib/client/lastPlan";
 import { planForTake, takePlanLine } from "@/lib/client/takePlan";
 import { SaveVideoButton } from "./SaveVideoButton";
+import { TakeThumb } from "./TakeThumb";
 
 /**
  * "Your saved takes": the last few walkthroughs recorded in SightWork's camera, kept on this device.
  * Each row can be saved to the phone's Photos (share sheet) or downloaded, used for a new plan, or removed.
+ * Each row leads with a small still from the take's own video so back-to-back takes are easy to tell apart.
  * A take that already made a plan (still on the recent plans list) says so and can open that plan.
  * Remove offers an Undo that puts the take and its video back (until the next tap on the list), so a
  * walkthrough is never lost to one mis-tap. Hidden in print.
@@ -115,17 +117,20 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
           const made = planForTake(recents, e);
           return (
             <li key={e.id} data-take-id={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold leading-snug">{e.name}</p>
-                <p className="text-sm text-ink/70">{details}</p>
-                {made && (
-                  <p data-testid="take-plan" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-ink">
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
-                    </svg>
-                    <span className="min-w-0 break-words">{takePlanLine(made)}</span>
-                  </p>
-                )}
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <TakeThumb id={e.id} durationSec={e.durationSec} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold leading-snug">{e.name}</p>
+                  <p className="text-sm text-ink/70">{details}</p>
+                  {made && (
+                    <p data-testid="take-plan" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-ink">
+                      <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                      </svg>
+                      <span className="min-w-0 break-words">{takePlanLine(made)}</span>
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <SaveVideoButton
