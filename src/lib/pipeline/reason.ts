@@ -267,6 +267,41 @@ export function formatReasonStability(
   segmentation: SegmentationResult | null,
   output: Pick<ReasonOutput, "issues" | "watch" | "heroFrameIndex">,
 ): string {
+  // A non-object segmentation, a non-array flaggedFrames/counts, a
+  // null counts entry, or a non-object output / non-array issues used
+  // to throw a raw TypeError reading .length / .map / .label / .issues
+  // off null, with no argument named. Reject all of them here with a
+  // named reason error, the same named-error rule the other pipeline
+  // entry guards follow. Valid inputs are unchanged: the line below
+  // still reads exactly the same fields.
+  if (
+    segmentation !== null &&
+    (typeof segmentation !== "object" || Array.isArray(segmentation))
+  ) {
+    throw new Error("reason: formatReasonStability segmentation must be an object or null");
+  }
+  if (segmentation !== null) {
+    if (!Array.isArray(segmentation.flaggedFrames)) {
+      throw new Error("reason: formatReasonStability segmentation.flaggedFrames must be an array");
+    }
+    if (!Array.isArray(segmentation.counts)) {
+      throw new Error("reason: formatReasonStability segmentation.counts must be an array");
+    }
+    segmentation.counts.forEach((c, i) => {
+      if (c === null || typeof c !== "object" || Array.isArray(c)) {
+        throw new Error(`reason: formatReasonStability segmentation.counts[${i}] must be an object`);
+      }
+    });
+  }
+  if (output === null || typeof output !== "object" || Array.isArray(output)) {
+    throw new Error("reason: formatReasonStability output must be an object");
+  }
+  if (!Array.isArray(output.issues)) {
+    throw new Error("reason: formatReasonStability output.issues must be an array");
+  }
+  if (output.watch !== undefined && !Array.isArray(output.watch)) {
+    throw new Error("reason: formatReasonStability output.watch must be an array");
+  }
   const sam =
     segmentation === null
       ? "sam skipped"
@@ -290,6 +325,25 @@ export function formatReasonFilter(
   raw: Pick<ReasonOutput, "issues" | "watch">,
   filtered: Pick<ReasonOutput, "issues" | "watch">,
 ): string {
+  // A non-object side or a non-array issues list used to throw a raw
+  // TypeError reading .issues off null — or worse, silently produce a
+  // nonsense line (a string issues list counts its characters and
+  // reports a negative drop count). Reject both sides here with a
+  // named reason error, the same named-error rule the other pipeline
+  // entry guards follow. Valid inputs are unchanged.
+  const checkSide = (name: string, value: Pick<ReasonOutput, "issues" | "watch">): void => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`reason: formatReasonFilter ${name} must be an object`);
+    }
+    if (!Array.isArray(value.issues)) {
+      throw new Error(`reason: formatReasonFilter ${name}.issues must be an array`);
+    }
+    if (value.watch !== undefined && !Array.isArray(value.watch)) {
+      throw new Error(`reason: formatReasonFilter ${name}.watch must be an array`);
+    }
+  };
+  checkSide("raw", raw);
+  checkSide("filtered", filtered);
   const rawIssues = raw.issues.length;
   const rawWatch = raw.watch?.length ?? 0;
   const kept = filtered.issues.length;
