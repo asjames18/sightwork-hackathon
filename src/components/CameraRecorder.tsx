@@ -5,6 +5,7 @@ import { aimRangeSpoken, durationRulesFor, formatDuration, type DurationRules } 
 import { isTooQuiet, nextQuietSince, openMicMeter, smoothLevel, type MicMeter } from "@/lib/client/micLevel";
 import { keepScreenOn } from "@/lib/client/wakeLock";
 import { torchSupported, setTorch, torchButtonLabel, darkHintWithTorch } from "@/lib/client/torch";
+import { wideZoomRange, setWideView, wideButtonLabel, wideZoomTag, type ZoomRange } from "@/lib/client/cameraZoom";
 import { lumaStats } from "@/lib/client/blankTake";
 import { sharpness } from "@/lib/client/frameSampling";
 import {
@@ -109,6 +110,10 @@ export function CameraRecorder({
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [torchBusy, setTorchBusy] = useState(false);
+  // Wide view: only offered when the camera can zoom out below where it opened (an ultra-wide lens).
+  const [wideRange, setWideRange] = useState<ZoomRange | null>(null);
+  const [wideOn, setWideOn] = useState(false);
+  const [wideBusy, setWideBusy] = useState(false);
   // Keep the latest callbacks without restarting the camera when the parent re-renders.
   const cb = useRef({ onRecorded, onCancel, onUnavailable });
   // Read by the running timer, so the stop point is the size picked when recording started.
@@ -170,6 +175,8 @@ export function CameraRecorder({
       const track = stream.getVideoTracks()[0];
       setSettings(track?.getSettings?.() ?? null);
       setTorchAvailable(torchSupported(track));
+      setWideRange(wideZoomRange(track));
+      setWideOn(false);
       const v = videoRef.current;
       if (v) {
         v.srcObject = stream;
@@ -397,6 +404,15 @@ export function CameraRecorder({
     setTorchBusy(false);
   }, [torchOn]);
 
+  const toggleWide = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    setWideBusy(true);
+    const next = await setWideView(track, !wideOn);
+    setWideOn(next);
+    setWideBusy(false);
+  }, [wideOn]);
+  const wideTag = wideZoomTag(wideRange);
+
   const resolution = describeResolution(settings);
   const state = elapsedState(elapsed, rules);
   const recording = phase === "recording";
@@ -554,7 +570,7 @@ export function CameraRecorder({
               Start recording
             </button>
           )}
-          <div className="flex gap-2 sm:contents">
+          <div className="flex flex-wrap gap-2 sm:contents">
             {cameraOpen && torchAvailable && (
               <button
                 type="button"
@@ -568,6 +584,22 @@ export function CameraRecorder({
                   <path d="M7 2h10v4l-3 4v12h-4V10L7 6V2Zm2 2v1.34L12 9.4l3-4.06V4H9Z" />
                 </svg>
                 {torchButtonLabel(torchOn)}
+              </button>
+            )}
+            {cameraOpen && wideRange && (
+              <button
+                type="button"
+                onClick={toggleWide}
+                disabled={wideBusy}
+                aria-pressed={wideOn}
+                data-testid="wide-toggle"
+                className="btn-secondary flex-1 whitespace-nowrap sm:flex-none"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" className="mr-2 inline-block h-4 w-4 fill-current">
+                  <path d="M3 5h6v2H5v4H3V5Zm12 0h6v6h-2V7h-4V5ZM3 13h2v4h4v2H3v-6Zm16 0h2v6h-6v-2h4v-4Z" />
+                </svg>
+                {wideButtonLabel(wideOn)}
+                {!wideOn && wideTag && <span className="text-ink/65">{" "}({wideTag})</span>}
               </button>
             )}
             <button type="button" onClick={cancel} className="btn-secondary flex-1 sm:flex-none">
