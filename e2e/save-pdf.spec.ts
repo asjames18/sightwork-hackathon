@@ -57,7 +57,7 @@ async function stubShareSheet(page: Page, opts: { refuseFirst?: boolean } = {}) 
 }
 
 const shared = (page: Page) => page.evaluate(() => (window as unknown as Win).__shared);
-const NAME = /^sightwork-plan-\d{4}-\d{2}-\d{2}\.pdf$/;
+const NAME = /^sightwork-plan-(?:[a-z0-9]+-)+\d{4}-\d{2}-\d{2}\.pdf$/;
 
 test.describe("Save PDF on a phone", () => {
   test.skip(({ isMobile }) => !isMobile, "phone share sheet");
@@ -133,6 +133,7 @@ test.describe("Save PDF on a computer", () => {
     await save.click();
     const d = await download;
     expect(d.suggestedFilename()).toMatch(NAME);
+    expect(d.suggestedFilename()).toMatch(/^sightwork-plan-sanctuary-stage-/);
     const path = await d.path();
     const { readFileSync } = await import("node:fs");
     const bytes = readFileSync(path);
