@@ -63,10 +63,32 @@ export interface PlanPdfOptions {
 
 export const PDF_SAMPLE_LABEL = "Example plan with sample data, not a real run";
 
-/** "sightwork-plan-2026-10-30.pdf", by the local date. */
-export function pdfFileName(date: Date = new Date()): string {
+/**
+ * The space name as a short file-name part: "Sanctuary stage" -> "sanctuary-stage". Lowercase ASCII letters and
+ * digits joined by single hyphens, accents dropped, at most 40 characters cut at a word break. "" when nothing is left.
+ */
+export function fileNameSlug(name: string | null | undefined, max = 40): string {
+  const slug = (name ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (slug.length <= max) return slug;
+  const cut = slug.slice(0, max);
+  if (slug[max] === "-") return cut;
+  const lastBreak = cut.lastIndexOf("-");
+  return (lastBreak > 0 ? cut.slice(0, lastBreak) : cut).replace(/-+$/, "");
+}
+
+/**
+ * "sightwork-plan-sanctuary-stage-2026-10-30.pdf" by the space name and the local date, so two rooms saved the
+ * same day get their own files. Without a usable space name it is "sightwork-plan-2026-10-30.pdf".
+ */
+export function pdfFileName(date: Date = new Date(), spaceName?: string | null): string {
   const p = (n: number) => String(n).padStart(2, "0");
-  return `sightwork-plan-${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}.pdf`;
+  const slug = fileNameSlug(spaceName);
+  return `sightwork-plan-${slug ? `${slug}-` : ""}${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}.pdf`;
 }
 
 /**

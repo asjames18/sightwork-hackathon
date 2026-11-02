@@ -27,7 +27,7 @@ const MESSAGES: Record<Exclude<DeliverResult, "shared" | "cancelled" | "needs-ta
 
 /**
  * Header "Save PDF": builds a real PDF file from the plan (jsPDF, loaded on first use). Phones get the share
- * sheet with the file, so Save to Files works; computers download sightwork-plan-<date>.pdf. If the file can't
+ * sheet with the file, so Save to Files works; computers download sightwork-plan-<space>-<date>.pdf. If the file can't
  * be built, the print dialog opens instead; if that's missing too, a short message says what to do.
  */
 export function SavePdfButton({ plan, example, sample }: { plan: WorkPlan; example?: Example; sample: boolean }) {

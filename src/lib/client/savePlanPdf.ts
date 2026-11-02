@@ -1,7 +1,7 @@
 /**
  * Save PDF, browser side: lazy-loads jsPDF, turns the plan's pictures into small JPEGs, builds the file
  * (planPdf.ts), and hands it over. Phones get the share sheet with the file (Save to Files, Messages, Mail);
- * everything else downloads it as sightwork-plan-<date>.pdf. The print dialog is only the last fallback,
+ * everything else downloads it as sightwork-plan-<space>-<date>.pdf. The print dialog is only the last fallback,
  * for a browser that can't build the file at all.
  */
 import type { WorkPlan } from "@/lib/types";
@@ -92,7 +92,7 @@ export async function makePlanPdf(plan: WorkPlan, label: PdfLabel = {}, date = n
   const [{ jsPDF }, images] = await Promise.all([loadJsPdf(), loadPdfImages(plan)]);
   const doc = buildPlanPdf(jsPDF, plan, { ...label, date, images });
   const blob = doc.output("blob");
-  const name = pdfFileName(date);
+  const name = pdfFileName(date, plan.spaceName);
   return { file: new File([blob], name, { type: "application/pdf" }), name, bytes: blob.size };
 }
 

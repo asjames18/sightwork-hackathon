@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { jsPDF } from "jspdf";
-import { buildPlanPdf, pdfFileName, pdfFrameIndexes, pdfSafe, PDF_SAMPLE_LABEL, type PdfImage } from "@/lib/client/planPdf";
+import { buildPlanPdf, fileNameSlug, pdfFileName, pdfFrameIndexes, pdfSafe, PDF_SAMPLE_LABEL, type PdfImage } from "@/lib/client/planPdf";
 import { deliverPlanPdf, loadPdfImages, type PlanPdf } from "@/lib/client/savePlanPdf";
 import { EXAMPLES } from "@/lib/examples";
 import { COST_LABEL, type WorkPlan } from "@/lib/types";
@@ -54,6 +54,22 @@ function plan(extra: Partial<WorkPlan> = {}): WorkPlan {
 test("file name uses the local date", () => {
   assert.equal(pdfFileName(DAY), "sightwork-plan-2026-10-30.pdf");
   assert.equal(pdfFileName(new Date(2027, 0, 5)), "sightwork-plan-2027-01-05.pdf");
+});
+
+test("file name carries the space name when there is one", () => {
+  assert.equal(pdfFileName(DAY, "Sanctuary stage"), "sightwork-plan-sanctuary-stage-2026-10-30.pdf");
+  assert.equal(pdfFileName(DAY, "  Café & Fellowship Hall #2 "), "sightwork-plan-cafe-fellowship-hall-2-2026-10-30.pdf");
+  assert.equal(pdfFileName(DAY, ""), "sightwork-plan-2026-10-30.pdf");
+  assert.equal(pdfFileName(DAY, "\u{1F6A7}\u{1F6A7}"), "sightwork-plan-2026-10-30.pdf");
+  assert.equal(pdfFileName(DAY, null), "sightwork-plan-2026-10-30.pdf");
+  assert.equal(pdfFileName(DAY, "../../etc/passwd"), "sightwork-plan-etc-passwd-2026-10-30.pdf");
+});
+
+test("space name part is short and cut at a word break", () => {
+  assert.equal(fileNameSlug("Main sanctuary stage and choir loft with the side rooms"), "main-sanctuary-stage-and-choir-loft-with");
+  assert.equal(fileNameSlug("Main sanctuary stage and choir loft without side rooms"), "main-sanctuary-stage-and-choir-loft");
+  assert.ok(fileNameSlug("x".repeat(80)).length <= 40);
+  assert.match(fileNameSlug("Gym — east bleachers"), /^[a-z0-9]+(-[a-z0-9]+)*$/);
 });
 
 test("text is made safe for the built-in fonts", () => {
