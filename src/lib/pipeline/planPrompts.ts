@@ -779,6 +779,16 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * caller bypassing runPlan gets the same fail-fast here, naming
  * the field. Null transcript still builds the explicit
  * "(no narration)" prompt, and a non-blank string still builds.
+ * A space name or space type that is blank at all (an empty string,
+ * or only whitespace) used to slip past the string, newline and
+ * placeholder checks, so buildReasonPrompt silently fell back to
+ * "Walkthrough" or "room" instead of failing — the caller never
+ * learned the name was blank, and the model planned a generic
+ * Walkthrough rather than the space that was filmed. runReason's
+ * own validator already rejects a blank space name or space type
+ * when given before any paid call, so a direct buildReasonPrompt
+ * caller bypassing runReason gets the same fail-fast here, naming
+ * the field. An omitted field still falls back to the default.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -821,6 +831,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     }
     if (typeof v === "string" && /\{\{[a-z_]+\}\}/.test(v)) {
       throw new Error(`buildReasonPrompt: ${field} must not contain a {{...}} placeholder`);
+    }
+    if (typeof v === "string" && v.trim().length === 0) {
+      throw new Error(`buildReasonPrompt: ${field} must not be blank when given`);
     }
   }
   if (typeof input.spaceName === "string" && input.spaceName.includes('"')) {
