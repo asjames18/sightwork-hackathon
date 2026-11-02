@@ -25,6 +25,7 @@ import { keepInViewDelta, stickyLine } from "@/lib/client/keepInView";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { problemsShareTitle, problemsToText, sendShownLabel } from "@/lib/client/problemsText";
 import { sendWatchLabel, watchShareTitle, watchToText } from "@/lib/client/watchText";
+import { loadWatchChecked, saveWatchChecked, toggleWatchChecked, watchCheckLabel, watchCheckedLine } from "@/lib/client/watchChecked";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -565,8 +566,25 @@ function SendShownButton({ count, title, text }: { count: number; title: string;
   );
 }
 
-/** "Worth a closer look": lower-confidence finds, collapsed by default, each with its photo. */
+/**
+ * "Worth a closer look": lower-confidence finds, collapsed by default, each with its photo. Each find has a
+ * "Mark checked" toggle for whoever looks at it in person, kept on this device per plan (watchChecked.ts).
+ */
 function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchItem[]; frames: PlanFrame[]; masks: boolean; sample: boolean; spaceName?: string }) {
+  const [checked, setChecked] = useState<number[]>([]);
+  const watchKeyPlan = { spaceName, watch: items };
+  const planRef = useRef(watchKeyPlan);
+  planRef.current = watchKeyPlan;
+  const titles = items.map((w) => w.title).join("\u0001");
+  useEffect(() => {
+    setChecked(loadWatchChecked(planRef.current));
+  }, [spaceName, titles]);
+  function onToggle(index: number) {
+    const next = toggleWatchChecked(checked, index);
+    setChecked(next);
+    saveWatchChecked(planRef.current, next);
+  }
+  const checkedLine = watchCheckedLine(checked.length, items.length);
   return (
     <PrintOpenDetails className="group mt-6 rounded-2xl border border-ink/10 bg-white" data-testid="watch-list">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
@@ -579,13 +597,24 @@ function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchIt
             <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs font-bold tabular-nums">{items.length}</span>
           </span>
           <span className="mt-0.5 block text-sm text-ink/65">Lower confidence. Not in the ranked list or the work order; check these in person.</span>
+          {checkedLine && (
+            <span className="mt-1 block text-sm font-semibold text-safe-dark" data-testid="watch-checked-summary">
+              {checkedLine}
+            </span>
+          )}
         </span>
       </summary>
       <ul className="flex flex-col gap-3 px-5 pb-5">
         {items.map((w, i) => {
           const proof = w.proofFrames?.[0];
+          const isChecked = checked.includes(i);
           return (
-            <li key={`${w.title}-${i}`} className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3 rounded-xl bg-ink/[0.03] p-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <li
+              key={`${w.title}-${i}`}
+              data-testid="watch-item"
+              data-checked={isChecked ? "true" : "false"}
+              className={`grid min-w-0 grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3 rounded-xl p-3 sm:grid-cols-[minmax(0,1fr)_10rem] ${isChecked ? "bg-safe-dark/[0.08]" : "bg-ink/[0.03]"}`}
+            >
               <div className="min-w-0">
                 <p className="font-bold leading-snug">{w.title}</p>
                 {w.detail && <p className="mt-0.5 text-sm text-ink/75">{w.detail}</p>}
@@ -595,6 +624,22 @@ function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchIt
                     {Math.round(w.confidence * 100)}% sure
                   </p>
                 )}
+                <button
+                  type="button"
+                  aria-pressed={isChecked}
+                  aria-label={`${watchCheckLabel(isChecked)}: ${w.title}`}
+                  onClick={() => onToggle(i)}
+                  data-testid="watch-check"
+                  className={`mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark print:hidden ${
+                    isChecked ? "border-safe-dark bg-safe-dark text-white" : "border-ink/20 bg-white text-ink hover:border-ink/40"
+                  }`}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {isChecked ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : <circle cx="10" cy="10" r="6.5" />}
+                  </svg>
+                  {watchCheckLabel(isChecked)}
+                </button>
+                {isChecked && <p className="mt-2 hidden text-sm font-semibold print:block">Checked in person</p>}
               </div>
               <div className="min-w-0">
                 <ProofFrame
@@ -611,7 +656,7 @@ function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchIt
           );
         })}
       </ul>
-      <SendWatchButton count={items.length} title={watchShareTitle(spaceName)} text={() => watchToText(items, { spaceName, sample })} />
+      <SendWatchButton count={items.length} title={watchShareTitle(spaceName)} text={() => watchToText(items, { spaceName, sample, checked })} />
     </PrintOpenDetails>
   );
 }
