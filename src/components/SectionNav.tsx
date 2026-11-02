@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { activeSection, chipScrollDelta } from "@/lib/client/sectionSpy";
+import { chipCount } from "@/lib/client/chipCount";
 
 /**
  * Sticky chip row for the plan sections. The chip for the section on screen is marked (aria-current) and,
- * on narrow screens, slides into view inside the row so it is never hidden off the edge.
+ * on narrow screens, slides into view inside the row so it is never hidden off the edge. A chip with a count
+ * ("Problems 7") shows how big that part of the plan is before you scroll to it.
  */
-export function SectionNav({ chips }: { chips: { href: string; label: string }[] }) {
+export function SectionNav({ chips }: { chips: { href: string; label: string; count?: number }[] }) {
   const navRef = useRef<HTMLElement>(null);
   const rowRef = useRef<HTMLUListElement>(null);
   const [current, setCurrent] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export function SectionNav({ chips }: { chips: { href: string; label: string }[]
       <ul ref={rowRef} className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
         {chips.map((c) => {
           const on = current === c.href.slice(1);
+          const count = chipCount(c.count);
           return (
             <li key={c.href} className="shrink-0">
               <a
@@ -76,6 +79,14 @@ export function SectionNav({ chips }: { chips: { href: string; label: string }[]
                 }`}
               >
                 {c.label}
+                {count && (
+                  <span
+                    data-testid="chip-count"
+                    className={`ml-1.5 rounded-full px-1.5 text-xs font-bold tabular-nums leading-5 ${on ? "bg-white/20 text-white" : "bg-ink/[.08] text-ink/80"}`}
+                  >
+                    {count}
+                  </span>
+                )}
               </a>
             </li>
           );
