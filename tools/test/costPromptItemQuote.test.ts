@@ -2,8 +2,8 @@
  * buildCostPrompt escapes a double quote in a material item, instead
  * of printing it verbatim, so the item="..." field in the materials
  * list cannot be closed early. An inch mark like 2" pipe still builds,
- * as 2\" pipe. A note is printed quoted too, but it is not covered
- * by this treatment too; see costPromptNoteQuote.test.ts.
+ * as 2\" pipe. A note is printed quoted too, and a quote there is
+ * escaped the same way; see costPromptNoteQuote.test.ts.
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
