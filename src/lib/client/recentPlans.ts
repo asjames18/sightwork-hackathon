@@ -169,6 +169,54 @@ export async function removeRecentPlan(id: string): Promise<void> {
   } catch {}
 }
 
+/** What Undo needs to put a removed row back: the row, its stored plan and where it sat in the list. */
+export type RemovedRecent = { entry: RecentEntry; saved: SavedPlan; position: number };
+
+/**
+ * Removes one row like removeRecentPlan, but first keeps its stored plan in memory so the row can be
+ * put back with restoreRecentPlan. Resolves null when there's nothing to undo (unknown row, or its
+ * stored copy was already gone); the row is removed either way.
+ */
+export async function removeRecentPlanWithUndo(id: string): Promise<RemovedRecent | null> {
+  const list = listRecentPlans();
+  const position = list.findIndex((e) => e.id === id);
+  const entry = position >= 0 ? list[position] : null;
+  let saved: SavedPlan | null = null;
+  try {
+    const value = (await store()?.get(id)) as SavedPlan | null | undefined;
+    if (value?.plan && Array.isArray(value.plan.issues)) saved = value;
+  } catch {
+    saved = null;
+  }
+  await removeRecentPlan(id);
+  return entry && saved ? { entry, saved, position } : null;
+}
+
+/**
+ * Undo for a removed row: stores its plan again and puts the row back where it was (or as near as the
+ * list allows, still at most RECENT_MAX; a row pushed past the end has its stored copy deleted).
+ * Resolves true once the row is listed again.
+ */
+export async function restoreRecentPlan(removed: RemovedRecent): Promise<boolean> {
+  const s = store();
+  const { entry, saved } = removed ?? ({} as RemovedRecent);
+  if (!s || !isEntry(entry) || !saved?.plan || !Array.isArray(saved.plan.issues)) return false;
+  const rest = listRecentPlans().filter((e) => e.id !== entry.id);
+  const at = Math.max(0, Math.min(Number.isInteger(removed.position) ? removed.position : 0, rest.length));
+  if (at >= RECENT_MAX) return false;
+  try {
+    await s.put(entry.id, saved);
+  } catch {
+    return false;
+  }
+  const merged = [...rest.slice(0, at), entry, ...rest.slice(at)];
+  const next = merged.slice(0, RECENT_MAX);
+  const dropped = merged.slice(RECENT_MAX);
+  if (!writeIndex(next)) return false;
+  for (const old of dropped) void s.remove(old.id).catch(() => {});
+  return true;
+}
+
 /** The stored plan for a row; a row whose copy is gone or unreadable is dropped from the list. */
 export async function openRecentPlan(id: string): Promise<SavedPlan | null> {
   let value: unknown = null;

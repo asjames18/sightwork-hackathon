@@ -62,9 +62,32 @@ test("recent plans list: shows each run, reopens one, and removes one", async ({
   await expectNoAxeViolations(page, "recent plans list");
 
   await rows.nth(1).getByRole("button", { name: "Remove" }).click();
-  await expect(section).toHaveCount(0); // one left: the list hides, "Open my last plan" covers a single plan
+  // Undo is on offer (and focused), so the list stays up with the one row left.
+  await expect(section.getByRole("status")).toContainText("Removed Sanctuary");
+  const undo = section.getByRole("button", { name: /^Undo/ });
+  await expect(undo).toBeFocused();
+  await expect(rows).toHaveCount(1);
+  await expectNoSideScroll(page);
+  await expectNoAxeViolations(page, "recent plans undo note");
+
+  await undo.click();
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1)).toContainText("Sanctuary");
+  await expect(rows.nth(1).getByRole("button", { name: /^Sanctuary/ })).toBeFocused();
+  await expect(section.getByRole("status")).toHaveCount(0);
+
+  // The restored row still opens its plan.
+  await rows.nth(1).getByRole("button", { name: /^Sanctuary/ }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Sanctuary");
+
+  await page.goto("/start");
+  await section.getByRole("listitem").nth(1).getByRole("button", { name: "Remove" }).click();
+  await expect(section.getByRole("status")).toContainText("Removed Sanctuary");
   const index = await page.evaluate(() => JSON.parse(localStorage.getItem("sightwork:recentPlans:v1") ?? "[]").length);
   expect(index).toBe(1);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(section).toHaveCount(0); // one left: the list hides, "Open my last plan" covers a single plan
 });
 
 test("recent plans list: tapping a row opens that plan", async ({ page }) => {
@@ -106,3 +129,19 @@ test("no recent list on a fresh device", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByRole("region", { name: "Your recent plans" })).toHaveCount(0);
 });
+
+for (const width of [375, 768, 1280]) {
+  test(`recent plans undo note fits at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await seed(page, [
+      { id: "pA", plan: { ...sanctuary, spaceName: "Fellowship hall and the long back hallway by the kitchen" }, savedAt: "2026-10-30T22:10:00Z", region: null },
+      { id: "pB", plan: office, savedAt: "2026-10-30T21:00:00Z", region: null },
+      { id: "pC", plan: sanctuary, savedAt: "2026-10-30T20:00:00Z", region: null },
+    ]);
+    const section = page.getByRole("region", { name: "Your recent plans" });
+    await section.getByRole("listitem").nth(0).getByRole("button", { name: "Remove" }).click();
+    await expect(section.getByRole("button", { name: /^Undo/ })).toBeVisible();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `recent plans undo note at ${width}`);
+  });
+}

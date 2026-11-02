@@ -8,6 +8,8 @@ import {
   recentPlanId,
   recentWhen,
   removeRecentPlan,
+  removeRecentPlanWithUndo,
+  restoreRecentPlan,
   RECENT_INDEX_KEY,
   RECENT_MAX,
   setRecentPlanStoreForTests,
@@ -129,5 +131,69 @@ describe("recent plans", () => {
     assert.equal(listRecentPlans()[0].spaceName, "Walkthrough");
     assert.match(recentWhen("2026-10-30T22:12:00Z", "en-US"), /^Oct 30, \d{1,2}:12 [AP]M$/);
     assert.equal(recentWhen("nope"), "");
+  });
+});
+
+describe("recent plans: undo a remove", () => {
+  const t = (m: number) => new Date(Date.UTC(2026, 9, 30, 22, m));
+  async function three() {
+    await addRecentPlan(plan("A"), "a.mov", t(0));
+    await addRecentPlan(plan("B"), "b.mov", t(1));
+    await addRecentPlan(plan("C"), "c.mov", t(2));
+    return listRecentPlans().map((e) => e.id); // C, B, A
+  }
+
+  test("remove keeps what Undo needs, and Undo puts the row back in its place with its plan", async () => {
+    const ids = await three();
+    const removed = await removeRecentPlanWithUndo(ids[1]);
+    assert.ok(removed);
+    assert.equal(removed.position, 1);
+    assert.equal(removed.entry.spaceName, "B");
+    assert.deepEqual(listRecentPlans().map((e) => e.spaceName), ["C", "A"]);
+    assert.equal(store.data.has(ids[1]), false);
+
+    assert.equal(await restoreRecentPlan(removed), true);
+    assert.deepEqual(listRecentPlans().map((e) => e.spaceName), ["C", "B", "A"]);
+    const reopened = await openRecentPlan(ids[1]);
+    assert.equal(reopened?.plan.spaceName, "B");
+    assert.equal(reopened?.videoName, "b.mov");
+  });
+
+  test("nothing to undo when the row is unknown or its saved copy is already gone", async () => {
+    const ids = await three();
+    assert.equal(await removeRecentPlanWithUndo("nope"), null);
+    store.data.delete(ids[0]);
+    assert.equal(await removeRecentPlanWithUndo(ids[0]), null);
+    assert.deepEqual(listRecentPlans().map((e) => e.spaceName), ["B", "A"]);
+  });
+
+  test("undo after the list shrank puts the row at the end, and after it grew keeps it at most RECENT_MAX", async () => {
+    const ids = await three();
+    const removed = await removeRecentPlanWithUndo(ids[2]); // A, last
+    assert.ok(removed);
+    await removeRecentPlan(ids[1]);
+    assert.equal(await restoreRecentPlan(removed), true);
+    assert.deepEqual(listRecentPlans().map((e) => e.spaceName), ["C", "A"]);
+
+    const first = listRecentPlans()[0].id;
+    const top = await removeRecentPlanWithUndo(first); // C at position 0
+    assert.ok(top);
+    for (let i = 0; i < RECENT_MAX; i++) await addRecentPlan(plan(`N${i}`), null, t(10 + i));
+    assert.equal(listRecentPlans().length, RECENT_MAX);
+    const oldestBefore = listRecentPlans()[RECENT_MAX - 1].id;
+    assert.equal(await restoreRecentPlan(top), true);
+    assert.equal(listRecentPlans().length, RECENT_MAX);
+    assert.equal(listRecentPlans()[0].spaceName, "C");
+    assert.equal(store.data.has(oldestBefore), false);
+  });
+
+  test("undo fails quietly when the plan can't be stored again", async () => {
+    const ids = await three();
+    const removed = await removeRecentPlanWithUndo(ids[0]);
+    assert.ok(removed);
+    store.fail = true;
+    assert.equal(await restoreRecentPlan(removed), false);
+    assert.deepEqual(listRecentPlans().map((e) => e.spaceName), ["B", "A"]);
+    assert.equal(await restoreRecentPlan(null as unknown as Parameters<typeof restoreRecentPlan>[0]), false);
   });
 });
