@@ -14,6 +14,7 @@ import { PoweredByMeta } from "./PoweredByMeta";
 import { SectionNav } from "./SectionNav";
 import { SendCostButton } from "@/components/SendCostButton";
 import { SendCountsButton } from "./SendCountsButton";
+import { SendBeforeAfterButton } from "./SendBeforeAfterButton";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictKind } from "@/lib/review";
 import { ProblemList } from "./ProblemList";
@@ -253,6 +254,7 @@ export function PlanView({
       {plan.afterImageUrl && hero && (
         <Section title="Before and after" className="mt-6!">
           <BeforeAfter before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? AFTER_IMAGE_LABEL} />
+          <SendBeforeAfterButton before={hero.url} after={plan.afterImageUrl} label={plan.afterImageLabel ?? AFTER_IMAGE_LABEL} spaceName={plan.spaceName} sample={sample || !!example || plan.meta?.isExample === true} />
         </Section>
       )}
 
