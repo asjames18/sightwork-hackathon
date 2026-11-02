@@ -13,6 +13,7 @@ import {
 import { firstNeededLine, materialsNeededBy, neededByLine } from "@/lib/client/materialsNeededBy";
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
 import { fixLinks, problemAnchor } from "@/lib/client/stepLinks";
+import { ClearTicksButton } from "@/components/ClearTicksButton";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -57,9 +58,9 @@ export function MaterialsList({
     saveGotMaterials(plan, next);
   }
 
-  function clearAll() {
-    setGot([]);
-    saveGotMaterials(plan, []);
+  function setTicks(next: number[]) {
+    setGot(next);
+    saveGotMaterials(plan, next);
   }
 
   async function onSend() {
@@ -88,11 +89,7 @@ export function MaterialsList({
           {ready && line ? line : "Tick items off as you get them. Saved on this device."}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {got.length > 0 && (
-            <button type="button" onClick={clearAll} className="btn-tertiary text-sm">
-              Clear ticks
-            </button>
-          )}
+          <ClearTicksButton ticked={got} noun="item" onChange={setTicks} />
           <button
             type="button"
             onClick={onSend}

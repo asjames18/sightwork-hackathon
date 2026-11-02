@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
+import { ClearTicksButton } from "@/components/ClearTicksButton";
 import { useGotMaterials } from "@/lib/client/useGotMaterials";
 import { stepMaterialsDescription, stepMaterialsLabel, stepMaterialsState } from "@/lib/client/stepMaterials";
 import type { WorkPlan } from "@/lib/types";
@@ -41,10 +42,6 @@ export function WorkSteps({
 
   function toggle(order: number, checked: boolean) {
     update(checked ? [...done.filter((n) => n !== order), order] : done.filter((n) => n !== order));
-  }
-
-  function clearAll() {
-    update([]);
   }
 
   const line = progressLine(done.length, total);
@@ -120,11 +117,7 @@ export function WorkSteps({
         <p className="text-sm text-ink/75" aria-live="polite">
           {ready && line ? line : "Tick steps off as you go. Saved on this device."}
         </p>
-        {done.length > 0 && (
-          <button type="button" onClick={clearAll} className="btn-tertiary text-sm">
-            Clear ticks
-          </button>
-        )}
+        <ClearTicksButton ticked={done} noun="step" onChange={update} />
       </div>
       {done.length > 0 && (
         <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-ink/10 print:hidden" aria-hidden="true">
