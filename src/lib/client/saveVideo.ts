@@ -56,3 +56,15 @@ export function keptTakeNote(kept: boolean, phone: boolean): string {
   if (kept) return phone ? "Saved on this phone. Tap Save video to keep it in Photos." : "Saved in this browser. Tap Save video to download it.";
   return phone ? "Tap Save video to keep a copy in Photos." : "Tap Save video to download a copy.";
 }
+
+/**
+ * The line on a stopped run's card for a take recorded in SightWork's camera. The video is never
+ * uploaded, so a failed run doesn't lose it; this says so and points at Save video. Null for a video
+ * picked from the phone's library or files (it's already there).
+ */
+export function failedTakeNote(kept: boolean, phone: boolean): string | null {
+  if (!kept) return null;
+  return phone
+    ? "Your video is still saved on this phone. Tap Save video to keep it in Photos, then try again."
+    : "Your video is still saved in this browser. Tap Save video to download it, then try again.";
+}

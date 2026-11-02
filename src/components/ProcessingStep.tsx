@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RunStep, StepCheck } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS, planningNowLine, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
@@ -8,6 +8,10 @@ import { failedRunCostLine } from "@/lib/client/runCost";
 import { narrationPartLine } from "@/lib/client/narrationChunks";
 import { STOP_RUN_LABEL, stopRunConfirm } from "@/lib/client/stopRun";
 import { offlineNote, readOnline } from "@/lib/client/connection";
+import { listSavedTakes, listSavedTakesOnServer, savedTakeFor, subscribeSavedTakes } from "@/lib/client/savedTakes";
+import { failedTakeNote } from "@/lib/client/saveVideo";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+import { SaveVideoButton } from "./SaveVideoButton";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -268,6 +272,7 @@ export function ProcessingStep({
               {offline}
             </p>
           )}
+          {videoFile && <FailedTakeNote file={videoFile} />}
           {failedRunCostLine(failure.costUsd) && (
             <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd)}</p>
           )}
@@ -304,6 +309,22 @@ export function ProcessingStep({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * On a stopped run: a take recorded in SightWork's camera is still kept on this device, so say so and
+ * offer Save video. Nothing shows for a video picked from the library or files.
+ */
+function FailedTakeNote({ file }: { file: File }) {
+  const takes = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
+  const note = failedTakeNote(Boolean(savedTakeFor(takes, file)), prefersShareSheet());
+  if (!note) return null;
+  return (
+    <div data-testid="failed-take" className="mt-3 flex flex-col gap-2 rounded-xl bg-paper px-3 py-2 sm:flex-row sm:items-center print:hidden">
+      <p className="min-w-0 flex-1 text-sm text-ink/80">{note}</p>
+      <SaveVideoButton getFile={() => file} className="btn-secondary min-h-11 shrink-0 px-3 text-sm" />
+    </div>
   );
 }
 
