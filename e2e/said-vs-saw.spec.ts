@@ -30,3 +30,39 @@ test("said vs saw rows carry a tally, a tag per row and a link to the problem", 
   await expect(page).toHaveURL(new RegExp(`#problem-${rank}$`));
   await expect(page.locator(`#problem-${rank}`)).toBeInViewport();
 });
+
+for (const width of [375, 768, 1280]) {
+  test(`said vs saw can show only what you didn't mention (${width} px)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/start?view=example&ex=kitchen");
+    const section = page.locator("#said-vs-saw");
+    await expect(section).toBeVisible();
+    const toggle = section.getByTestId("said-vs-saw-only-unmentioned");
+    await expect(toggle).toHaveText("Show only what you didn't mention (3)");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    const box = await toggle.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveText("Show all 6 rows");
+    await expect(section.getByTestId("said-vs-saw-row")).toHaveCount(3);
+    await expect(section.locator('[data-kind="matched"]')).toHaveCount(0);
+    await expect(section.getByTestId("said-vs-saw-hidden-line")).toHaveText("Hiding 3 rows you mentioned.");
+    // The tally still describes the whole comparison.
+    await expect(section.getByTestId("said-vs-saw-tally")).toHaveText("3 matched, 3 you didn't mention.");
+    await section.scrollIntoViewIfNeeded();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `said vs saw filtered ${width}`);
+
+    await toggle.click();
+    await expect(section.getByTestId("said-vs-saw-row")).toHaveCount(6);
+    await expect(section.getByTestId("said-vs-saw-hidden-line")).toHaveText("");
+  });
+}
+
+test("the sanctuary example, whose rows are all unmentioned, shows no toggle", async ({ page }) => {
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("said-vs-saw-only-unmentioned")).toHaveCount(0);
+});
