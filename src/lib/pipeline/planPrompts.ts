@@ -649,6 +649,13 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * but the label is rejected for any {{...}} token here so the
  * failure names the field instead of surfacing as a generic
  * unfilled-placeholder error.
+ * A segmentation count or confidence that is not a finite number
+ * would be printed verbatim as JSON, and JSON.stringify turns NaN
+ * and Infinity into null, so a bad count used to reach the model
+ * as count null instead of failing fast; a negative or fractional
+ * count, or a confidence outside 0..1, is likewise not a count the
+ * segment step can produce (it sums whole instances and averages
+ * scores), so such values now fail fast too.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -725,6 +732,29 @@ export function validateReasonPromptInput(input: ReasonInput): void {
         throw new Error(
           `buildReasonPrompt: segmentation.counts[${i}].label must not contain a {{...}} placeholder`,
         );
+      }
+      if (c && typeof c === "object") {
+        const count = (c as { count?: unknown }).count;
+        if (
+          typeof count !== "number" ||
+          !Number.isInteger(count) ||
+          count < 0
+        ) {
+          throw new Error(
+            `buildReasonPrompt: segmentation.counts[${i}].count must be a whole number >= 0`,
+          );
+        }
+        const confidence = (c as { confidence?: unknown }).confidence;
+        if (
+          typeof confidence !== "number" ||
+          !Number.isFinite(confidence) ||
+          confidence < 0 ||
+          confidence > 1
+        ) {
+          throw new Error(
+            `buildReasonPrompt: segmentation.counts[${i}].confidence must be a finite number between 0 and 1`,
+          );
+        }
       }
     });
   }
