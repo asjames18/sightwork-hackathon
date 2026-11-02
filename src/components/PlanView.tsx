@@ -326,7 +326,7 @@ export function PlanView({
       {narrated && plan.saidVsSeen && plan.saidVsSeen.length > 0 && (
         <Section title={SAID_VS_SEEN_HEADING} id="said-vs-saw">
           <p className="mb-3 text-sm text-ink/80" data-testid="said-vs-saw-tally">{saidVsSeenTally(plan.saidVsSeen)}</p>
-          <SaidVsSeenList rows={plan.saidVsSeen} problemRanks={issues.map((x) => x.rank)} />
+          <SaidVsSeenList rows={plan.saidVsSeen} problemRanks={issues.map((x) => x.rank)} spaceName={plan.spaceName} sample={sample || !!example || plan.meta?.isExample === true} />
         </Section>
       )}
 

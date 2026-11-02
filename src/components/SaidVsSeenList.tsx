@@ -1,20 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SaidVsSeenEntry } from "@/lib/types";
 import { SAID_VS_SEEN_TAG, saidVsSeenKind } from "@/lib/client/planText";
 import { problemAnchor } from "@/lib/client/stepLinks";
+import { sharePlanText, type ShareResult } from "@/lib/client/planText";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+import { saidVsSeenShareTitle, saidVsSeenToText } from "@/lib/client/saidVsSeenText";
 import { canFilterUnmentioned, hiddenSaidRowsLine, showSaidVsSeenRow, unmentionedToggleLabel } from "@/lib/client/saidVsSeenFilter";
+
+const SEND_STATUS: Record<Exclude<ShareResult, "shared">, string> = {
+  copied: "Copied. Paste it into a message.",
+  cancelled: "",
+  failed: "Couldn't share from this browser.",
+};
 
 /**
  * The "You said / We saw" rows. When a plan has both rows the walker mentioned and rows they didn't, a toggle
- * narrows the list to just the things nobody said out loud, so the catch stands out.
+ * narrows the list to just the things nobody said out loud, so the catch stands out. A send button shares the
+ * rows on screen as plain text (share sheet, else clipboard); hidden in print.
  */
-export function SaidVsSeenList({ rows, problemRanks }: { rows: SaidVsSeenEntry[]; problemRanks: number[] }) {
+export function SaidVsSeenList({
+  rows,
+  problemRanks,
+  spaceName,
+  sample,
+}: {
+  rows: SaidVsSeenEntry[];
+  problemRanks: number[];
+  spaceName?: string;
+  sample?: boolean;
+}) {
   const [onlyUnmentioned, setOnlyUnmentioned] = useState(false);
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
   const canFilter = canFilterUnmentioned(rows);
   const only = canFilter && onlyUnmentioned;
   const hiddenLine = hiddenSaidRowsLine(rows, only);
+  const text = saidVsSeenToText(rows, { spaceName, sample, onlyUnmentioned: only });
+  async function onSend() {
+    if (busy || !text) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(saidVsSeenShareTitle(spaceName), text, navigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(SEND_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
   return (
     <>
       {canFilter && (
@@ -75,6 +113,25 @@ export function SaidVsSeenList({ rows, problemRanks }: { rows: SaidVsSeenEntry[]
           })}
         </ul>
       </div>
+      {text && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={busy}
+            data-testid="send-said-vs-saw"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+            </svg>
+            {only ? "Send what you didn't mention" : "Send this list"}
+          </button>
+          <p role="status" aria-live="polite" className="text-sm text-ink/70" data-testid="send-said-vs-saw-status">
+            {status}
+          </p>
+        </div>
+      )}
     </>
   );
 }
