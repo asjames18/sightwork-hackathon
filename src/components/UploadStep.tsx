@@ -21,6 +21,7 @@ import { keptTakeNote } from "@/lib/client/saveVideo";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { SaveVideoButton } from "./SaveVideoButton";
 import { SavedTakes } from "./SavedTakes";
+import type { SavedPlan } from "@/lib/client/lastPlan";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -41,6 +42,7 @@ export function UploadStep({
   onExample,
   onLastPlan,
   recent,
+  onOpenPlan,
   resumeFile,
   stoppedFile,
 }: {
@@ -56,6 +58,8 @@ export function UploadStep({
   onLastPlan?: () => void;
   /** The "Your recent plans" list, shown under "Open my last plan". */
   recent?: React.ReactNode;
+  /** Opens a saved plan; lets a saved take that already made a plan open it. */
+  onOpenPlan?: (saved: SavedPlan) => void;
 }) {
   const savedPlan = useSyncExternalStore(subscribeStorage, hasSavedPlan, noPlanOnServer);
   const takes = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
@@ -348,7 +352,7 @@ export function UploadStep({
             </p>
           ) : null}
           {recent}
-          <SavedTakes onUse={(file) => pick(file)} />
+          <SavedTakes onUse={(file) => pick(file)} onOpenPlan={onOpenPlan} />
           {runner === "api" && <TesterCode />}
           <FilmingTips aim={aimRangeSpoken(rules)} label={rules.label} />
           <ExamplePicker onPick={onExample} />

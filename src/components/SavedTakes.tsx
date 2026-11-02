@@ -12,15 +12,20 @@ import {
   type TakeEntry,
 } from "@/lib/client/savedTakes";
 import { formatDuration } from "@/lib/client/duration";
+import { listRecentPlans, listRecentPlansOnServer, openRecentPlan, subscribeRecentPlans } from "@/lib/client/recentPlans";
+import type { SavedPlan } from "@/lib/client/lastPlan";
+import { planForTake, takePlanLine } from "@/lib/client/takePlan";
 import { SaveVideoButton } from "./SaveVideoButton";
 
 /**
  * "Your saved takes": the last few walkthroughs recorded in SightWork's camera, kept on this device.
  * Each row can be saved to the phone's Photos (share sheet) or downloaded, used for a new plan, or removed.
+ * A take that already made a plan (still on the recent plans list) says so and can open that plan.
  * Hidden in print.
  */
-export function SavedTakes({ onUse }: { onUse?: (file: File) => void }) {
+export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void; onOpenPlan?: (saved: SavedPlan) => void }) {
   const list = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
+  const recents = useSyncExternalStore(subscribeRecentPlans, listRecentPlans, listRecentPlansOnServer);
   const [gone, setGone] = useState<string | null>(null);
   if (list.length === 0) return gone ? <p role="status" className="mt-2 text-sm text-ink/70 print:hidden">{gone}</p> : null;
 
@@ -28,6 +33,14 @@ export function SavedTakes({ onUse }: { onUse?: (file: File) => void }) {
     const file = await openSavedTake(e.id);
     if (!file) setGone("That take is no longer saved on this device, so it was taken off the list.");
     return file;
+  };
+
+  const openPlan = (id: string) => {
+    setGone(null);
+    void openRecentPlan(id).then((saved) => {
+      if (saved) onOpenPlan?.(saved);
+      else setGone("That plan is no longer saved on this device, so it was taken off the list.");
+    });
   };
 
   return (
@@ -40,11 +53,20 @@ export function SavedTakes({ onUse }: { onUse?: (file: File) => void }) {
         {list.map((e) => {
           const when = takeWhen(e.savedAt);
           const details = [when, e.durationSec ? formatDuration(e.durationSec) : null, takeSize(e.size)].filter(Boolean).join(" · ");
+          const made = planForTake(recents, e);
           return (
             <li key={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold leading-snug">{e.name}</p>
                 <p className="text-sm text-ink/70">{details}</p>
+                {made && (
+                  <p data-testid="take-plan" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-ink">
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+                    </svg>
+                    <span className="min-w-0 break-words">{takePlanLine(made)}</span>
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <SaveVideoButton
@@ -52,6 +74,16 @@ export function SavedTakes({ onUse }: { onUse?: (file: File) => void }) {
                   ariaLabel={`Save video ${e.name}`}
                   className="btn-secondary min-h-11 px-3 text-sm"
                 />
+                {made && onOpenPlan && (
+                  <button
+                    type="button"
+                    onClick={() => openPlan(made.id)}
+                    aria-label={`Open plan made from ${e.name}`}
+                    className="btn-secondary min-h-11 shrink-0 px-3 text-sm"
+                  >
+                    Open plan
+                  </button>
+                )}
                 {onUse && (
                   <button
                     type="button"

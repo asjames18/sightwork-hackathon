@@ -198,6 +198,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           onExample={showExample}
           onLastPlan={showLastPlan}
           recent={<RecentPlans onOpen={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })} />}
+          onOpenPlan={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })}
         />
       )}
       {stage.kind === "processing" && (
