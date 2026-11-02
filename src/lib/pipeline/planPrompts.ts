@@ -692,6 +692,14 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * of counts) inside the SEGMENTATION section instead of the counts
  * object the model expects; such values now fail fast too, naming
  * the field.
+ * A segmentation counts entry that is an array at all used to slip
+ * past the object check the same way, and the per-field guards read
+ * label, count and confidence straight off the array, so an entry
+ * carrying those fields as array properties passed every check and
+ * was then printed verbatim as JSON — but JSON.stringify drops array
+ * properties, so it reached the model as an empty "[]" and its count
+ * was silently lost; such entries now fail fast too, naming the
+ * entry index.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -775,6 +783,11 @@ export function validateReasonPromptInput(input: ReasonInput): void {
       if (!c || typeof c !== "object") {
         throw new Error(
           `buildReasonPrompt: segmentation.counts[${i}] must be an object`,
+        );
+      }
+      if (Array.isArray(c)) {
+        throw new Error(
+          `buildReasonPrompt: segmentation.counts[${i}] must be an object, not an array`,
         );
       }
       if (typeof (c as { label?: unknown }).label !== "string") {
