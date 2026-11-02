@@ -44,3 +44,28 @@ test("the Steps and Materials chips show progress once things are ticked, and go
   await expect(stepsChip.getByTestId("chip-progress")).toHaveCount(0);
   await expect(stepsChip.getByTestId("chip-count")).toHaveText(String(totalSteps));
 });
+
+test("the Problems chip shows how many problems are fixed once a ticked step fixes one", async ({ page }) => {
+  await page.goto("/start?view=example&ex=kitchen");
+  const nav = page.getByTestId("section-nav");
+  const problemsChip = nav.getByRole("link", { name: /^Problems/ });
+  await expect(problemsChip.getByTestId("chip-progress")).toHaveCount(0);
+  const steps = page.locator("#work-steps-list").getByRole("checkbox", { name: /^Step \d+ done: / });
+  const total = await steps.count();
+  for (let i = 0; i < total; i++) await steps.nth(i).check();
+  // Every step ticked: the tracked problems are all fixed, so the chip is complete.
+  const badge = problemsChip.getByTestId("chip-progress");
+  await expect(badge).toHaveText(/^(\d+)\/\1/);
+  await expect(problemsChip).toHaveAccessibleName(/^Problems\s*, all \d+ fixed$/);
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    // Scan from the top: mid-page, the sticky row can sit over a button and axe counts that as a small target.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(badge).toBeVisible();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `problems chip ${width}`);
+  }
+  for (let i = 0; i < total; i++) await steps.nth(i).uncheck();
+  await expect(badge).toHaveCount(0);
+  await expect(problemsChip.getByTestId("chip-count")).toBeVisible();
+});

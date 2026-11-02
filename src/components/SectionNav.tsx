@@ -5,13 +5,16 @@ import { activeSection, chipScrollDelta } from "@/lib/client/sectionSpy";
 import { chipCount, chipProgress, type ChipTrack } from "@/lib/client/chipCount";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { useGotMaterials } from "@/lib/client/useGotMaterials";
+import { problemsFixed } from "@/lib/client/problemsFixed";
+import { rankedIssues } from "@/lib/planExtras";
 import type { WorkPlan } from "@/lib/types";
 
 /**
  * Sticky chip row for the plan sections. The chip for the section on screen is marked (aria-current) and,
  * on narrow screens, slides into view inside the row so it is never hidden off the edge. A chip with a count
  * ("Problems 7") shows how big that part of the plan is before you scroll to it. Once steps or materials are ticked,
- * their chips show progress instead ("Steps 3/8", "Materials 2/5"), following the ticks live.
+ * their chips show progress instead ("Steps 3/8", "Materials 2/5"), following the ticks live. Once a ticked step fixes
+ * a problem, the Problems chip shows how many of the problems a step fixes are fixed ("Problems 2/5").
  */
 export function SectionNav({
   chips,
@@ -19,10 +22,11 @@ export function SectionNav({
 }: {
   chips: { href: string; label: string; count?: number; track?: ChipTrack }[];
   /** The plan whose ticks the Steps and Materials chips follow. Without it every chip shows its plain count. */
-  plan?: Pick<WorkPlan, "spaceName" | "workOrder" | "materials"> | null;
+  plan?: Pick<WorkPlan, "spaceName" | "workOrder" | "materials" | "issues"> | null;
 }) {
   const { done } = useDoneSteps(plan);
   const { got } = useGotMaterials(plan);
+  const fixed = plan && Array.isArray(plan.issues) ? problemsFixed(rankedIssues(plan), plan.workOrder, done) : null;
   const navRef = useRef<HTMLElement>(null);
   const rowRef = useRef<HTMLUListElement>(null);
   const [current, setCurrent] = useState<string | null>(null);
@@ -81,7 +85,11 @@ export function SectionNav({
       <ul ref={rowRef} className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
         {chips.map((c) => {
           const on = current === c.href.slice(1);
-          const progress = plan && c.track ? chipProgress(c.track === "steps" ? done.length : got.length, c.count, c.track) : null;
+          const progress = !plan || !c.track
+            ? null
+            : c.track === "problems"
+              ? fixed && chipProgress(fixed.fixed, fixed.total, "problems")
+              : chipProgress(c.track === "steps" ? done.length : got.length, c.count, c.track);
           const count = progress ? null : chipCount(c.count);
           return (
             <li key={c.href} className="shrink-0">

@@ -42,3 +42,10 @@ test("chip progress is null before any tick or for an empty section, and never r
   assert.deepEqual(chipProgress(9, 3, "steps"), { text: "3/3", spoken: "all 3 done", complete: true });
   assert.equal(chipProgress(150, 120, "materials")?.text, "99+/99+");
 });
+
+test("the Problems chip says fixed, out of the problems some step fixes", async () => {
+  const { chipProgress } = await import("@/lib/client/chipCount");
+  assert.deepEqual(chipProgress(2, 5, "problems"), { text: "2/5", spoken: "2 of 5 fixed", complete: false });
+  assert.deepEqual(chipProgress(3, 3, "problems"), { text: "3/3", spoken: "all 3 fixed", complete: true });
+  assert.equal(chipProgress(0, 5, "problems"), null);
+});

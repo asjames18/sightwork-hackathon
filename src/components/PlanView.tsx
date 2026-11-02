@@ -170,8 +170,8 @@ export function PlanView({
   // Sticky section chips: one per section that actually renders, so no chip points at nothing.
   const showSaid = narrated && !!plan.saidVsSeen && plan.saidVsSeen.length > 0;
   // Problems, Counts, Steps and Materials carry how many they hold; an empty section shows just its name.
-  const chips: { href: string; label: string; count?: number; track?: "steps" | "materials" }[] = [
-    { href: "#problems", label: "Problems", count: issues.length },
+  const chips: { href: string; label: string; count?: number; track?: "steps" | "materials" | "problems" }[] = [
+    { href: "#problems", label: "Problems", count: issues.length, track: "problems" },
     ...(showSaid ? [{ href: "#said-vs-saw", label: "Said vs saw" }] : []),
     { href: "#counts", label: "Counts", count: plan.inventory.length },
     { href: "#steps", label: "Steps", count: plan.workOrder.length, track: "steps" },
