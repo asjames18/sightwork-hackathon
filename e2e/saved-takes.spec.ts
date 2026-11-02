@@ -73,6 +73,10 @@ for (const width of [375, 768, 1280]) {
 
     await page.goto("/start");
     await page.getByRole("button", { name: new RegExp(`^Remove ${name.replace(/\./g, "\\.")}`) }).click();
+    // The list empties, with Undo on offer until the next tap; a reload clears it for good.
+    await expect(page.getByTestId("saved-takes").getByRole("listitem")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Undo: put/ })).toBeVisible();
+    await page.reload();
     await expect(page.getByTestId("saved-takes")).toHaveCount(0);
   });
 }

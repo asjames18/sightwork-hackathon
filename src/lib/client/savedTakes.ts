@@ -212,6 +212,56 @@ export async function removeSavedTake(id: string): Promise<void> {
   } catch {}
 }
 
+/** What Undo needs to put a removed take back: its row, its stored video and where it sat on the list. */
+export type RemovedTake = { entry: TakeEntry; stored: StoredTake; position: number };
+
+/**
+ * Removes one kept take like removeSavedTake, but first reads its stored video so Undo can put it back.
+ * Resolves null when there was nothing to keep (the take was already gone or unreadable).
+ */
+export async function removeSavedTakeWithUndo(id: string): Promise<RemovedTake | null> {
+  const list = listSavedTakes();
+  const position = list.findIndex((e) => e.id === id);
+  const entry = position >= 0 ? list[position] : null;
+  let stored: StoredTake | null = null;
+  try {
+    const v = (await store()?.get(id)) as StoredTake | null | undefined;
+    if (v && v.blob instanceof Blob && v.blob.size > 0) stored = v;
+  } catch {
+    stored = null;
+  }
+  await removeSavedTake(id);
+  return entry && stored ? { entry, stored, position } : null;
+}
+
+/**
+ * Undo for a removed take: stores its video again and puts the row back where it was (or as near as the
+ * list allows). When the list has filled up again since, it resolves false rather than push another
+ * take off. Resolves true once the take is listed again. Never throws.
+ */
+export async function restoreSavedTake(removed: RemovedTake): Promise<boolean> {
+  try {
+    const s = store();
+    const { entry, stored } = removed ?? ({} as RemovedTake);
+    if (!s || !isEntry(entry) || !(stored?.blob instanceof Blob) || !(stored.blob.size > 0)) return false;
+    const rest = listSavedTakes().filter((e) => e.id !== entry.id);
+    if (rest.length >= TAKES_MAX) return false;
+    const at = Math.max(0, Math.min(Number.isInteger(removed.position) ? removed.position : 0, rest.length));
+    try {
+      await s.put(entry.id, stored);
+    } catch {
+      return false;
+    }
+    if (!writeIndex([...rest.slice(0, at), entry, ...rest.slice(at)])) {
+      void s.remove(entry.id).catch(() => {});
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** "Nov 2, 12:40 PM" in the viewer's own time zone. */
 export function takeWhen(savedAt: string, locale?: string): string {
   const d = new Date(savedAt);

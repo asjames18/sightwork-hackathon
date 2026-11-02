@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   listSavedTakes,
   listSavedTakesOnServer,
   openSavedTake,
-  removeSavedTake,
+  removeSavedTakeWithUndo,
+  restoreSavedTake,
   subscribeSavedTakes,
   takeSize,
   takeWhen,
+  type RemovedTake,
   type TakeEntry,
 } from "@/lib/client/savedTakes";
 import { formatDuration } from "@/lib/client/duration";
@@ -21,13 +23,69 @@ import { SaveVideoButton } from "./SaveVideoButton";
  * "Your saved takes": the last few walkthroughs recorded in SightWork's camera, kept on this device.
  * Each row can be saved to the phone's Photos (share sheet) or downloaded, used for a new plan, or removed.
  * A take that already made a plan (still on the recent plans list) says so and can open that plan.
- * Hidden in print.
+ * Remove offers an Undo that puts the take and its video back (until the next tap on the list), so a
+ * walkthrough is never lost to one mis-tap. Hidden in print.
  */
 export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void; onOpenPlan?: (saved: SavedPlan) => void }) {
   const list = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
   const recents = useSyncExternalStore(subscribeRecentPlans, listRecentPlans, listRecentPlansOnServer);
   const [gone, setGone] = useState<string | null>(null);
-  if (list.length === 0) return gone ? <p role="status" className="mt-2 text-sm text-ink/70 print:hidden">{gone}</p> : null;
+  const [removed, setRemoved] = useState<RemovedTake | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Keyboard and screen reader users keep their place: focus moves to Undo after a remove, and back
+  // to the restored take's Save video button after Undo.
+  useEffect(() => {
+    if (removed) undoRef.current?.focus();
+  }, [removed]);
+  useEffect(() => {
+    if (!focusId) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-take-id="${CSS.escape(focusId)}"] button`)?.focus();
+    setFocusId(null);
+  }, [focusId, list]);
+
+  const remove = (e: TakeEntry) => {
+    setGone(null);
+    setRemoved(null);
+    void removeSavedTakeWithUndo(e.id).then(setRemoved);
+  };
+
+  const undo = () => {
+    const r = removed;
+    setRemoved(null);
+    if (!r) return;
+    void restoreSavedTake(r).then((ok) => {
+      if (ok) setFocusId(r.entry.id);
+      else setGone("That take couldn't be put back on this device.");
+    });
+  };
+
+  const undoRow = removed && (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="take-undo">
+      <p role="status" className="min-w-0 break-words text-sm text-ink/70">
+        Removed {removed.entry.name}, {takeWhen(removed.entry.savedAt)}.
+      </p>
+      <button
+        ref={undoRef}
+        type="button"
+        onClick={undo}
+        aria-label={`Undo: put ${removed.entry.name} back on this device`}
+        className="btn-tertiary min-h-11 shrink-0 px-3 text-sm"
+      >
+        Undo
+      </button>
+    </div>
+  );
+
+  if (list.length === 0)
+    return undoRow || gone ? (
+      <section aria-label="Your saved takes" className="mt-6 print:hidden" data-testid="saved-takes">
+        {undoRow}
+        {gone && <p role="status" className="mt-2 text-sm text-ink/70">{gone}</p>}
+      </section>
+    ) : null;
 
   const open = async (e: TakeEntry) => {
     const file = await openSavedTake(e.id);
@@ -37,6 +95,7 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
 
   const openPlan = (id: string) => {
     setGone(null);
+    setRemoved(null);
     void openRecentPlan(id).then((saved) => {
       if (saved) onOpenPlan?.(saved);
       else setGone("That plan is no longer saved on this device, so it was taken off the list.");
@@ -49,13 +108,13 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
         Your saved takes
       </h2>
       <p className="mt-1 text-sm text-ink/70">Videos you recorded here, kept on this device only.{list.length > 1 ? ` The last ${list.length}, newest first.` : ""}</p>
-      <ul className="mt-3 divide-y divide-ink/10 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink/10">
+      <ul ref={listRef} className="mt-3 divide-y divide-ink/10 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink/10">
         {list.map((e) => {
           const when = takeWhen(e.savedAt);
           const details = [when, e.durationSec ? formatDuration(e.durationSec) : null, takeSize(e.size)].filter(Boolean).join(" · ");
           const made = planForTake(recents, e);
           return (
-            <li key={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+            <li key={e.id} data-take-id={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold leading-snug">{e.name}</p>
                 <p className="text-sm text-ink/70">{details}</p>
@@ -87,7 +146,10 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
                 {onUse && (
                   <button
                     type="button"
-                    onClick={() => void open(e).then((file) => file && onUse(file))}
+                    onClick={() => {
+                      setRemoved(null);
+                      void open(e).then((file) => file && onUse(file));
+                    }}
                     aria-label={`Use ${e.name} for a new plan`}
                     className="btn-tertiary min-h-11 shrink-0 px-3 text-sm"
                   >
@@ -96,10 +158,7 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    setGone(null);
-                    void removeSavedTake(e.id);
-                  }}
+                  onClick={() => remove(e)}
                   aria-label={`Remove ${e.name}, ${when}, from this device`}
                   className="btn-tertiary min-h-11 shrink-0 px-3 text-sm"
                 >
@@ -110,6 +169,7 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
           );
         })}
       </ul>
+      {undoRow}
       {gone && (
         <p role="status" className="mt-2 text-sm text-ink/70">
           {gone}
