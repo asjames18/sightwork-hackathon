@@ -24,6 +24,7 @@ import { getProofPhoto, withPhotoLine } from "@/lib/client/proofPhoto";
 import { keepInViewDelta, stickyLine } from "@/lib/client/keepInView";
 import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { problemsShareTitle, problemsToText, sendShownLabel } from "@/lib/client/problemsText";
+import { sendWatchLabel, watchShareTitle, watchToText } from "@/lib/client/watchText";
 
 /**
  * The Problems section body (richer findings, items 2, 6 and 7): problems grouped into Fix now / Fix soon /
@@ -439,7 +440,7 @@ export function ProblemList({
         </p>
       )}
 
-      {watch.length > 0 && <WatchList items={watch} frames={frames} masks={masks} sample={sample} />}
+      {watch.length > 0 && <WatchList items={watch} frames={frames} masks={masks} sample={sample} spaceName={plan.spaceName} />}
       {showChecklist && <Checklist issues={issues} watch={watch} />}
     </>
   );
@@ -565,7 +566,7 @@ function SendShownButton({ count, title, text }: { count: number; title: string;
 }
 
 /** "Worth a closer look": lower-confidence finds, collapsed by default, each with its photo. */
-function WatchList({ items, frames, masks, sample }: { items: WatchItem[]; frames: PlanFrame[]; masks: boolean; sample: boolean }) {
+function WatchList({ items, frames, masks, sample, spaceName }: { items: WatchItem[]; frames: PlanFrame[]; masks: boolean; sample: boolean; spaceName?: string }) {
   return (
     <PrintOpenDetails className="group mt-6 rounded-2xl border border-ink/10 bg-white" data-testid="watch-list">
       <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
@@ -610,7 +611,52 @@ function WatchList({ items, frames, masks, sample }: { items: WatchItem[]; frame
           );
         })}
       </ul>
+      <SendWatchButton count={items.length} title={watchShareTitle(spaceName)} text={() => watchToText(items, { spaceName, sample })} />
     </PrintOpenDetails>
+  );
+}
+
+/**
+ * At the foot of the open "Worth a closer look" list: sends the lower-confidence finds as one short list (watchText.ts)
+ * to whoever checks them in person, by the phone's share sheet, else the clipboard. Hidden in print.
+ */
+function SendWatchButton({ count, title, text }: { count: number; title: string; text: () => string | null }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  async function onSend() {
+    const body = text();
+    if (busy || !body) return;
+    setBusy(true);
+    setStatus("");
+    const result = await sharePlanText(title, body, navigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(SEND_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pb-5 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        data-testid="send-watch"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ink/20 bg-white px-3.5 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        {sendWatchLabel(count)}
+      </button>
+      <p role="status" aria-live="polite" className="text-sm text-ink/70">
+        {status}
+      </p>
+    </div>
   );
 }
 
