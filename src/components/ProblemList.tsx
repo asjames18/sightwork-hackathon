@@ -4,6 +4,7 @@ import { ProofFrame } from "./ProofFrame";
 import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
 import { boxSource, coverageNote, groupByTier, issueExtras, issueTier, TIER_HINT, TIER_LABEL, type Tier, type WatchItem } from "@/lib/planExtras";
 import { checklistRows } from "@/lib/checklist";
+import { areaProblemRanks, areaProblemsLabel } from "@/lib/client/checklistLinks";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { PrintOpenDetails } from "./PrintOpenDetails";
 import { fixedInLabel, problemAnchor, stepAnchor, stepsFixing } from "@/lib/client/stepLinks";
@@ -725,8 +726,11 @@ function Checklist({ issues, watch }: { issues: Issue[]; watch: WatchItem[] }) {
       </p>
       {hits.length > 0 && (
         <ul className="mt-3 divide-y divide-ink/10" aria-label="Areas with findings">
-          {hits.map((r) => (
-            <li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+          {hits.map((r) => {
+            const ranks = areaProblemRanks(issues as (Issue & { checklistKey?: unknown })[], r.id);
+            return (
+            <li key={r.id} className="py-2 text-sm" data-testid="checklist-area">
+              <div className="flex min-h-7 items-center justify-between gap-3">
               <span className="flex min-w-0 items-center gap-2">
                 <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900">
                   <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M8 4v4.5M8 11.5v.2" /></svg>
@@ -738,8 +742,25 @@ function Checklist({ issues, watch }: { issues: Issue[]; watch: WatchItem[] }) {
                 {r.found > 0 && r.watch > 0 ? " · " : null}
                 {r.watch > 0 ? `${r.watch} to check` : null}
               </span>
+              </div>
+              {ranks.length > 0 && (
+                // Each number jumps to that problem's card, so the summary leads straight to the evidence.
+                <div role="group" aria-label={areaProblemsLabel(r.label, ranks)} className="mt-1.5 flex flex-wrap gap-1.5 pl-7" data-testid="checklist-problems">
+                  {ranks.map((n) => (
+                      <a
+                        key={n}
+                        href={`#${problemAnchor(n)}`}
+                        aria-label={`Problem ${n}`}
+                        className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-accent-dark/30 px-2 text-sm font-semibold text-accent-dark tabular-nums hover:border-accent-dark hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+                      >
+                        #{n}
+                      </a>
+                  ))}
+                </div>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       {clear.length > 0 && (
