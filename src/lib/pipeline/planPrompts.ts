@@ -670,6 +670,13 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * only run when counts is an array, so it was printed verbatim as
  * JSON inside the SEGMENTATION section; such values now fail fast
  * too, naming the field.
+ * A segmentation counts entry whose label is not a string at all
+ * (a number, null, an object, or missing) used to slip past the
+ * placeholder guard, which only runs when the label is a string,
+ * so it was printed verbatim as JSON inside the SEGMENTATION
+ * section (a number label as "label":5, a missing label dropped
+ * from the JSON entirely); such labels now fail fast too, naming
+ * the entry index.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -748,6 +755,11 @@ export function validateReasonPromptInput(input: ReasonInput): void {
       if (!c || typeof c !== "object") {
         throw new Error(
           `buildReasonPrompt: segmentation.counts[${i}] must be an object`,
+        );
+      }
+      if (typeof (c as { label?: unknown }).label !== "string") {
+        throw new Error(
+          `buildReasonPrompt: segmentation.counts[${i}].label must be a string`,
         );
       }
       if (
