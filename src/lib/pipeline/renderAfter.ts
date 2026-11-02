@@ -173,6 +173,21 @@ export function pickHeroFrameIndex(plan: WorkPlan): number | null {
   if (!Array.isArray(plan.workOrder)) {
     throw new Error("renderAfter: plan.workOrder must be an array");
   }
+  // Parity with the array guards above: a non-object issues or
+  // workOrder entry used to pass here and only fail in the ranked
+  // pick below, reading rank off null in the sort comparator (or
+  // fixes off null in the filter) with a raw TypeError and no entry
+  // named. Fail fast here, with the index named.
+  plan.issues.forEach((issue, i) => {
+    if (!issue || typeof issue !== "object") {
+      throw new Error(`renderAfter: plan.issues[${i}] must be an object`);
+    }
+  });
+  plan.workOrder.forEach((s, i) => {
+    if (!s || typeof s !== "object") {
+      throw new Error(`renderAfter: plan.workOrder[${i}] must be an object`);
+    }
+  });
   const ranked = [...plan.issues].sort((a, b) => a.rank - b.rank);
   for (const issue of ranked) {
     const fixing = plan.workOrder.filter((s) => s.fixes?.includes(issue.rank));
