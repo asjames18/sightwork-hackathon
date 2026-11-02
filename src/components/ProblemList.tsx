@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { Box, Issue, PlanFrame, PlanReview, WorkPlan } from "@/lib/types";
+import type { Box, Issue, PlanFrame, PlanReview, WorkPlan, WorkStep } from "@/lib/types";
 import { ProofFrame } from "./ProofFrame";
 import { verdictFor, verdictKind, supportedScope } from "@/lib/review";
+import { tierFixed, tierFixedSr } from "@/lib/client/tierFixed";
 import { boxSource, coverageNote, groupByTier, issueExtras, issueTier, TIER_HINT, TIER_LABEL, type Tier, type WatchItem } from "@/lib/planExtras";
 import { checklistRows } from "@/lib/checklist";
 import { areaProblemRanks, areaProblemsLabel } from "@/lib/client/checklistLinks";
@@ -410,6 +411,7 @@ export function ProblemList({
                 <span aria-hidden className={`h-2.5 w-2.5 shrink-0 translate-y-[-1px] rounded-full ${TIER_DOT[g.tier]}`} />
                 <h3 id={`tier-${g.tier}`} className="text-base font-extrabold">
                   {TIER_LABEL[g.tier]} <span className="font-semibold text-ink/60 tabular-nums">· {g.issues.length}</span>
+                  <TierFixedTag issues={g.issues} tier={g.tier} workOrder={plan.workOrder} done={done} />
                 </h3>
               </div>
               <p className="-mt-2 mb-3 pl-[1.125rem] text-sm text-ink/65">{TIER_HINT[g.tier]}</p>
@@ -445,6 +447,19 @@ export function ProblemList({
       {watch.length > 0 && <WatchList items={watch} frames={frames} masks={masks} sample={sample} spaceName={plan.spaceName} />}
       {showChecklist && <Checklist issues={issues} watch={watch} />}
     </>
+  );
+}
+
+/** "· 1 fixed" / "· all fixed" after a tier heading once ticked-off steps fix problems in it. */
+function TierFixedTag({ issues, tier, workOrder, done }: { issues: Issue[]; tier: Tier; workOrder: WorkStep[]; done: readonly number[] }) {
+  const t = tierFixed(issues, workOrder, done);
+  if (!t) return null;
+  return (
+    <span className={`font-semibold tabular-nums ${t.all ? "text-safe-dark" : "text-ink/65"}`} data-testid={`tier-fixed-${tier}`}>
+      {" "}
+      <span aria-hidden>· {t.all ? "✓ " : ""}{t.label}</span>
+      <span className="sr-only">, {tierFixedSr(t)}</span>
+    </span>
   );
 }
 
