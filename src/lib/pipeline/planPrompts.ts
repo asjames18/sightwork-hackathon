@@ -768,6 +768,17 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * buildReasonPrompt caller bypassing runReason gets the same
  * fail-fast here, naming the field. Null transcript still builds
  * the explicit "(no narration)" prompt.
+ * A transcript that is blank at all (an empty string, or only
+ * whitespace) used to slip past the string-or-null check, so it
+ * built the prompt with an empty TRANSCRIPT section — neither the
+ * speaker's words nor the explicit "(no narration)" marker, so
+ * step 2's null-if-no-narration rule had nothing to key on and the
+ * model could treat an empty section as silence or invent
+ * narration. runPlan's own validator already rejects a blank
+ * transcript before any paid call, so a direct buildReasonPrompt
+ * caller bypassing runPlan gets the same fail-fast here, naming
+ * the field. Null transcript still builds the explicit
+ * "(no narration)" prompt, and a non-blank string still builds.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -820,6 +831,12 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     typeof input.transcript !== "string"
   ) {
     throw new Error("buildReasonPrompt: transcript must be a string or null");
+  }
+  if (
+    typeof input.transcript === "string" &&
+    input.transcript.trim().length === 0
+  ) {
+    throw new Error("buildReasonPrompt: transcript must not be blank");
   }
   if (
     input.segmentation !== null &&
