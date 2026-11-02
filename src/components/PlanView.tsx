@@ -13,6 +13,7 @@ import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import { SectionNav } from "./SectionNav";
 import { BackToTop } from "./BackToTop";
+import { JumpBack } from "./JumpBack";
 import { SendCostButton } from "@/components/SendCostButton";
 import { SendCountsButton } from "./SendCountsButton";
 import { SendBeforeAfterButton } from "./SendBeforeAfterButton";
@@ -302,6 +303,7 @@ export function PlanView({
 
       <SectionNav chips={chips} />
       <BackToTop targetId="plan-top" />
+      <JumpBack />
 
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
