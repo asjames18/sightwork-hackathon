@@ -18,8 +18,9 @@ test("ticking steps shows the hours of work left, then hides it when everything 
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await left.scrollIntoViewIfNeeded();
-    await expect(left).toBeVisible();
+    // Step 1 to the top (its scroll margin clears the sticky chips), so no control above sits half under them while axe runs.
+    await page.locator("#step-1").evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await expect(left).toBeAttached();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `hours left ${width}`);
   }

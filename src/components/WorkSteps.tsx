@@ -20,6 +20,7 @@ import { prefersShareSheet } from "@/lib/client/savePlanPdf";
 import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
 import { calendarFileName, calendarSummary, crewCalendarFileName, planCalendar } from "@/lib/client/stepCalendar";
 import { downloadBlob } from "@/lib/client/savePlanPdf";
+import { canHideDone, hiddenDoneLine, hiddenStepTarget, hideDoneLabel } from "@/lib/client/stepsHide";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -50,6 +51,37 @@ export function WorkSteps({
   const totalHours = hoursLabel(crew.totalHours, crew.totalPartial);
   // Ticks load after mount, so the server render never shows hours left.
   const leftLine = ready ? hoursLeftLine(hoursLeft(plan.workOrder, done)) : "";
+  const [hideDone, setHideDone] = useState(false);
+  const showHide = ready && canHideDone(done.length, total);
+  // Hiding only applies while there is something to hide and something left; paper always lists every step.
+  const hiding = hideDone && showHide;
+  const hiddenLine = hiddenDoneLine(done.length, hiding);
+
+  // A link elsewhere on the plan ("Fixed in step 3", Next up, the summary) can point at a hidden done step:
+  // show every step again and land on it, so a link never goes nowhere.
+  useEffect(() => {
+    if (!hiding) return;
+    function reveal(hash: string) {
+      const n = hiddenStepTarget(hash, done);
+      if (n === null) return false;
+      setHideDone(false);
+      requestAnimationFrame(() => document.getElementById(stepAnchor(n))?.scrollIntoView({ block: "start" }));
+      return true;
+    }
+    function onClick(e: MouseEvent) {
+      const a = (e.target as Element | null)?.closest?.("a[href^='#']");
+      if (a) reveal(a.getAttribute("href") ?? "");
+    }
+    function onHash() {
+      reveal(window.location.hash);
+    }
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("hashchange", onHash);
+    };
+  }, [hiding, done]);
 
   return (
     <>
@@ -119,8 +151,27 @@ export function WorkSteps({
         <p className="text-sm text-ink/75" aria-live="polite">
           {ready && line ? line : "Tick steps off as you go. Saved on this device."}
         </p>
-        <ClearTicksButton ticked={done} noun="step" onChange={update} />
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {showHide && (
+            <button
+              type="button"
+              onClick={() => setHideDone((h) => !h)}
+              aria-pressed={hiding}
+              aria-controls="work-steps-list"
+              data-testid="steps-hide-done"
+              className="btn-tertiary text-sm"
+            >
+              {hideDoneLabel(done.length, hiding)}
+            </button>
+          )}
+          <ClearTicksButton ticked={done} noun="step" onChange={update} />
+        </span>
       </div>
+      {hiddenLine && (
+        <p data-testid="steps-hidden-line" className="-mt-2 mb-3 text-sm text-ink/70 print:hidden">
+          {hiddenLine}
+        </p>
+      )}
       {leftLine && (
         <p className="-mt-2 mb-3 text-sm text-ink/75 tabular-nums print:hidden" data-testid="hours-left">
           {leftLine}
@@ -131,7 +182,7 @@ export function WorkSteps({
           <div className="h-full rounded-full bg-safe-dark transition-[width] motion-reduce:transition-none" style={{ width: `${pct}%` }} />
         </div>
       )}
-      <ol className="rounded-2xl bg-white px-4 py-2 sm:px-5">
+      <ol id="work-steps-list" className="rounded-2xl bg-white px-4 py-2 sm:px-5">
         {plan.workOrder.map((step, i) => {
           const last = i === total - 1;
           const isDone = done.includes(step.order);
@@ -141,7 +192,7 @@ export function WorkSteps({
           const mats = gotReady ? stepMaterialsState(plan, step, got) : null;
           const waiting = stepsWaitingOn(plan.workOrder, step.order).map((s) => s.order);
           return (
-            <li key={step.order} id={stepAnchor(step.order)} className="sw-land relative flex scroll-mt-32 gap-3 rounded-xl py-3">
+            <li key={step.order} id={stepAnchor(step.order)} className={`sw-land relative scroll-mt-32 gap-3 rounded-xl py-3 ${hiding && isDone ? "hidden print:flex" : "flex"}`}>
               {!last && (
                 <span aria-hidden="true" className="absolute top-12 bottom-0 left-4 w-0.5 -translate-x-1/2 bg-ink/15" />
               )}
