@@ -10,7 +10,7 @@ import { loadRegion } from "@/lib/client/location";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { addRecentPlan } from "@/lib/client/recentPlans";
-import { cuePlanReady } from "@/lib/client/planReadyCue";
+import { buzzPlanReady, cuePlanReady } from "@/lib/client/planReadyCue";
 import { showPlanTitle } from "@/lib/client/planTitle";
 import { RecentPlans } from "./RecentPlans";
 import { UploadStep } from "./UploadStep";
@@ -93,6 +93,8 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   useEffect(() => {
     if (stage.kind !== "plan" || !readyCue.current) return;
     readyCue.current = false;
+    // On a phone that can vibrate, a short buzz says the plan is ready even with the screen in a pocket.
+    buzzPlanReady();
     return cuePlanReady(planIssues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);

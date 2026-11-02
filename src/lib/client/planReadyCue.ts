@@ -37,3 +37,27 @@ export function cuePlanReady(problemCount: number | null | undefined, doc: CueDo
   doc.addEventListener("visibilitychange", onVisible);
   return stop;
 }
+
+type BuzzNavigator = { vibrate?: (pattern: number | number[]) => boolean };
+type BuzzWindow = { matchMedia?: (query: string) => { matches: boolean } };
+
+/** Two short pulses: noticeable in a pocket or on a pew, never a long alarm. */
+export const PLAN_READY_BUZZ: readonly number[] = [70, 90, 70];
+
+/**
+ * A short buzz on phones that support vibration (most Android browsers; iPhone Safari has no vibration,
+ * so nothing happens there) when a real run finishes into a plan. Skipped when the person asked for
+ * reduced motion. Never throws; returns true only when the buzz was sent.
+ */
+export function buzzPlanReady(
+  nav: BuzzNavigator | undefined = typeof navigator === "undefined" ? undefined : (navigator as BuzzNavigator),
+  win: BuzzWindow | undefined = typeof window === "undefined" ? undefined : (window as BuzzWindow),
+): boolean {
+  if (!nav || typeof nav.vibrate !== "function") return false;
+  try {
+    if (win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
+    return nav.vibrate([...PLAN_READY_BUZZ]) === true;
+  } catch {
+    return false;
+  }
+}

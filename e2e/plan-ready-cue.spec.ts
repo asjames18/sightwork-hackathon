@@ -45,3 +45,36 @@ test("plan that finishes on screen keeps the normal title", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveTitle(startTitle);
 });
+
+async function recordBuzz(page: import("@playwright/test").Page, reduced = false) {
+  await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
+  await page.addInitScript(() => {
+    const w = window as unknown as { __buzz: unknown[] };
+    w.__buzz = [];
+    Object.defineProperty(navigator, "vibrate", { configurable: true, value: (p: unknown) => (w.__buzz.push(p), true) });
+  });
+}
+
+for (const width of [375, 768, 1280]) {
+  test(`finished run buzzes once on a phone that can vibrate (${width} px)`, async ({ page }) => {
+    await recordBuzz(page);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/start");
+    await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+    await page.getByRole("button", { name: "Make my work plan" }).click();
+    await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __buzz: unknown[] }).__buzz)).toEqual([[70, 90, 70]]);
+    await expectNoSideScroll(page);
+  });
+}
+
+test("reduced motion: finished run does not buzz", async ({ page }) => {
+  await recordBuzz(page, true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/start");
+  await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
+  await page.getByRole("button", { name: "Make my work plan" }).click();
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as unknown as { __buzz: unknown[] }).__buzz)).toEqual([]);
+});

@@ -67,3 +67,39 @@ test("a title set by something else is left alone", () => {
 test("no document (server render): nothing happens", () => {
   assert.doesNotThrow(() => cuePlanReady(3, undefined)());
 });
+
+import { buzzPlanReady, PLAN_READY_BUZZ } from "@/lib/client/planReadyCue";
+
+function fakeNav(result = true) {
+  const calls: unknown[] = [];
+  return { calls, vibrate: (p: number | number[]) => (calls.push(p), result) };
+}
+const motionOk = { matchMedia: () => ({ matches: false }) };
+const reduced = { matchMedia: (q: string) => ({ matches: q.includes("reduce") }) };
+
+test("buzz: sends two short pulses when vibration is supported", () => {
+  const nav = fakeNav();
+  assert.equal(buzzPlanReady(nav, motionOk), true);
+  assert.deepEqual(nav.calls, [[70, 90, 70]]);
+  assert.ok(PLAN_READY_BUZZ.reduce((a, b) => a + b, 0) < 500, "never a long alarm");
+});
+
+test("buzz: skipped with reduced motion", () => {
+  const nav = fakeNav();
+  assert.equal(buzzPlanReady(nav, reduced), false);
+  assert.equal(nav.calls.length, 0);
+});
+
+test("buzz: no vibration support (iPhone Safari, desktop) does nothing", () => {
+  assert.equal(buzzPlanReady({}, motionOk), false);
+  assert.equal(buzzPlanReady(undefined, motionOk), false);
+});
+
+test("buzz: works without matchMedia and never throws", () => {
+  const nav = fakeNav();
+  assert.equal(buzzPlanReady(nav, {}), true);
+  assert.equal(buzzPlanReady(nav, undefined), true);
+  const throwing = { vibrate: () => { throw new Error("blocked"); } };
+  assert.equal(buzzPlanReady(throwing, motionOk), false);
+  assert.equal(buzzPlanReady(fakeNav(false), motionOk), false);
+});
