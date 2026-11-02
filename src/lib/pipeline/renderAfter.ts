@@ -373,7 +373,10 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
  * do the same: the title is the prompt line,
  * so buildRenderAfterPrompt rejects it, but only after the hero pick
  * and visible-changes work. Hidden titles still pass,
- * since their lines never reach the prompt.
+ * since their lines never reach the prompt. A work-step title that
+ * is not a string used to pass here and only fail later, as a raw
+ * TypeError from .trim in the visible-changes build, so such titles
+ * fail fast here with the step named.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -450,6 +453,9 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
   // checked here as well. Hidden titles never become prompt lines,
   // so they still pass.
   plan.workOrder.forEach((s, i) => {
+    if (s && typeof s === "object" && typeof s.title !== "string") {
+      throw new Error(`renderAfter: plan.workOrder[${i}].title must be a string`);
+    }
     if (
       s &&
       typeof s === "object" &&
