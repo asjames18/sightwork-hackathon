@@ -26,6 +26,9 @@ import { livePricesLine, planLocation, SAID_VS_SEEN_HEADING, SAID_VS_SEEN_TAG, s
 import { problemAnchor } from "@/lib/client/stepLinks";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "@/lib/client/countMethod";
 
+// Focus ring for the links on the dark summary card.
+const SUMMARY_LINK_FOCUS = "focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50";
+
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -218,34 +221,40 @@ export function PlanView({
       {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
       {plan.issues.length > 0 && (
-        <a
-          href="#problems"
-          className="mt-5 block rounded-2xl bg-ink p-5 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50 sm:p-6"
-        >
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-10">
-            {stats.map((s) => (
-              <div key={s.label} className="min-w-0">
-                <dt className="text-sm font-semibold text-white/80">{s.label}</dt>
-                <dd className={`font-extrabold leading-tight break-words ${s.small ? "text-2xl" : "text-4xl"} ${s.accent ? "text-accent" : "text-white"}`}>
-                  {s.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+        <div className="mt-5 rounded-2xl bg-ink p-5 text-white sm:p-6">
+          {/* The stats go to the problem list; each named problem below goes straight to its own card. */}
+          <a href="#problems" className={`block rounded-lg ${SUMMARY_LINK_FOCUS}`}>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-10">
+              {stats.map((s) => (
+                <div key={s.label} className="min-w-0">
+                  <dt className="text-sm font-semibold text-white/80">{s.label}</dt>
+                  <dd className={`font-extrabold leading-tight break-words ${s.small ? "text-2xl" : "text-4xl"} ${s.accent ? "text-accent" : "text-white"}`}>
+                    {s.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </a>
           {unmentioned.length > 0 && <p className="mt-4 text-sm font-semibold text-white">Not mentioned:</p>}
-          <ul className={`${unmentioned.length > 0 ? "mt-1.5" : "mt-4"} space-y-1.5 text-sm text-white/80`} data-testid="summary-titles">
+          <ul className={`${unmentioned.length > 0 ? "mt-1.5" : "mt-4"} space-y-1 text-sm text-white/80`} data-testid="summary-titles">
             {summaryList.items.map((i) => (
-              <li key={i.rank} className="flex min-w-0 gap-2">
-                <span aria-hidden="true" className="w-6 shrink-0 font-semibold tabular-nums text-white/70">#{i.rank}</span>
-                <span className="min-w-0 break-words">
-                  <span className="sr-only">Problem {i.rank}: </span>
-                  {i.title}
-                </span>
+              <li key={i.rank} className="min-w-0">
+                <a href={`#${problemAnchor(i.rank)}`} className={`group flex min-w-0 gap-2 rounded py-0.5 ${SUMMARY_LINK_FOCUS}`}>
+                  <span aria-hidden="true" className="w-6 shrink-0 font-semibold tabular-nums text-white/70">#{i.rank}</span>
+                  <span className="min-w-0 break-words underline-offset-2 group-hover:underline">
+                    <span className="sr-only">Problem {i.rank}: </span>
+                    {i.title}
+                  </span>
+                </a>
               </li>
             ))}
           </ul>
-          {summaryMore && <p className="mt-1.5 text-sm font-semibold text-white/80">{summaryMore}</p>}
-        </a>
+          {summaryMore && (
+            <p className="mt-1.5 text-sm font-semibold text-white/80">
+              <a href="#problems" className={`rounded underline underline-offset-2 ${SUMMARY_LINK_FOCUS}`}>{summaryMore}</a>
+            </p>
+          )}
+        </div>
       )}
 
       <FixFirst issues={issues} workOrder={plan.workOrder} stepCosts={stepCosts} issueCosts={issueCosts} spaceName={plan.spaceName} sample={sample || !!example || plan.meta?.isExample === true} />
