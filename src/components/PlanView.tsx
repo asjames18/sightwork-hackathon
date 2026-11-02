@@ -15,6 +15,7 @@ import { SectionNav } from "./SectionNav";
 import { SendCostButton } from "@/components/SendCostButton";
 import { SendCountsButton } from "./SendCountsButton";
 import { SendBeforeAfterButton } from "./SendBeforeAfterButton";
+import { summaryMoreLine, summaryTitles } from "@/lib/client/summaryTitles";
 import type { Example } from "@/lib/examples";
 import { planReview, reviewLine, verdictKind } from "@/lib/review";
 import { ProblemList } from "./ProblemList";
@@ -157,6 +158,10 @@ export function PlanView({
     ...(plan.costRange ? [{ label: "Rough cost", value: `${usd(plan.costRange.low)}–${usd(plan.costRange.high)}`, small: true }] : []),
   ];
 
+  // Summary card list: the problems the walk never named when there are any, else all of them; long lists stop at four.
+  const summaryList = summaryTitles(unmentioned.length > 0 ? unmentioned : issues);
+  const summaryMore = summaryMoreLine(summaryList.more);
+
   // Sticky section chips: one per section that actually renders, so no chip points at nothing.
   const showSaid = narrated && !!plan.saidVsSeen && plan.saidVsSeen.length > 0;
   const chips: { href: string; label: string }[] = [
@@ -227,10 +232,19 @@ export function PlanView({
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-sm text-white/80">
-            {unmentioned.length > 0 && <span className="font-semibold text-white">Not mentioned: </span>}
-            {(unmentioned.length > 0 ? unmentioned : issues).map((i) => i.title).join(" · ")}
-          </p>
+          {unmentioned.length > 0 && <p className="mt-4 text-sm font-semibold text-white">Not mentioned:</p>}
+          <ul className={`${unmentioned.length > 0 ? "mt-1.5" : "mt-4"} space-y-1.5 text-sm text-white/80`} data-testid="summary-titles">
+            {summaryList.items.map((i) => (
+              <li key={i.rank} className="flex min-w-0 gap-2">
+                <span aria-hidden="true" className="w-6 shrink-0 font-semibold tabular-nums text-white/70">#{i.rank}</span>
+                <span className="min-w-0 break-words">
+                  <span className="sr-only">Problem {i.rank}: </span>
+                  {i.title}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {summaryMore && <p className="mt-1.5 text-sm font-semibold text-white/80">{summaryMore}</p>}
         </a>
       )}
 
