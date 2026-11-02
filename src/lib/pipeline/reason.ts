@@ -474,6 +474,21 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       throw new Error(`reason: filterAndRenumber output.saidVsSeen[${i}].issueRank must be a finite number`);
     }
   });
+  // Issues are kept, watched, or dropped below by confidence, so a
+  // non-number confidence used to be silently mishandled: NaN
+  // falls through every bar and drops the issue with no entry
+  // named, null fell to 0 through ?? and dropped the same way,
+  // and a string coerced through the comparison. Guard it the
+  // same way: an undefined confidence stays (it still defaults
+  // to 0 below, the old drop), anything else must be a finite
+  // number.
+  output.issues.forEach((issue, i) => {
+    const confidence = (issue as { confidence?: unknown }).confidence;
+    if (confidence === undefined) return;
+    if (typeof confidence !== "number" || !Number.isFinite(confidence)) {
+      throw new Error(`reason: filterAndRenumber output.issues[${i}].confidence must be a finite number`);
+    }
+  });
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
