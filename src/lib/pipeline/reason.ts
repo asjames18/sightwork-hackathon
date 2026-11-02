@@ -375,8 +375,9 @@ function logReasonFilterIfLossy(raw: ReasonOutput, filtered: ReasonOutput): void
  * reference to a demoted or dropped issue disappears rather than
  * pointing at the wrong problem. */
 export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
-  // A non-object output, a non-array collection, or a non-object
-  // entry in one of the collections below used to throw a raw
+  // A non-object output, a non-array collection (including the
+  // passed-through watch list), or a non-object entry in one of
+  // the collections below used to throw a raw
   // TypeError reading .watch / .confidence / .forIssues / .fixes /
   // .issueRank off null, with no entry named. Reject all of them here
   // with a named reason error, the same named-error rule the other
@@ -401,6 +402,20 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
   entries("materials", output.materials);
   entries("workOrder", output.workOrder);
   entries("saidVsSeen", output.saidVsSeen);
+  // Watch is passed through untouched below, so it was the one
+  // collection this guard skipped: a string watch spread into single
+  // characters, and a null watch entry passed through silently, both
+  // with no entry named. Guard it the same way.
+  if (output.watch !== undefined) {
+    if (!Array.isArray(output.watch)) {
+      throw new Error("reason: filterAndRenumber output.watch must be an array");
+    }
+    output.watch.forEach((entry, i) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`reason: filterAndRenumber output.watch[${i}] must be an object`);
+      }
+    });
+  }
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
