@@ -700,6 +700,11 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * properties, so it reached the model as an empty "[]" and its count
  * was silently lost; such entries now fail fast too, naming the
  * entry index.
+ * Two counts entries sharing one label used to print verbatim as
+ * JSON, so the model saw the same item counted twice and could add
+ * the two counts together; such a repeat now fails fast too, naming
+ * the second entry's index (the cost builder already rejects a
+ * repeated material item and a repeated step title the same way).
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -779,6 +784,7 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     typeof input.segmentation === "object" &&
     Array.isArray((input.segmentation as { counts?: unknown }).counts)
   ) {
+    const seenLabels = new Set<string>();
     (input.segmentation as { counts: unknown[] }).counts.forEach((c, i) => {
       if (!c || typeof c !== "object") {
         throw new Error(
@@ -804,6 +810,19 @@ export function validateReasonPromptInput(input: ReasonInput): void {
         throw new Error(
           `buildReasonPrompt: segmentation.counts[${i}].label must not contain a {{...}} placeholder`,
         );
+      }
+      if (
+        c &&
+        typeof c === "object" &&
+        typeof (c as { label?: unknown }).label === "string"
+      ) {
+        const label = (c as { label: string }).label;
+        if (seenLabels.has(label)) {
+          throw new Error(
+            `buildReasonPrompt: segmentation.counts[${i}].label must be unique`,
+          );
+        }
+        seenLabels.add(label);
       }
       if (c && typeof c === "object") {
         const count = (c as { count?: unknown }).count;
@@ -1170,6 +1189,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
 
