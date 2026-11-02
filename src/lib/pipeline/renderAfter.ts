@@ -257,7 +257,10 @@ export function buildVisibleChanges(plan: WorkPlan, hero: number): string[] {
  * changes list threw a bare TypeError on .map, an empty list produced
  * a prompt with an empty "Change only" section (a paid Image call
  * that asks for nothing), and a non-string/blank entry leaked
- * "undefined" into the prompt. Valid inputs pass through verbatim,
+ * "undefined" into the prompt. A newline inside a change entry used
+ * to print as a second, unbulleted line in the Change only list — a
+ * line the image model could read as an extra requested change — so
+ * such entries now fail fast. Valid inputs pass through verbatim,
  * so prompts built from good input are unchanged.
  */
 function validatePromptChanges(visibleChanges: unknown, caller: string): void {
@@ -268,6 +271,9 @@ function validatePromptChanges(visibleChanges: unknown, caller: string): void {
     if (typeof c !== "string" || c.trim().length === 0) {
       throw new Error(`renderAfter: ${caller} visibleChanges[${i}] must be a non-empty string`);
     }
+    if (/[\r\n]/.test(c)) {
+      throw new Error(`renderAfter: ${caller} visibleChanges[${i}] must not contain a newline`);
+    }
   });
 }
 
@@ -275,6 +281,9 @@ function validatePromptChanges(visibleChanges: unknown, caller: string): void {
 export function buildRenderAfterPrompt(spaceType: string, visibleChanges: string[]): string {
   if (typeof spaceType !== "string" || spaceType.trim().length === 0) {
     throw new Error("renderAfter: buildRenderAfterPrompt spaceType must be a non-empty string");
+  }
+  if (/[\r\n]/.test(spaceType)) {
+    throw new Error("renderAfter: buildRenderAfterPrompt spaceType must not contain a newline");
   }
   validatePromptChanges(visibleChanges, "buildRenderAfterPrompt");
   const changes = visibleChanges.map((c) => `- ${c}`).join("\n");
