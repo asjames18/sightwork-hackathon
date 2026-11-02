@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import type { Box, PlanFrame } from "@/lib/types";
+import { canToggleOutline, outlineToggleLabel, outlineToggleStatus } from "@/lib/client/outlineToggle";
 
 /**
  * A proof frame with an optional normalized (0-1000) box drawn on top.
@@ -19,7 +20,8 @@ import type { Box, PlanFrame } from "@/lib/types";
  *
  * Tapping the photo opens it full size in a modal dialog (same outline, caption and time), so a
  * judge or crew lead can check the proof on a phone. Esc, the close button or a tap outside closes
- * it, and focus returns to the photo.
+ * it, and focus returns to the photo. When the photo has a box, a "Hide outline" toggle in the dialog
+ * shows what is under it; the outline comes back each time the dialog opens.
  */
 function OutlineBox({ box, dashed }: { box: Box; dashed: boolean }) {
   return (
@@ -59,6 +61,8 @@ export function ProofFrame({
   compact?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [outlineHidden, setOutlineHidden] = useState(false);
+  const [outlineStatus, setOutlineStatus] = useState("");
   if (!frame)
     return (
       <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/70">
@@ -69,11 +73,22 @@ export function ProofFrame({
   const samBox = Boolean(box) && boxSource === "sam";
   const dashed = outlineUnavailable && !samBox;
   const label = caption ?? `Frame at ${frame.tSec} s`;
+  const toggleable = canToggleOutline(box);
+  function openFull() {
+    setOutlineHidden(false);
+    setOutlineStatus("");
+    dialogRef.current?.showModal();
+  }
+  function toggleOutline() {
+    const next = !outlineHidden;
+    setOutlineHidden(next);
+    setOutlineStatus(outlineToggleStatus(next, boxSource));
+  }
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
       <button
         type="button"
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={openFull}
         aria-haspopup="dialog"
         className={`group block cursor-zoom-in focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-accent ${
           sized
@@ -127,7 +142,21 @@ export function ProofFrame({
         className="m-auto max-h-[100dvh] max-w-[100vw] overflow-visible bg-transparent p-3 backdrop:bg-black/85 sm:p-6"
       >
         <div className="flex flex-col items-center gap-2">
-          <div className="flex w-full justify-end">
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            {toggleable && (
+              <button
+                type="button"
+                onClick={toggleOutline}
+                aria-pressed={outlineHidden}
+                data-testid="proof-outline-toggle"
+                className="flex min-h-11 items-center gap-1.5 rounded-full border border-white/40 bg-black/60 px-4 text-sm font-semibold text-white shadow backdrop-blur-sm hover:bg-black/80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="4" y="4" width="12" height="12" rx="2" strokeDasharray={outlineHidden ? "3 3" : undefined} />
+                </svg>
+                {outlineToggleLabel(outlineHidden)}
+              </button>
+            )}
             <button
               type="button"
               autoFocus
@@ -162,8 +191,11 @@ export function ProofFrame({
                   : "block h-auto max-h-[calc(100dvh-8rem)] w-auto max-w-[calc(100vw-1.5rem)] rounded-lg sm:max-w-[calc(100vw-3rem)]"
               }
             />
-            {box && <OutlineBox box={box} dashed={dashed} />}
+            {box && !(toggleable && outlineHidden) && <OutlineBox box={box} dashed={dashed} />}
           </div>
+          <p role="status" aria-live="polite" className="sr-only" data-testid="proof-outline-status">
+            {outlineStatus}
+          </p>
           <p className="flex w-full justify-between gap-3 text-sm text-white/90">
             <span>{caption ?? "Proof frame"}</span>
             <span className="shrink-0 tabular-nums">{frame.tSec.toFixed(1)} s</span>
