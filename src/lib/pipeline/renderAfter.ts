@@ -367,7 +367,9 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
 /**
  * Validate the renderAfter input shape before any work. Throws with a
  * clear reason: error; a bad plan used to surface as a TypeError inside
- * the hero pick or the visible-changes build instead.
+ * the hero pick or the visible-changes build instead, and a newline in
+ * spaceType used to pass here and only fail at the prompt build, after
+ * the hero pick and visible-changes work.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -431,6 +433,17 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
     (typeof input.spaceType !== "string" || input.spaceType.trim().length === 0)
   ) {
     throw new Error("renderAfter: spaceType must be a non-empty string when given");
+  }
+  // Parity with buildRenderAfterPrompt (prompt 04): a newline in the
+  // space type used to pass this validator and only fail at the prompt
+  // build, after the hero pick and visible-changes work. A direct
+  // validate-then-run caller gets the same fail-fast here, before any
+  // work, with the field named. Clean space types pass unchanged.
+  if (
+    typeof input.spaceType === "string" &&
+    /[\r\n]/.test(input.spaceType)
+  ) {
+    throw new Error("renderAfter: spaceType must not contain a newline when given");
   }
 }
 
