@@ -19,6 +19,8 @@ import type { SavedPlan } from "@/lib/client/lastPlan";
 import { planForTake, takePlanLine } from "@/lib/client/takePlan";
 import { SaveVideoButton } from "./SaveVideoButton";
 import { TakeThumb } from "./TakeThumb";
+import { TakePreview } from "./TakePreview";
+import { keepOpenTake, nextOpenTake, takeWatchLabels } from "@/lib/client/takePreview";
 
 /**
  * "Your saved takes": the last few walkthroughs recorded in SightWork's camera, kept on this device.
@@ -26,7 +28,8 @@ import { TakeThumb } from "./TakeThumb";
  * Each row leads with a small still from the take's own video so back-to-back takes are easy to tell apart.
  * A take that already made a plan (still on the recent plans list) says so and can open that plan.
  * Remove offers an Undo that puts the take and its video back (until the next tap on the list), so a
- * walkthrough is never lost to one mis-tap. Hidden in print.
+ * walkthrough is never lost to one mis-tap. Watch plays a take back inline (one at a time) so it can be
+ * checked before it is used. Hidden in print.
  */
 export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void; onOpenPlan?: (saved: SavedPlan) => void }) {
   const list = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
@@ -34,11 +37,13 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
   const [gone, setGone] = useState<string | null>(null);
   const [removed, setRemoved] = useState<RemovedTake | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [watching, setWatching] = useState<string | null>(null);
+  const openId = keepOpenTake(watching, list.map((t) => t.id));
   const undoRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   // Keyboard and screen reader users keep their place: focus moves to Undo after a remove, and back
-  // to the restored take's Save video button after Undo.
+  // to the restored take's first button (Watch) after Undo.
   useEffect(() => {
     if (removed) undoRef.current?.focus();
   }, [removed]);
@@ -116,7 +121,7 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
           const details = [when, e.durationSec ? formatDuration(e.durationSec) : null, takeSize(e.size)].filter(Boolean).join(" · ");
           const made = planForTake(recents, e);
           return (
-            <li key={e.id} data-take-id={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+            <li key={e.id} data-take-id={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <TakeThumb id={e.id} durationSec={e.durationSec} />
                 <div className="min-w-0 flex-1">
@@ -133,6 +138,19 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRemoved(null);
+                    setWatching((cur) => nextOpenTake(cur, e.id));
+                  }}
+                  aria-expanded={openId === e.id}
+                  aria-controls={`take-preview-${e.id}`}
+                  aria-label={takeWatchLabels(openId === e.id, e.name).aria}
+                  className="btn-secondary min-h-11 shrink-0 px-3 text-sm"
+                >
+                  {takeWatchLabels(openId === e.id, e.name).text}
+                </button>
                 <SaveVideoButton
                   getFile={() => open(e)}
                   ariaLabel={`Save video ${e.name}`}
@@ -170,6 +188,18 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
                   Remove
                 </button>
               </div>
+              {openId === e.id && (
+                <div id={`take-preview-${e.id}`} className="w-full sm:basis-full">
+                  <TakePreview
+                    id={e.id}
+                    name={e.name}
+                    onMissing={() => {
+                      setWatching(null);
+                      setGone("That take is no longer saved on this device, so it was taken off the list.");
+                    }}
+                  />
+                </div>
+              )}
             </li>
           );
         })}

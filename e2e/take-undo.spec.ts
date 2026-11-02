@@ -78,7 +78,7 @@ for (const width of [375, 768, 1280]) {
     await undo.click();
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText(NEW);
-    await expect(rows.nth(0).getByRole("button", { name: `Save video ${NEW}` })).toBeFocused();
+    await expect(rows.nth(0).getByRole("button", { name: `Watch ${NEW} on this device` })).toBeFocused();
     await expect(list.getByTestId("take-undo")).toHaveCount(0);
     await expect.poll(() => storedKeys(page)).toEqual(["take:t1", "take:t2"]);
     await page.reload();
