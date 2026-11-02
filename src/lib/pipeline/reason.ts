@@ -432,6 +432,36 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       }
     });
   }
+  // Rank references are remapped below with .filter/.map, so a
+  // non-array forIssues/fixes used to throw a raw TypeError reading
+  // .filter off a string, and a non-number rank inside one was
+  // silently dropped by the remap lookup, with no entry named.
+  // Guard both the same way. Valid outputs are unchanged: the
+  // remap below still reads exactly the same fields.
+  output.materials.forEach((m, i) => {
+    const refs = (m as { forIssues?: unknown }).forIssues;
+    if (refs === undefined) return;
+    if (!Array.isArray(refs)) {
+      throw new Error(`reason: filterAndRenumber output.materials[${i}].forIssues must be an array`);
+    }
+    refs.forEach((r, j) => {
+      if (typeof r !== "number" || !Number.isFinite(r)) {
+        throw new Error(`reason: filterAndRenumber output.materials[${i}].forIssues[${j}] must be a finite number`);
+      }
+    });
+  });
+  output.workOrder.forEach((s, i) => {
+    const refs = (s as { fixes?: unknown }).fixes;
+    if (refs === undefined) return;
+    if (!Array.isArray(refs)) {
+      throw new Error(`reason: filterAndRenumber output.workOrder[${i}].fixes must be an array`);
+    }
+    refs.forEach((r, j) => {
+      if (typeof r !== "number" || !Number.isFinite(r)) {
+        throw new Error(`reason: filterAndRenumber output.workOrder[${i}].fixes[${j}] must be a finite number`);
+      }
+    });
+  });
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
