@@ -705,6 +705,14 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * the two counts together; such a repeat now fails fast too, naming
  * the second entry's index (the cost builder already rejects a
  * repeated material item and a repeated step title the same way).
+ * A flagged frame listed twice used to print verbatim as JSON, so
+ * the model was told twice to look hardest at the same frame; the
+ * segment step only flags each frame once (a sorted, unique set in
+ * segment.ts), so such a repeat now fails fast too, naming the
+ * second entry's index. A flagged index is not range-checked
+ * against the frame list here: the existing flagged-frames test
+ * builds cleanly with index 3 on a one-frame input, so a flagged
+ * index is not required to be a sampled-frame position.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -859,12 +867,19 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     if (!Array.isArray(flagged)) {
       throw new Error("buildReasonPrompt: segmentation.flaggedFrames must be an array");
     }
+    const seenFlagged = new Set<number>();
     flagged.forEach((f, i) => {
       if (typeof f !== "number" || !Number.isInteger(f) || f < 0) {
         throw new Error(
           `buildReasonPrompt: segmentation.flaggedFrames[${i}] must be a whole number >= 0`,
         );
       }
+      if (seenFlagged.has(f)) {
+        throw new Error(
+          `buildReasonPrompt: segmentation.flaggedFrames[${i}] must be unique`,
+        );
+      }
+      seenFlagged.add(f);
     });
   }
   if (
