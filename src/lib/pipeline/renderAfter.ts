@@ -369,7 +369,11 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
  * clear reason: error; a bad plan used to surface as a TypeError inside
  * the hero pick or the visible-changes build instead, and a newline in
  * spaceType used to pass here and only fail at the prompt build, after
- * the hero pick and visible-changes work.
+ * the hero pick and visible-changes work. A newline in a visible
+ * work-step title used to do the same: the title is the prompt line,
+ * so buildRenderAfterPrompt rejects it, but only after the hero pick
+ * and visible-changes work. Hidden and non-visible titles still pass,
+ * since their lines never reach the prompt.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -434,6 +438,26 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
   ) {
     throw new Error("renderAfter: spaceType must be a non-empty string when given");
   }
+  // Parity with buildRenderAfterPrompt (via validatePromptChanges): a
+  // newline in a visible work-step title used to pass this validator
+  // and only fail at the prompt build, after the hero pick and
+  // visible-changes work. A direct validate-then-run caller gets the
+  // same fail-fast here, before any work, with the step named. Only
+  // titles that could reach the prompt are checked: a step that
+  // describes visible work and is not hidden work. Hidden and
+  // non-visible titles never become prompt lines, so they still pass.
+  plan.workOrder.forEach((s, i) => {
+    if (
+      s &&
+      typeof s === "object" &&
+      typeof s.title === "string" &&
+      /[\r\n]/.test(s.title) &&
+      isVisibleStep(s) &&
+      !isHiddenStep(s)
+    ) {
+      throw new Error(`renderAfter: plan.workOrder[${i}].title must not contain a newline`);
+    }
+  });
   // Parity with buildRenderAfterPrompt (prompt 04): a newline in the
   // space type used to pass this validator and only fail at the prompt
   // build, after the hero pick and visible-changes work. A direct
