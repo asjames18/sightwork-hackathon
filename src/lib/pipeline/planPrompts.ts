@@ -731,6 +731,17 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * call), so a direct buildReasonPrompt caller bypassing runReason
  * gets the same fail-fast here, naming the field. Null segmentation
  * still builds the explicit no-data prompt.
+ * A non-null segmentation with no flaggedFrames field at all used to
+ * slip past the flaggedFrames guard, which only ran when flaggedFrames
+ * was present, so it was printed verbatim as JSON with no flagged
+ * frames at all ({"counts":[...]}) while the template tells the model
+ * to look hardest at flaggedFrames; the model then had no hazard
+ * frames to look hardest at. SegmentationResult requires
+ * flaggedFrames (and runReason's own validator already rejects a
+ * missing flaggedFrames array before any paid call), so a direct
+ * buildReasonPrompt caller bypassing runReason gets the same fail-fast
+ * here, naming the field. Null segmentation still builds the
+ * explicit no-data prompt.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -880,11 +891,7 @@ export function validateReasonPromptInput(input: ReasonInput): void {
       }
     });
   }
-  if (
-    input.segmentation &&
-    typeof input.segmentation === "object" &&
-    (input.segmentation as { flaggedFrames?: unknown }).flaggedFrames !== undefined
-  ) {
+  if (input.segmentation && typeof input.segmentation === "object") {
     const flagged = (input.segmentation as { flaggedFrames: unknown })
       .flaggedFrames;
     if (!Array.isArray(flagged)) {
