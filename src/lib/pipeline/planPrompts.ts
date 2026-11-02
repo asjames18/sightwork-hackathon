@@ -750,6 +750,12 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * so the trade="..." field cannot be closed early either.
  * A material qty containing a double quote is escaped the same way,
  * so the qty="..." field cannot be closed early either.
+ * A region, space type, material item/qty/note, or work step
+ * title/trade containing a {{placeholder}} would be expanded by a
+ * later fill() pass (fills run in order: space_type, region,
+ * labor_basis, materials_list, steps_list), so a {{steps_list}} token
+ * in an item would print the whole steps list inside that item line;
+ * such values now fail fast.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -761,11 +767,17 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   if (/[\r\n]/.test(input.region)) {
     throw new Error("buildCostPrompt: region must not contain a newline");
   }
+  if (/\{\{[a-z_]+\}\}/.test(input.region)) {
+    throw new Error("buildCostPrompt: region must not contain a {{...}} placeholder");
+  }
   if (spaceType !== undefined && typeof spaceType !== "string") {
     throw new Error("buildCostPrompt: spaceType must be a string when given");
   }
   if (typeof spaceType === "string" && /[\r\n]/.test(spaceType)) {
     throw new Error("buildCostPrompt: spaceType must not contain a newline");
+  }
+  if (typeof spaceType === "string" && /\{\{[a-z_]+\}\}/.test(spaceType)) {
+    throw new Error("buildCostPrompt: spaceType must not contain a {{...}} placeholder");
   }
   if (
     input.laborBasis !== undefined &&
@@ -795,6 +807,11 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       if (typeof value === "string" && /[\r\n]/.test(value)) {
         throw new Error(
           `buildCostPrompt: materials[${i}].${field} must not contain a newline`,
+        );
+      }
+      if (typeof value === "string" && /\{\{[a-z_]+\}\}/.test(value)) {
+        throw new Error(
+          `buildCostPrompt: materials[${i}].${field} must not contain a {{...}} placeholder`,
         );
       }
     }
@@ -843,6 +860,11 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
       if (typeof value === "string" && /[\r\n]/.test(value)) {
         throw new Error(
           `buildCostPrompt: workOrder[${i}].${field} must not contain a newline`,
+        );
+      }
+      if (typeof value === "string" && /\{\{[a-z_]+\}\}/.test(value)) {
+        throw new Error(
+          `buildCostPrompt: workOrder[${i}].${field} must not contain a {{...}} placeholder`,
         );
       }
     }
@@ -981,6 +1003,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
 
