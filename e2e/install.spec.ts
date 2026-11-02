@@ -23,6 +23,7 @@ for (const path of ["/", "/start"]) {
     const m = await res.json();
     expect(m.start_url).toBe("/start");
     expect(m.display).toBe("standalone");
+    expect((m.shortcuts ?? []).map((x: { url: string }) => x.url)).toEqual(["/start", "/start?view=last", "/start?view=example"]);
 
     const icon = await request.get(touchHref!);
     expect(icon.ok()).toBeTruthy();
