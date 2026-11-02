@@ -19,7 +19,8 @@ const seg: SegmentationResult = {
   counts: [{ label: "door", count: 2, confidence: 0.9 }],
   flaggedFrames: [3],
 };
-const out = { issues: [{}, {}], watch: [{}], heroFrameIndex: 3 };
+// Only lengths are read, so bare placeholder entries stand in for full issues.
+const out = { issues: [{}, {}], watch: [{}], heroFrameIndex: 3 } as never;
 
 describe("formatReasonStability entry guard", () => {
   test("a non-object segmentation throws a named reason error", () => {
@@ -103,8 +104,8 @@ describe("formatReasonFilter entry guard", () => {
   test("a valid filter still produces the same summary line", () => {
     assert.equal(
       formatReasonFilter(
-        { issues: [{}, {}, {}, {}, {}], watch: [{}] },
-        { issues: [{}, {}], watch: [{}, {}] },
+        { issues: [{}, {}, {}, {}, {}], watch: [{}] } as never,
+        { issues: [{}, {}], watch: [{}, {}] } as never,
       ),
       "reason: filter kept 2 ranked, 2 watch (1 from model, 1 demoted), dropped 2 of 5 raw issues",
     );
