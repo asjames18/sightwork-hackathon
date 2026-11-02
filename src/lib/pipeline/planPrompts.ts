@@ -720,6 +720,17 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * entry index. The check runs on the trimmed label, so a
  * whitespace-only label fails the same way; the uniqueness check
  * already normalizes case and whitespace.
+ * A non-null segmentation with no counts field at all used to slip
+ * past the counts guard, which only ran when counts was present and
+ * not an array, so it was printed verbatim as JSON with no counts
+ * at all ({"flaggedFrames":[...]}) while the template tells the
+ * model the segmentation counts are the inventory floor; the model
+ * could then invent its own counts with nothing to floor them
+ * against. SegmentationResult requires counts (and runReason's own
+ * validator already rejects a missing counts array before any paid
+ * call), so a direct buildReasonPrompt caller bypassing runReason
+ * gets the same fail-fast here, naming the field. Null segmentation
+ * still builds the explicit no-data prompt.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -789,7 +800,6 @@ export function validateReasonPromptInput(input: ReasonInput): void {
   if (
     input.segmentation &&
     typeof input.segmentation === "object" &&
-    (input.segmentation as { counts?: unknown }).counts !== undefined &&
     !Array.isArray((input.segmentation as { counts?: unknown }).counts)
   ) {
     throw new Error("buildReasonPrompt: segmentation.counts must be an array");
