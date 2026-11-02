@@ -298,6 +298,32 @@ function logReasonFilterIfLossy(raw: ReasonOutput, filtered: ReasonOutput): void
  * reference to a demoted or dropped issue disappears rather than
  * pointing at the wrong problem. */
 export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
+  // A non-object output, a non-array collection, or a non-object
+  // entry in one of the collections below used to throw a raw
+  // TypeError reading .watch / .confidence / .forIssues / .fixes /
+  // .issueRank off null, with no entry named. Reject all of them here
+  // with a named reason error, the same named-error rule the other
+  // pipeline entry guards follow. Valid outputs are unchanged: every
+  // collection is still read exactly as before. (Inventory entries
+  // are read by dropTotalInventoryRows, not here, so its own guard
+  // is a separate piece.)
+  if (output === null || typeof output !== "object" || Array.isArray(output)) {
+    throw new Error("reason: filterAndRenumber output must be an object");
+  }
+  const entries = (field: string, value: unknown): void => {
+    if (!Array.isArray(value)) {
+      throw new Error(`reason: filterAndRenumber output.${field} must be an array`);
+    }
+    value.forEach((entry, i) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`reason: filterAndRenumber output.${field}[${i}] must be an object`);
+      }
+    });
+  };
+  entries("issues", output.issues);
+  entries("materials", output.materials);
+  entries("workOrder", output.workOrder);
+  entries("saidVsSeen", output.saidVsSeen);
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
