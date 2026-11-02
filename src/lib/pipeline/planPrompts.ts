@@ -656,6 +656,10 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * count, or a confidence outside 0..1, is likewise not a count the
  * segment step can produce (it sums whole instances and averages
  * scores), so such values now fail fast too.
+ * A flaggedFrames entry that is not a whole frame index >= 0 would
+ * be printed verbatim as JSON (NaN/Infinity as null, and a string
+ * token expanded by the later transcript fill), so such entries now
+ * fail fast too; the segment step only flags integer frame indices.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -755,6 +759,24 @@ export function validateReasonPromptInput(input: ReasonInput): void {
             `buildReasonPrompt: segmentation.counts[${i}].confidence must be a finite number between 0 and 1`,
           );
         }
+      }
+    });
+  }
+  if (
+    input.segmentation &&
+    typeof input.segmentation === "object" &&
+    (input.segmentation as { flaggedFrames?: unknown }).flaggedFrames !== undefined
+  ) {
+    const flagged = (input.segmentation as { flaggedFrames: unknown })
+      .flaggedFrames;
+    if (!Array.isArray(flagged)) {
+      throw new Error("buildReasonPrompt: segmentation.flaggedFrames must be an array");
+    }
+    flagged.forEach((f, i) => {
+      if (typeof f !== "number" || !Number.isInteger(f) || f < 0) {
+        throw new Error(
+          `buildReasonPrompt: segmentation.flaggedFrames[${i}] must be a whole number >= 0`,
+        );
       }
     });
   }
