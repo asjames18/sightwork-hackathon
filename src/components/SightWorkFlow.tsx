@@ -11,6 +11,7 @@ import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
 import { addRecentPlan } from "@/lib/client/recentPlans";
 import { cuePlanReady } from "@/lib/client/planReadyCue";
+import { showPlanTitle } from "@/lib/client/planTitle";
 import { RecentPlans } from "./RecentPlans";
 import { UploadStep } from "./UploadStep";
 import { ProcessingStep } from "./ProcessingStep";
@@ -79,6 +80,13 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // A real or saved plan names its space in the tab title; example pages keep their own title. Declared
+  // before the plan-ready cue so the cue goes on top and comes back to this title.
+  const titleSpace = stage.kind === "plan" && !stage.example ? stage.plan.spaceName : null;
+  useEffect(() => {
+    if (titleSpace === null) return;
+    return showPlanTitle(titleSpace);
+  }, [titleSpace]);
   // A plan that finished while the tab was in the background: the tab title says so until the tab is
   // shown again. This runs after the processing screen's own title cleanup, so the cue isn't overwritten.
   const planIssues = stage.kind === "plan" ? stage.plan.issues.length : null;
