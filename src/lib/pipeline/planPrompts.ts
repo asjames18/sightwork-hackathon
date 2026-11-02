@@ -825,12 +825,13 @@ export function validateReasonPromptInput(input: ReasonInput): void {
         typeof (c as { label?: unknown }).label === "string"
       ) {
         const label = (c as { label: string }).label;
-        if (seenLabels.has(label)) {
+        const normalizedLabel = label.trim().toLowerCase();
+        if (seenLabels.has(normalizedLabel)) {
           throw new Error(
             `buildReasonPrompt: segmentation.counts[${i}].label must be unique`,
           );
         }
-        seenLabels.add(label);
+        seenLabels.add(normalizedLabel);
       }
       if (c && typeof c === "object") {
         const count = (c as { count?: unknown }).count;
