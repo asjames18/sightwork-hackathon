@@ -1,9 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import { useDoneSteps } from "@/lib/client/useDoneSteps";
 import { useGotMaterials } from "@/lib/client/useGotMaterials";
-import { alsoReadyLine, nextUp, nextUpHours, nextUpProgress } from "@/lib/client/nextUp";
+import {
+  alsoReadyLine,
+  markedDoneLine,
+  nextUp,
+  nextUpHours,
+  nextUpProgress,
+  undoMarkLabel,
+  undoMarkOpen,
+  withoutStep,
+} from "@/lib/client/nextUp";
 import { stepMaterialsDescription, stepMaterialsLabel, stepMaterialsState } from "@/lib/client/stepMaterials";
 import { stepWhoLabel } from "@/lib/client/stepText";
 import { stepAnchor } from "@/lib/client/stepLinks";
@@ -12,13 +22,33 @@ import { StepSendButton } from "@/components/WorkSteps";
 /**
  * "Next up": once any work step is ticked off, names the next step that is ready to start, who does it, about how
  * long, whether its materials are in hand, with a link to the step, a button to tick it off from here and one to
- * send just that step to whoever does it.
+ * send just that step to whoever does it. After a step is ticked off from here, a short line says which one with an
+ * Undo, so a mis-tap on a phone is one tap to take back.
  * Nothing shows on an untouched plan. Live with the ticks (and other tabs). Hidden in print.
  */
 export function NextUp({ plan }: { plan: WorkPlan }) {
   const { done, ready, update } = useDoneSteps(plan);
   const { got } = useGotMaterials(plan);
+  const [mark, setMark] = useState<{ order: number; count: number } | null>(null);
   if (!ready) return null;
+  const undo = undoMarkOpen(mark, done) && mark ? (
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="next-up-undo">
+      <span role="status" className="text-sm text-ink/70">
+        {markedDoneLine(mark.order)}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          update(withoutStep(done, mark.order));
+          setMark(null);
+        }}
+        aria-label={undoMarkLabel(mark.order)}
+        className="btn-tertiary min-h-11 px-3 text-sm"
+      >
+        Undo
+      </button>
+    </p>
+  ) : null;
   const n = nextUp(plan.workOrder, done);
   if (!n) return null;
 
@@ -36,6 +66,7 @@ export function NextUp({ plan }: { plan: WorkPlan }) {
         <p className="mt-1 text-sm text-ink/80" aria-live="polite" data-testid="next-up-progress">
           {nextUpProgress(n)} Walk the space again to check each problem in person.
         </p>
+        {undo}
       </section>
     );
   }
@@ -105,13 +136,18 @@ export function NextUp({ plan }: { plan: WorkPlan }) {
       <div className="mt-3 flex flex-wrap items-start gap-x-3 gap-y-2">
         <button
           type="button"
-          onClick={() => update([...done, step.order])}
+          onClick={() => {
+            const next = [...done, step.order];
+            update(next);
+            setMark({ order: step.order, count: new Set(next).size });
+          }}
           className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-ink/15 px-4 text-sm font-semibold hover:bg-ink/[0.04] focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/50"
         >
           Mark step {step.order} done
         </button>
         <StepSendButton plan={plan} step={step} got={got} testId="next-up-send" spacing="" />
       </div>
+      {undo}
     </section>
   );
 }

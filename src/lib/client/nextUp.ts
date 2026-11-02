@@ -91,3 +91,27 @@ export function nextUpShareLine(
   const also = alsoReadyLine(n.alsoReady);
   return also ? `${head}. ${also}` : `${head}.`;
 }
+
+/** Status line after "Mark step N done" on the Next up card: "Marked step 3 done." */
+export function markedDoneLine(order: number): string {
+  return `Marked step ${order} done.`;
+}
+
+/** Accessible name for the Undo next to that line: "Undo marking step 3 done". */
+export function undoMarkLabel(order: number): string {
+  return `Undo marking step ${order} done`;
+}
+
+/**
+ * Whether the Undo for a step marked from the Next up card is still on offer: only while that step is still
+ * ticked and nothing else has been ticked or unticked since (any other change starts fresh).
+ */
+export function undoMarkOpen(mark: { order: number; count: number } | null, done: readonly number[]): boolean {
+  if (!mark) return false;
+  return done.includes(mark.order) && new Set(done).size === mark.count;
+}
+
+/** The ticks with that one step taken back off, other ticks kept in their order. */
+export function withoutStep(done: readonly number[], order: number): number[] {
+  return done.filter((o) => o !== order);
+}
