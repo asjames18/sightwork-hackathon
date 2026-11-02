@@ -1,17 +1,20 @@
 /**
- * Render-after input validation rejects a newline in a visible
- * work-step title up front, instead of passing validation and only
- * failing at the prompt build, after the hero pick and
- * visible-changes work: the title is the prompt line, so
- * buildRenderAfterPrompt already rejects it. A direct
- * validate-then-run caller gets the same fail-fast here, before any
- * work. Hidden and non-visible titles still pass, since their lines
- * never reach the prompt.
+ * Render-after input validation rejects a newline in a work-step
+ * title up front, instead of passing validation and only failing at
+ * the prompt build, after the hero pick and visible-changes work:
+ * the title is the prompt line, so buildRenderAfterPrompt already
+ * rejects it. A direct validate-then-run caller gets the same
+ * fail-fast here, before any work. Hidden titles still pass, since
+ * their lines never reach the prompt; a non-visible, non-hidden
+ * title is checked too, because buildVisibleChanges lists every
+ * non-hidden step that fixes a hero issue, whether or not it
+ * matches a visible keyword.
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildRenderAfterPrompt,
+  buildVisibleChanges,
   validateRenderAfterInput,
 } from "@/lib/pipeline/renderAfter";
 import type { WorkPlan } from "@/lib/types";
@@ -56,7 +59,31 @@ describe("renderAfter input visible title newline", () => {
     );
   });
 
-  test("still accepts clean, hidden, and non-visible newline titles", () => {
+  test("rejects a newline in a non-visible, non-hidden work-step title", () => {
+    assert.throws(
+      () =>
+        validateRenderAfterInput(
+          input([{ title: "Fix\nbudget", detail: "Sort the budget" }]),
+        ),
+      /renderAfter: plan\.workOrder\[0\]\.title must not contain a newline/,
+    );
+  });
+
+  test("a non-visible, non-hidden title fixing a hero issue reaches the prompt", () => {
+    const plan = {
+      issues: [{ frameIndex: 0, rank: 1 }],
+      workOrder: [
+        { title: "Fix\nbudget", detail: "Sort the budget", fixes: [1] },
+      ],
+    } as unknown as WorkPlan;
+    assert.deepEqual(buildVisibleChanges(plan, 0), ["Fix\nbudget"]);
+    assert.throws(
+      () => buildRenderAfterPrompt("room", buildVisibleChanges(plan, 0)),
+      /must not contain a newline/,
+    );
+  });
+
+  test("still accepts clean and hidden newline titles", () => {
     assert.doesNotThrow(() =>
       validateRenderAfterInput(
         input([{ title: "Repaint wall", detail: "Paint the wall" }]),
@@ -70,11 +97,6 @@ describe("renderAfter input visible title newline", () => {
             detail: "Check above the ceiling",
           },
         ]),
-      ),
-    );
-    assert.doesNotThrow(() =>
-      validateRenderAfterInput(
-        input([{ title: "Fix\nbudget", detail: "Sort the budget" }]),
       ),
     );
   });
