@@ -49,7 +49,7 @@ describe("buildReasonPrompt segmentation must not contain a placeholder", () => 
             flaggedFrames: [],
           }),
         ),
-      /buildReasonPrompt: segmentation must not contain a \{\.\.\.\} placeholder/,
+      /buildReasonPrompt: segmentation must not contain a \{\{\.\.\.\}\} placeholder/,
     );
   });
 
@@ -63,7 +63,7 @@ describe("buildReasonPrompt segmentation must not contain a placeholder", () => 
             source: "sam {{transcript}}",
           }),
         ),
-      /buildReasonPrompt: segmentation must not contain a \{\.\.\.\} placeholder/,
+      /buildReasonPrompt: segmentation must not contain a \{\{\.\.\.\}\} placeholder/,
     );
   });
 
@@ -78,7 +78,7 @@ describe("buildReasonPrompt segmentation must not contain a placeholder", () => 
             flaggedFrames: [],
           }),
         ),
-      /buildReasonPrompt: segmentation\.counts\[0\]\.label must not contain a \{\.\.\.\} placeholder/,
+      /buildReasonPrompt: segmentation\.counts\[0\]\.label must not contain a \{\{\.\.\.\}\} placeholder/,
     );
   });
 
