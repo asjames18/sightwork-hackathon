@@ -744,6 +744,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * mark like 2" pipe still builds, as 2\" pipe.
  * A material note containing a double quote is escaped the same way,
  * so the note="..." field cannot be closed early either.
+ * A work step title containing a double quote is escaped the same way,
+ * so the title="..." field cannot be closed early either.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -959,7 +961,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   const stepsList = input.workOrder
     .map(
       (s) =>
-        `order=${s.order} title="${s.title}" trade="${s.trade ?? "unknown"}" hours=${
+        `order=${s.order} title="${s.title.replaceAll('"', '\\"')}" trade="${s.trade ?? "unknown"}" hours=${
           s.hours ? `[${s.hours[0]}, ${s.hours[1]}]` : "unknown"
         }`,
     )
