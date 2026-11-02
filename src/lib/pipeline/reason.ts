@@ -462,6 +462,18 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       }
     });
   });
+  // saidVsSeen rows are filtered below by the remap lookup, so a
+  // non-number issueRank used to be silently dropped as an
+  // unkept rank, with no entry named. Guard it the same way:
+  // an undefined rank stays (a row with no matching issue),
+  // anything else must be a finite number.
+  output.saidVsSeen.forEach((row, i) => {
+    const rank = (row as { issueRank?: unknown }).issueRank;
+    if (rank === undefined) return;
+    if (typeof rank !== "number" || !Number.isFinite(rank)) {
+      throw new Error(`reason: filterAndRenumber output.saidVsSeen[${i}].issueRank must be a finite number`);
+    }
+  });
   const kept: Issue[] = [];
   const watch: WatchIssue[] = [...(output.watch ?? [])];
   const remap = new Map<number, number>();
