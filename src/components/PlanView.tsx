@@ -12,6 +12,7 @@ import { SinceLastVisit } from "./SinceLastVisit";
 import { MaterialsList } from "./MaterialsList";
 import { PoweredByMeta } from "./PoweredByMeta";
 import { SectionNav } from "./SectionNav";
+import { BackToTop } from "./BackToTop";
 import { SendCostButton } from "@/components/SendCostButton";
 import { SendCountsButton } from "./SendCountsButton";
 import { SendBeforeAfterButton } from "./SendBeforeAfterButton";
@@ -202,7 +203,7 @@ export function PlanView({
         )
       )}
 
-      <h1 className="text-3xl font-extrabold leading-tight break-words sm:text-4xl">{plan.spaceName}</h1>
+      <h1 id="plan-top" tabIndex={-1} className="scroll-mt-24 text-3xl font-extrabold leading-tight break-words outline-none sm:text-4xl">{plan.spaceName}</h1>
       {location && (
         <p className="mt-1 text-sm font-semibold text-ink/80 break-words" data-testid="plan-location">
           <span className="sr-only">Location: </span>
@@ -300,6 +301,7 @@ export function PlanView({
       )}
 
       <SectionNav chips={chips} />
+      <BackToTop targetId="plan-top" />
 
       <Section title="Problems, worst first" id="problems">
         {plan.issues.length === 0 && <Empty>No problems found in the frames we looked at. Walk it in person before you sign off.</Empty>}
