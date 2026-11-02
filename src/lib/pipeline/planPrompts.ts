@@ -686,6 +686,12 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * SEGMENTATION section. Such tokens now fail fast too, naming
  * the segmentation object; a token in a label still throws the
  * label error first.
+ * A segmentation value that is an array at all used to slip past the
+ * object check, because arrays are objects in JavaScript, so it was
+ * printed verbatim as JSON ("[]" for an empty array, or a bare list
+ * of counts) inside the SEGMENTATION section instead of the counts
+ * object the model expects; such values now fail fast too, naming
+ * the field.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -746,6 +752,11 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     typeof input.segmentation !== "object"
   ) {
     throw new Error("buildReasonPrompt: segmentation must be an object or null");
+  }
+  if (Array.isArray(input.segmentation)) {
+    throw new Error(
+      "buildReasonPrompt: segmentation must be an object, not an array",
+    );
   }
   if (
     input.segmentation &&
