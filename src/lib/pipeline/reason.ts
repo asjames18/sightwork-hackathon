@@ -448,6 +448,50 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
 
 /** Validate a reason result against the input frames and the contract. */
 export function validateReason(input: ReasonInput, output: ReasonOutput): string[] {
+  // A non-object input/output, a non-array input.frames or
+  // output.issues/watch, a non-object issue/watch entry, or a
+  // non-array proofFrames list used to throw a raw TypeError reading
+  // .forEach / .frameIndex / .tSec off null, with no argument named.
+  // Reject all of them here with a named reason error, the same
+  // named-error rule the other pipeline entry guards follow. Valid
+  // inputs are unchanged: every collection is still read exactly as
+  // before, and frame mismatches still return error strings rather
+  // than throwing.
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("reason: validateReason input must be an object");
+  }
+  if (!Array.isArray(input.frames)) {
+    throw new Error("reason: validateReason input.frames must be an array");
+  }
+  if (output === null || typeof output !== "object" || Array.isArray(output)) {
+    throw new Error("reason: validateReason output must be an object");
+  }
+  if (!Array.isArray(output.issues)) {
+    throw new Error("reason: validateReason output.issues must be an array");
+  }
+  if (output.watch !== undefined && !Array.isArray(output.watch)) {
+    throw new Error("reason: validateReason output.watch must be an array");
+  }
+  const checkEntries = (field: string, value: unknown[]): void => {
+    value.forEach((entry, i) => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new Error(`reason: validateReason output.${field}[${i}] must be an object`);
+      }
+      const proof = (entry as { proofFrames?: unknown }).proofFrames;
+      if (proof !== undefined && !Array.isArray(proof)) {
+        throw new Error(`reason: validateReason output.${field}[${i}].proofFrames must be an array`);
+      }
+      if (Array.isArray(proof)) {
+        proof.forEach((f, j) => {
+          if (f === null || typeof f !== "object" || Array.isArray(f)) {
+            throw new Error(`reason: validateReason output.${field}[${i}].proofFrames[${j}] must be an object`);
+          }
+        });
+      }
+    });
+  };
+  checkEntries("issues", output.issues);
+  if (output.watch !== undefined) checkEntries("watch", output.watch);
   const errs: string[] = [];
   output.issues.forEach((issue, i) => {
     const frame = input.frames[issue.frameIndex];
