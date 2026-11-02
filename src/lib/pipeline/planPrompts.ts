@@ -665,6 +665,11 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * only check label/count/confidence when the entry is an object, so
  * it was printed verbatim as JSON inside the SEGMENTATION section;
  * such entries now fail fast too, naming the entry index.
+ * A segmentation counts field that is not an array at all (a string,
+ * an object, a number) used to slip past the per-entry guards, which
+ * only run when counts is an array, so it was printed verbatim as
+ * JSON inside the SEGMENTATION section; such values now fail fast
+ * too, naming the field.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -725,6 +730,14 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     typeof input.segmentation !== "object"
   ) {
     throw new Error("buildReasonPrompt: segmentation must be an object or null");
+  }
+  if (
+    input.segmentation &&
+    typeof input.segmentation === "object" &&
+    (input.segmentation as { counts?: unknown }).counts !== undefined &&
+    !Array.isArray((input.segmentation as { counts?: unknown }).counts)
+  ) {
+    throw new Error("buildReasonPrompt: segmentation.counts must be an array");
   }
   if (
     input.segmentation &&
