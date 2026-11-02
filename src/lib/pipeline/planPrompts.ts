@@ -660,6 +660,11 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * be printed verbatim as JSON (NaN/Infinity as null, and a string
  * token expanded by the later transcript fill), so such entries now
  * fail fast too; the segment step only flags integer frame indices.
+ * A segmentation counts entry that is not an object at all (null, a
+ * string, a number) used to slip past the per-field guards, which
+ * only check label/count/confidence when the entry is an object, so
+ * it was printed verbatim as JSON inside the SEGMENTATION section;
+ * such entries now fail fast too, naming the entry index.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -727,6 +732,11 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     Array.isArray((input.segmentation as { counts?: unknown }).counts)
   ) {
     (input.segmentation as { counts: unknown[] }).counts.forEach((c, i) => {
+      if (!c || typeof c !== "object") {
+        throw new Error(
+          `buildReasonPrompt: segmentation.counts[${i}] must be an object`,
+        );
+      }
       if (
         c &&
         typeof c === "object" &&
