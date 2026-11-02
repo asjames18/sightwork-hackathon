@@ -15,6 +15,7 @@ import { SectionNav } from "./SectionNav";
 import { BackToTop } from "./BackToTop";
 import { JumpBack } from "./JumpBack";
 import { SendCostButton } from "@/components/SendCostButton";
+import { CostLeft } from "./CostLeft";
 import { SendCountsButton } from "./SendCountsButton";
 import { SendBeforeAfterButton } from "./SendBeforeAfterButton";
 import { SaidVsSeenList } from "./SaidVsSeenList";
@@ -404,6 +405,7 @@ export function PlanView({
                       : "Split by step above. The step costs add up to this total."}
                 </p>
               )}
+              {stepCosts && <CostLeft plan={plan} stepCosts={stepCosts} />}
               <details className="group mt-3 border-t border-ink/10 pt-3">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
                   <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-ink/60 motion-safe:transition-transform group-open:rotate-90">
