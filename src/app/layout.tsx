@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-int
 export const metadata: Metadata = {
   title: "SightWork",
   description: "Film a walkthrough. Get a work plan.",
+  applicationName: "SightWork",
+  // Added to a phone's home screen: keep the short name and the dark status bar.
+  appleWebApp: { capable: true, title: "SightWork", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {
