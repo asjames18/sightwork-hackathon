@@ -379,7 +379,10 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
  * fail fast here with the step named. A non-object work-order entry is
  * the same fail-fast, matching the issues-entry guard: it used to pass
  * here and only fail later in buildVisibleChanges, reading fixes off
- * null with a raw TypeError and no step named.
+ * null with a raw TypeError and no step named. A non-array proofFrames
+ * on an issues entry is the same fail-fast: it used to pass here and
+ * only fail later in buildVisibleChanges, calling .some off a
+ * non-array with a raw TypeError and no issue named.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -442,6 +445,13 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
   plan.issues.forEach((issue, i) => {
     if (!issue || typeof issue !== "object") {
       throw new Error(`renderAfter: plan.issues[${i}] must be an object`);
+    }
+    // Parity with the issues-entry guard: a non-array proofFrames
+    // used to pass this validator and only fail later in
+    // buildVisibleChanges, calling .some off a non-array with a raw
+    // TypeError and no issue named. Fail fast here, with the index named.
+    if (issue.proofFrames !== undefined && !Array.isArray(issue.proofFrames)) {
+      throw new Error(`renderAfter: plan.issues[${i}].proofFrames must be an array when given`);
     }
   });
   if (!Array.isArray(plan.workOrder)) {
