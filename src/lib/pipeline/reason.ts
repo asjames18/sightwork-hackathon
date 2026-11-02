@@ -216,6 +216,29 @@ function isRecord(v: unknown): v is Record<string, unknown> {
  * and dropping it would lose a count the model actually asserted.
  */
 export function dropTotalInventoryRows(inventory: InventoryItem[]): InventoryItem[] {
+  // A non-array inventory, a non-object entry, or an entry with a
+  // non-string label or non-finite count used to throw a raw TypeError
+  // reading .label / .count / .replace off null, with no entry named.
+  // Reject all of them here with a named reason error, the same
+  // named-error rule the other pipeline entry guards follow. Valid
+  // inventories are unchanged: the total-row drop rule below still
+  // reads exactly the same fields. (filterAndRenumber calls this, so
+  // this guard also covers the inventory side of that entry point,
+  // which its own guard deliberately left to this piece.)
+  if (!Array.isArray(inventory)) {
+    throw new Error("reason: dropTotalInventoryRows inventory must be an array");
+  }
+  inventory.forEach((item, i) => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`reason: dropTotalInventoryRows inventory[${i}] must be an object`);
+    }
+    if (typeof item.label !== "string") {
+      throw new Error(`reason: dropTotalInventoryRows inventory[${i}].label must be a string`);
+    }
+    if (typeof item.count !== "number" || !Number.isFinite(item.count)) {
+      throw new Error(`reason: dropTotalInventoryRows inventory[${i}].count must be a finite number`);
+    }
+  });
   const baseLabel = (label: string): string => label.replace(/\s*\([^)]*\)\s*$/, "").trim();
   const isTotalRow = (label: string): boolean => /total/i.test(label);
   const sums = new Map<string, number>();
