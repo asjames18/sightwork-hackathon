@@ -22,6 +22,7 @@ import { TakeThumb } from "./TakeThumb";
 import { TakePreview } from "./TakePreview";
 import { keepOpenTake, nextOpenTake, takeWatchLabels } from "@/lib/client/takePreview";
 import { takeFit, type TakeFitTone } from "@/lib/client/takeFit";
+import { bestTake } from "@/lib/client/takeBest";
 
 const FIT_STYLE: Record<TakeFitTone, string> = {
   good: "bg-emerald-50 text-emerald-900 ring-emerald-700/30",
@@ -39,6 +40,7 @@ const FIT_STYLE: Record<TakeFitTone, string> = {
  * walkthrough is never lost to one mis-tap. Watch plays a take back inline (one at a time) so it can be
  * checked before it is used. Each row also says how its length fits the room size picked on this screen
  * ("Good length for Large", "Short for Large", "Too long for Large"), using the upload check's own rules.
+ * With two or more takes, the one whose length fits best is marked "Best pick for Large".
  * Hidden in print.
  */
 export function SavedTakes({
@@ -127,6 +129,8 @@ export function SavedTakes({
     });
   };
 
+  const best = bestTake(list, roomSize);
+
   return (
     <section aria-labelledby="takes-heading" className="mt-6 print:hidden" data-testid="saved-takes">
       <h2 id="takes-heading" className="text-lg font-extrabold">
@@ -146,6 +150,20 @@ export function SavedTakes({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold leading-snug">{e.name}</p>
                   <p className="text-sm text-ink/70">{details}</p>
+                  {best?.id === e.id && (
+                    <p data-testid="take-best" className="mt-1">
+                      <span
+                        aria-hidden="true"
+                        className="inline-flex max-w-full items-center gap-1 break-words rounded-full bg-ink px-2 py-0.5 text-xs font-bold text-white"
+                      >
+                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0" fill="currentColor">
+                          <path d="M10 2.5l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 7.8l5-.7L10 2.5z" />
+                        </svg>
+                        {best.text}
+                      </span>
+                      <span className="sr-only">{best.aria}</span>
+                    </p>
+                  )}
                   {fit && (
                     <p data-testid="take-fit" data-tone={fit.tone} className="mt-1">
                       <span
