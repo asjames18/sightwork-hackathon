@@ -376,7 +376,10 @@ const MAX_RENDER_AFTER_IMAGE_BYTES = 5 * 1024 * 1024;
  * since their lines never reach the prompt. A work-step title that
  * is not a string used to pass here and only fail later, as a raw
  * TypeError from .trim in the visible-changes build, so such titles
- * fail fast here with the step named.
+ * fail fast here with the step named. A non-object work-order entry is
+ * the same fail-fast, matching the issues-entry guard: it used to pass
+ * here and only fail later in buildVisibleChanges, reading fixes off
+ * null with a raw TypeError and no step named.
  */
 export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!input || typeof input !== "object") {
@@ -462,6 +465,13 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
   // checked here as well. Hidden titles never become prompt lines,
   // so they still pass.
   plan.workOrder.forEach((s, i) => {
+    // Parity with the issues-entry guard above: a non-object
+    // work-order entry used to pass this validator and only fail
+    // later in buildVisibleChanges, reading fixes off null with a raw
+    // TypeError and no step named. Fail fast here, with the index named.
+    if (!s || typeof s !== "object") {
+      throw new Error(`renderAfter: plan.workOrder[${i}] must be an object`);
+    }
     if (s && typeof s === "object" && typeof s.title !== "string") {
       throw new Error(`renderAfter: plan.workOrder[${i}].title must be a string`);
     }
