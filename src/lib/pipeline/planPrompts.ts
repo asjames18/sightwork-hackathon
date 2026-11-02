@@ -641,6 +641,14 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * the space name there; such values now fail fast. The transcript
  * itself is filled last, so a token in it is caught by the final
  * unfilled-placeholder check instead.
+ * A segmentation count label is printed verbatim as JSON and filled
+ * before the transcript, so a {{transcript}} token in a label would
+ * be expanded by the transcript fill instead of caught: the label
+ * used to print the whole transcript inside the SEGMENTATION
+ * section. Other tokens in a label are caught by the final check,
+ * but the label is rejected for any {{...}} token here so the
+ * failure names the field instead of surfacing as a generic
+ * unfilled-placeholder error.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -701,6 +709,24 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     typeof input.segmentation !== "object"
   ) {
     throw new Error("buildReasonPrompt: segmentation must be an object or null");
+  }
+  if (
+    input.segmentation &&
+    typeof input.segmentation === "object" &&
+    Array.isArray((input.segmentation as { counts?: unknown }).counts)
+  ) {
+    (input.segmentation as { counts: unknown[] }).counts.forEach((c, i) => {
+      if (
+        c &&
+        typeof c === "object" &&
+        typeof (c as { label?: unknown }).label === "string" &&
+        /\{\{[a-z_]+\}\}/.test((c as { label: string }).label)
+      ) {
+        throw new Error(
+          `buildReasonPrompt: segmentation.counts[${i}].label must not contain a {{...}} placeholder`,
+        );
+      }
+    });
   }
 }
 
