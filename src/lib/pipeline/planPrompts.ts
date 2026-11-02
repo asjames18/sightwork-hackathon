@@ -742,6 +742,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * A material item containing a double quote is escaped as \" when
  * printed, so the item="..." field cannot be closed early; an inch
  * mark like 2" pipe still builds, as 2\" pipe.
+ * A material note containing a double quote is escaped the same way,
+ * so the note="..." field cannot be closed early either.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -952,7 +954,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   const space = spaceType && spaceType.trim() ? spaceType : "room";
   const laborBasis = input.laborBasis ?? "volunteer";
   const materialsList = input.materials
-    .map((m, i) => `i=${i} item="${m.item.replaceAll('"', '\\"')}" qty="${m.qty}" note="${m.note ?? ""}"`)
+    .map((m, i) => `i=${i} item="${m.item.replaceAll('"', '\\"')}" qty="${m.qty}" note="${(m.note ?? "").replaceAll('"', '\\"')}"`)
     .join("\n");
   const stepsList = input.workOrder
     .map(
