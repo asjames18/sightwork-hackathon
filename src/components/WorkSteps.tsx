@@ -21,6 +21,7 @@ import { fixLinks, problemAnchor, stepAnchor } from "@/lib/client/stepLinks";
 import { calendarFileName, calendarSummary, crewCalendarFileName, planCalendar } from "@/lib/client/stepCalendar";
 import { downloadBlob } from "@/lib/client/savePlanPdf";
 import { canHideDone, hiddenDoneLine, hiddenStepTarget, hideDoneLabel } from "@/lib/client/stepsHide";
+import { canSendStepsLeft, sendStepsLeftLabel, stepsLeft, stepsLeftText, stepsLeftTitle } from "@/lib/client/stepsLeftText";
 
 const range = (r: [number, number], unit = "") => (r[0] === r[1] ? `${r[0]}${unit}` : `${r[0]}–${r[1]}${unit}`);
 
@@ -167,6 +168,7 @@ export function WorkSteps({
           <ClearTicksButton ticked={done} noun="step" onChange={update} />
         </span>
       </div>
+      {ready && canSendStepsLeft(plan, done) && <StepsLeftSendButton plan={plan} done={done} />}
       {hiddenLine && (
         <p data-testid="steps-hidden-line" className="-mt-2 mb-3 text-sm text-ink/70 print:hidden">
           {hiddenLine}
@@ -492,6 +494,50 @@ function CrewSendButton({ plan, crew }: { plan: WorkPlan; crew: CrewRow }) {
         {status}
       </span>
     </span>
+  );
+}
+
+/** Sends only the steps not ticked yet (stepsLeftText.ts) by the share sheet, else the clipboard. Hidden in print. */
+function StepsLeftSendButton({ plan, done }: { plan: WorkPlan; done: readonly number[] }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  const left = stepsLeft(plan, done).length;
+
+  async function onSend() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const text = stepsLeftText(plan, done, { sample: plan.meta?.isExample === true });
+    const result = await sharePlanText(stepsLeftTitle(plan, left), text, navigator as ShareNavigator, prefersShareSheet());
+    setBusy(false);
+    if (result === "shared") return;
+    setStatus(CREW_STATUS[result]);
+    if (timer.current) clearTimeout(timer.current);
+    if (result === "copied") timer.current = setTimeout(() => setStatus(""), 4000);
+  }
+
+  return (
+    <div className="-mt-2 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={busy}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/20 bg-white px-3 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark disabled:opacity-60"
+        data-testid="steps-left-send"
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.5 2.5 9 11M17.5 2.5 12 17.5l-3-6.5-6.5-3 15-5.5Z" />
+        </svg>
+        {sendStepsLeftLabel(left)}
+      </button>
+      <span role="status" aria-live="polite" className="text-sm text-ink/70" data-testid="steps-left-status">
+        {status}
+      </span>
+    </div>
   );
 }
 
