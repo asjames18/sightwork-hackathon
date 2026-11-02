@@ -755,6 +755,19 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * buildReasonPrompt caller bypassing runReason gets the same
  * fail-fast here, naming the field. Null segmentation still builds
  * the explicit no-data prompt.
+ * A transcript field that is undefined at all used to slip past
+ * the string-or-null check, which only ran when transcript was
+ * neither null nor undefined, so it built the prompt with the
+ * literal "(no narration)" even though the transcribe step never
+ * ran and never reported silence — the caller simply omitted the
+ * field, and the model treated every issue as unmentioned with no
+ * warning that the narration was missing rather than silent.
+ * ReasonInput requires transcript (a string or null, not
+ * optional), and runReason's own validator already rejects an
+ * undefined transcript before any paid call, so a direct
+ * buildReasonPrompt caller bypassing runReason gets the same
+ * fail-fast here, naming the field. Null transcript still builds
+ * the explicit "(no narration)" prompt.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -804,7 +817,6 @@ export function validateReasonPromptInput(input: ReasonInput): void {
   }
   if (
     input.transcript !== null &&
-    input.transcript !== undefined &&
     typeof input.transcript !== "string"
   ) {
     throw new Error("buildReasonPrompt: transcript must be a string or null");
@@ -1246,6 +1258,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   }
   return prompt;
 }
+
 
 
 
