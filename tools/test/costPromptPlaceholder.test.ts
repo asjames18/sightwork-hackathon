@@ -61,8 +61,8 @@ describe("buildCostPrompt {{placeholder}} in a free-text field", () => {
           {
             ...base,
             workOrder: [
-              { order: 1, title: "Fix {{materials_list}}", trade: "volunteer", hours: [2, 3] },
-              { order: 2, title: "Repaint wall", trade: "volunteer", hours: [2, 3] },
+              { order: 1, title: "Fix {{materials_list}}", detail: "Stop the leak", trade: "volunteer", hours: [2, 3] },
+              { order: 2, title: "Repaint wall", detail: "Prime and repaint", trade: "volunteer", hours: [2, 3] },
             ],
           },
           "church sanctuary",
