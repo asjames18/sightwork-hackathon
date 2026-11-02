@@ -742,6 +742,19 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * buildReasonPrompt caller bypassing runReason gets the same fail-fast
  * here, naming the field. Null segmentation still builds the
  * explicit no-data prompt.
+ * A segmentation field that is undefined at all used to slip past
+ * the object check, which only ran when segmentation was neither
+ * null nor undefined, so it built the explicit no-data prompt
+ * ("the segmentation step failed") even though the segment step
+ * never ran and never failed — the caller simply omitted the
+ * field, and the model counted from the frames with no SAM floor
+ * and no warning that the floor was missing rather than failed.
+ * ReasonInput requires segmentation (an object or null, not
+ * optional), and runReason's own validator already rejects an
+ * undefined segmentation before any paid call, so a direct
+ * buildReasonPrompt caller bypassing runReason gets the same
+ * fail-fast here, naming the field. Null segmentation still builds
+ * the explicit no-data prompt.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -798,7 +811,6 @@ export function validateReasonPromptInput(input: ReasonInput): void {
   }
   if (
     input.segmentation !== null &&
-    input.segmentation !== undefined &&
     typeof input.segmentation !== "object"
   ) {
     throw new Error("buildReasonPrompt: segmentation must be an object or null");
