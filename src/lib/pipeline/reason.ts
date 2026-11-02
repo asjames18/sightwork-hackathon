@@ -165,8 +165,24 @@ const MAX_REASON_IMAGE_BYTES = 5 * 1024 * 1024;
  * Throws on an unresolvable reference instead of sending a broken schema.
  */
 export function inlineSchemaRefs(schema: unknown): unknown {
+  // A non-object schema used to pass through silently (null in, null
+  // out, so a broken schema rode on toward the model call) and a
+  // non-object $defs used to throw a raw TypeError from the `in`
+  // check below, with no field named. Reject both here with a named
+  // reason error, the same named-error rule the other pipeline entry
+  // guards follow. Valid schemas are unchanged: the inlining below
+  // still reads exactly the same fields.
+  if (schema === null || typeof schema !== "object" || Array.isArray(schema)) {
+    throw new Error("reason: inlineSchemaRefs schema must be an object");
+  }
   const root = schema as Record<string, unknown>;
-  const defs = (root?.$defs ?? {}) as Record<string, unknown>;
+  if (
+    root.$defs !== undefined &&
+    (root.$defs === null || typeof root.$defs !== "object" || Array.isArray(root.$defs))
+  ) {
+    throw new Error("reason: inlineSchemaRefs schema.$defs must be an object");
+  }
+  const defs = (root.$defs ?? {}) as Record<string, unknown>;
 
   const resolve = (node: unknown, seen: Set<string>): unknown => {
     if (Array.isArray(node)) return node.map((n) => resolve(n, seen));
