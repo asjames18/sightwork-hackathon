@@ -7,6 +7,7 @@ import { runTimeHint } from "@/lib/client/runTimeHint";
 import { failedRunCostLine } from "@/lib/client/runCost";
 import { narrationPartLine } from "@/lib/client/narrationChunks";
 import { STOP_RUN_LABEL, stopRunConfirm } from "@/lib/client/stopRun";
+import { offlineNote, readOnline } from "@/lib/client/connection";
 
 const LABELS: Record<ScreenStep, string> = {
   uploading: "Uploading",
@@ -117,6 +118,9 @@ export function ProcessingStep({
   useEffect(() => (failed ? undefined : keepScreenOn()), [failed]);
   const [screenStaysOn, setScreenStaysOn] = useState(false);
   useEffect(() => setScreenStaysOn(canKeepScreenOn()), []);
+  // A real run is one long streamed request, so say so when the phone drops its connection mid-run.
+  const online = useOnline();
+  const offline = offlineNote(online, { real: realRun, failed });
   // The tab title follows the run, so a user who switched apps can see where it is at a glance.
   useEffect(() => {
     const before = document.title;
@@ -178,6 +182,11 @@ export function ProcessingStep({
         {!failed && (
           <p data-testid="run-time-hint" className={`mt-2 text-sm ${hint.tone === "normal" ? "text-ink/65" : "font-medium text-ink/80"}`}>
             {hint.text} Keep this tab open{screenStaysOn ? "; we'll keep your screen on until it's done." : "."}
+          </p>
+        )}
+        {!failed && offline && (
+          <p role="status" data-testid="offline-note" className="mt-2 rounded-xl border border-amber-700/30 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+            {offline}
           </p>
         )}
       </div>
@@ -254,6 +263,11 @@ export function ProcessingStep({
         <div role="alert" className="mt-6 rounded-2xl border border-red-600/30 bg-white p-4">
           <p className="font-semibold text-red-700">Stopped at: {LABELS[steps[current]] ?? "a step"}</p>
           <p className="mt-1 text-sm text-ink/70">{failure.message}</p>
+          {offline && (
+            <p data-testid="offline-note" className="mt-1 text-sm font-medium text-amber-900">
+              {offline}
+            </p>
+          )}
           {failedRunCostLine(failure.costUsd) && (
             <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd)}</p>
           )}
@@ -437,4 +451,20 @@ function useObjectUrl(file?: File | null): string | null {
     };
   }, [file]);
   return file ? url : null;
+}
+
+/** Whether the browser says it is online, kept live by the online and offline events. */
+function useOnline(): boolean {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(readOnline(typeof navigator === "undefined" ? undefined : navigator));
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
 }
