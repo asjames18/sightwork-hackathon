@@ -35,6 +35,7 @@ import {
   type TakeInterruption,
   videoOnlyConstraints,
 } from "@/lib/client/recorder";
+import { keepTake } from "@/lib/client/savedTakes";
 
 export interface RecordingInfo {
   /** Camera resolution the browser actually delivered, e.g. "1920×1080" (null if it didn't say). */
@@ -248,6 +249,10 @@ export function CameraRecorder({
       if (discardRef.current) return;
       const blob = new Blob(chunks, { type: baseMime(type) });
       const file = new File([blob], recordingFileName(type, new Date()), { type: baseMime(type), lastModified: Date.now() });
+      // Keep the take on this device first, whatever happens to the upload. Never blocks or throws.
+      try {
+        void keepTake(file, { durationSec }).catch(() => {});
+      } catch {}
       cb.current.onRecorded(file, {
         resolution: describeResolution(s),
         width: s.width ?? null,

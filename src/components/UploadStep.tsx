@@ -16,6 +16,11 @@ import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRec
 import { SpacePicker } from "./SpacePicker";
 import { RoomSizePicker } from "./RoomSizePicker";
 import { stoppedRunNote } from "@/lib/client/stopRun";
+import { listSavedTakes, listSavedTakesOnServer, savedTakeFor, subscribeSavedTakes } from "@/lib/client/savedTakes";
+import { keptTakeNote } from "@/lib/client/saveVideo";
+import { prefersShareSheet } from "@/lib/client/savePlanPdf";
+import { SaveVideoButton } from "./SaveVideoButton";
+import { SavedTakes } from "./SavedTakes";
 
 /** Browsers leave `type` empty for some .mov files, so fall back to the extension. */
 function isVideoFile(f: File): boolean {
@@ -53,6 +58,7 @@ export function UploadStep({
   recent?: React.ReactNode;
 }) {
   const savedPlan = useSyncExternalStore(subscribeStorage, hasSavedPlan, noPlanOnServer);
+  const takes = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
   // Two hidden pickers: "Choose a video" (library/files, no capture attribute) and the phone's own
   // camera app (capture="environment"), used when the in-page camera can't open.
   const input = useRef<HTMLInputElement>(null);
@@ -342,6 +348,7 @@ export function UploadStep({
             </p>
           ) : null}
           {recent}
+          <SavedTakes onUse={(file) => pick(file)} />
           {runner === "api" && <TesterCode />}
           <FilmingTips aim={aimRangeSpoken(rules)} label={rules.label} />
           <ExamplePicker onPick={onExample} />
@@ -396,6 +403,14 @@ export function UploadStep({
               Change
             </button>
           </div>
+          {recorded && (
+            <div data-testid="save-take" className="mx-4 mb-3 rounded-lg bg-ink/[.04] px-3 py-2 print:hidden">
+              <p className="text-sm text-ink/80">{keptTakeNote(Boolean(savedTakeFor(takes, preview.file)), prefersShareSheet())}</p>
+              <div className="mt-2">
+                <SaveVideoButton getFile={() => preview.file} />
+              </div>
+            </div>
+          )}
           {interruptedNote && (
             <div role="status" data-testid="take-interrupted" className="mx-4 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
               <p>{interruptedNote}</p>
