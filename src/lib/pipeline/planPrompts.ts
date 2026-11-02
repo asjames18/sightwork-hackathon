@@ -713,6 +713,13 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * against the frame list here: the existing flagged-frames test
  * builds cleanly with index 3 on a one-frame input, so a flagged
  * index is not required to be a sampled-frame position.
+ * A segmentation counts label that is empty or only whitespace
+ * used to print verbatim as JSON, so the model saw a count row
+ * with no item name (\"label\":\"\") and could not attach it to
+ * an inventory item; such labels now fail fast too, naming the
+ * entry index. The check runs on the trimmed label, so a
+ * whitespace-only label fails the same way; the uniqueness check
+ * already normalizes case and whitespace.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -826,6 +833,11 @@ export function validateReasonPromptInput(input: ReasonInput): void {
       ) {
         const label = (c as { label: string }).label;
         const normalizedLabel = label.trim().toLowerCase();
+        if (normalizedLabel === "") {
+          throw new Error(
+            `buildReasonPrompt: segmentation.counts[${i}].label must not be empty`,
+          );
+        }
         if (seenLabels.has(normalizedLabel)) {
           throw new Error(
             `buildReasonPrompt: segmentation.counts[${i}].label must be unique`,
