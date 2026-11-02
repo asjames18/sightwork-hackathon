@@ -748,6 +748,8 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * so the title="..." field cannot be closed early either.
  * A work step trade containing a double quote is escaped the same way,
  * so the trade="..." field cannot be closed early either.
+ * A material qty containing a double quote is escaped the same way,
+ * so the qty="..." field cannot be closed early either.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -958,7 +960,7 @@ export function buildCostPrompt(input: CostInput, spaceType = "room"): string {
   const space = spaceType && spaceType.trim() ? spaceType : "room";
   const laborBasis = input.laborBasis ?? "volunteer";
   const materialsList = input.materials
-    .map((m, i) => `i=${i} item="${m.item.replaceAll('"', '\\"')}" qty="${m.qty}" note="${(m.note ?? "").replaceAll('"', '\\"')}"`)
+    .map((m, i) => `i=${i} item="${m.item.replaceAll('"', '\\"')}" qty="${m.qty.replaceAll('"', '\\"')}" note="${(m.note ?? "").replaceAll('"', '\\"')}"`)
     .join("\n");
   const stepsList = input.workOrder
     .map(
