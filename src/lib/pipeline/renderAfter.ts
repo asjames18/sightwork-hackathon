@@ -223,6 +223,25 @@ export function pickHeroFrameIndex(plan: WorkPlan): number | null {
  * the caller keeps the original hero and reports the skip.
  */
 export function pickFallbackHeroFrameIndex(plan: WorkPlan, tried: number): number | null {
+  // Same named-error rule as pickHeroFrameIndex: a direct caller
+  // bypassing runRenderAfter's input validation used to get a raw
+  // TypeError from the sort below, reading rank off a null entry, or
+  // from .some on a non-array frames list. Valid plans pass through
+  // unchanged: runRenderAfter already requires both arrays.
+  if (!plan || typeof plan !== "object") {
+    throw new Error("renderAfter: plan must be an object");
+  }
+  if (!Array.isArray(plan.issues)) {
+    throw new Error("renderAfter: plan.issues must be an array");
+  }
+  if (plan.frames !== undefined && !Array.isArray(plan.frames)) {
+    throw new Error("renderAfter: plan.frames must be an array when given");
+  }
+  plan.issues.forEach((issue, i) => {
+    if (!issue || typeof issue !== "object") {
+      throw new Error(`renderAfter: plan.issues[${i}] must be an object`);
+    }
+  });
   const ranked = [...plan.issues].sort((a, b) => a.rank - b.rank);
   const seen = new Set<number>([tried]);
   for (const issue of ranked) {
@@ -250,6 +269,20 @@ export function buildVisibleChanges(plan: WorkPlan, hero: number): string[] {
   if (!Array.isArray(plan.workOrder)) {
     throw new Error("renderAfter: plan.workOrder must be an array");
   }
+  // Parity with pickHeroFrameIndex above: a non-object entry used to
+  // pass here and only fail in the filter below, reading frameIndex
+  // off null (or fixes off null in the step filter) with a raw
+  // TypeError and no entry named. Fail fast here, with the index named.
+  plan.issues.forEach((issue, i) => {
+    if (!issue || typeof issue !== "object") {
+      throw new Error(`renderAfter: plan.issues[${i}] must be an object`);
+    }
+  });
+  plan.workOrder.forEach((s, i) => {
+    if (!s || typeof s !== "object") {
+      throw new Error(`renderAfter: plan.workOrder[${i}] must be an object`);
+    }
+  });
   const heroIssues = plan.issues.filter(
     (issue) =>
       issue.frameIndex === hero ||
