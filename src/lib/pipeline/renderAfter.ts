@@ -432,6 +432,15 @@ export function validateRenderAfterInput(input: RenderAfterInput): void {
   if (!Array.isArray(plan.issues)) {
     throw new Error("renderAfter: plan.issues must be an array");
   }
+  // Parity with the work-step title guard: a non-object issues entry
+  // used to pass this validator and only fail later in
+  // buildVisibleChanges, reading frameIndex off null with a raw
+  // TypeError and no issue named. Fail fast here, with the index named.
+  plan.issues.forEach((issue, i) => {
+    if (!issue || typeof issue !== "object") {
+      throw new Error(`renderAfter: plan.issues[${i}] must be an object`);
+    }
+  });
   if (!Array.isArray(plan.workOrder)) {
     throw new Error("renderAfter: plan.workOrder must be an array");
   }
