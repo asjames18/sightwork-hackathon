@@ -677,6 +677,15 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * section (a number label as "label":5, a missing label dropped
  * from the JSON entirely); such labels now fail fast too, naming
  * the entry index.
+ * The whole segmentation object is printed verbatim as JSON, so a
+ * {{transcript}} token in any part of it the per-field guards do
+ * not cover (an extra field on a counts entry, or an extra
+ * top-level field) used to be expanded by the later transcript
+ * fill instead of failing: an entry zone of "stage
+ * {{transcript}}" printed the whole transcript inside the
+ * SEGMENTATION section. Such tokens now fail fast too, naming
+ * the segmentation object; a token in a label still throws the
+ * label error first.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -814,6 +823,15 @@ export function validateReasonPromptInput(input: ReasonInput): void {
         );
       }
     });
+  }
+  if (
+    input.segmentation &&
+    typeof input.segmentation === "object" &&
+    /\{\{[a-z_]+\}\}/.test(JSON.stringify(input.segmentation))
+  ) {
+    throw new Error(
+      "buildReasonPrompt: segmentation must not contain a {{...}} placeholder",
+    );
   }
 }
 
