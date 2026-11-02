@@ -3,7 +3,7 @@
  * of printing it verbatim, so the item="..." field in the materials
  * list cannot be closed early. An inch mark like 2" pipe still builds,
  * as 2\" pipe. A note is printed quoted too, but it is not covered
- * by this treatment yet, so a quote there still builds verbatim.
+ * by this treatment too; see costPromptNoteQuote.test.ts.
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -57,7 +57,7 @@ describe("buildCostPrompt double quote in material item", () => {
     );
   });
 
-  test("still allows a double quote in a material note", () => {
+  test("escapes a double quote in a material note", () => {
     const prompt = buildCostPrompt(
       {
         ...base,
@@ -65,7 +65,7 @@ describe("buildCostPrompt double quote in material item", () => {
       },
       "church sanctuary",
     );
-    assert.ok(prompt.includes('say "hi"'));
+    assert.ok(prompt.includes('note="say \\"hi\\""'));
   });
 
   test("still rejects a newline in the region", () => {
