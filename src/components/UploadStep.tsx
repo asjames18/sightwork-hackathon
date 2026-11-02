@@ -352,7 +352,7 @@ export function UploadStep({
             </p>
           ) : null}
           {recent}
-          <SavedTakes onUse={(file) => pick(file)} onOpenPlan={onOpenPlan} />
+          <SavedTakes onUse={(file) => pick(file)} onOpenPlan={onOpenPlan} roomSize={roomSize} />
           {runner === "api" && <TesterCode />}
           <FilmingTips aim={aimRangeSpoken(rules)} label={rules.label} />
           <ExamplePicker onPick={onExample} />

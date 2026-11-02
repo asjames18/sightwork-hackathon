@@ -21,6 +21,14 @@ import { SaveVideoButton } from "./SaveVideoButton";
 import { TakeThumb } from "./TakeThumb";
 import { TakePreview } from "./TakePreview";
 import { keepOpenTake, nextOpenTake, takeWatchLabels } from "@/lib/client/takePreview";
+import { takeFit, type TakeFitTone } from "@/lib/client/takeFit";
+
+const FIT_STYLE: Record<TakeFitTone, string> = {
+  good: "bg-emerald-50 text-emerald-900 ring-emerald-700/30",
+  short: "bg-amber-50 text-amber-900 ring-amber-700/30",
+  long: "bg-amber-50 text-amber-900 ring-amber-700/30",
+  block: "bg-red-50 text-red-900 ring-red-700/30",
+};
 
 /**
  * "Your saved takes": the last few walkthroughs recorded in SightWork's camera, kept on this device.
@@ -29,9 +37,19 @@ import { keepOpenTake, nextOpenTake, takeWatchLabels } from "@/lib/client/takePr
  * A take that already made a plan (still on the recent plans list) says so and can open that plan.
  * Remove offers an Undo that puts the take and its video back (until the next tap on the list), so a
  * walkthrough is never lost to one mis-tap. Watch plays a take back inline (one at a time) so it can be
- * checked before it is used. Hidden in print.
+ * checked before it is used. Each row also says how its length fits the room size picked on this screen
+ * ("Good length for Large", "Short for Large", "Too long for Large"), using the upload check's own rules.
+ * Hidden in print.
  */
-export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void; onOpenPlan?: (saved: SavedPlan) => void }) {
+export function SavedTakes({
+  onUse,
+  onOpenPlan,
+  roomSize,
+}: {
+  onUse?: (file: File) => void;
+  onOpenPlan?: (saved: SavedPlan) => void;
+  roomSize?: string | null;
+}) {
   const list = useSyncExternalStore(subscribeSavedTakes, listSavedTakes, listSavedTakesOnServer);
   const recents = useSyncExternalStore(subscribeRecentPlans, listRecentPlans, listRecentPlansOnServer);
   const [gone, setGone] = useState<string | null>(null);
@@ -120,6 +138,7 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
           const when = takeWhen(e.savedAt);
           const details = [when, e.durationSec ? formatDuration(e.durationSec) : null, takeSize(e.size)].filter(Boolean).join(" · ");
           const made = planForTake(recents, e);
+          const fit = takeFit(e.durationSec, roomSize);
           return (
             <li key={e.id} data-take-id={e.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -127,6 +146,17 @@ export function SavedTakes({ onUse, onOpenPlan }: { onUse?: (file: File) => void
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold leading-snug">{e.name}</p>
                   <p className="text-sm text-ink/70">{details}</p>
+                  {fit && (
+                    <p data-testid="take-fit" data-tone={fit.tone} className="mt-1">
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block max-w-full break-words rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${FIT_STYLE[fit.tone]}`}
+                      >
+                        {fit.text}
+                      </span>
+                      <span className="sr-only">{fit.aria}</span>
+                    </p>
+                  )}
                   {made && (
                     <p data-testid="take-plan" className="mt-1 flex items-start gap-1.5 text-sm font-semibold text-ink">
                       <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
