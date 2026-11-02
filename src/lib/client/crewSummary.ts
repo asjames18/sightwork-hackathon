@@ -97,3 +97,28 @@ export function hoursLabel(hours: [number, number] | null, partial: boolean): st
 export function showCrewSummary(summary: CrewSummary): boolean {
   return summary.rows.length + (summary.unassigned.length ? 1 : 0) >= 2;
 }
+
+/**
+ * Hours of work still ahead once a crew has ticked some steps off: the summed range of the unticked steps,
+ * or null when nothing is ticked yet, everything is done, or none of the unticked steps has hours.
+ */
+export function hoursLeft(
+  workOrder: WorkStep[],
+  done: readonly number[],
+): { hours: [number, number]; partial: boolean; steps: number } | null {
+  const ticked = new Set(done);
+  const orders = new Set(workOrder.map((s) => s.order));
+  if (![...ticked].some((n) => orders.has(n))) return null;
+  const left = workOrder.filter((s) => !ticked.has(s.order));
+  if (left.length === 0) return null;
+  const { hours, partial } = sumHours(left);
+  return hours ? { hours, partial, steps: left.length } : null;
+}
+
+/** "About 6–9 h of work left on the 3 steps not ticked yet." / "...on the last step." */
+export function hoursLeftLine(left: ReturnType<typeof hoursLeft>): string {
+  if (!left) return "";
+  const label = hoursLabel(left.hours, left.partial) ?? "";
+  const where = left.steps === 1 ? "the last step" : `the ${left.steps} steps not ticked yet`;
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)} of work left on ${where}.`;
+}

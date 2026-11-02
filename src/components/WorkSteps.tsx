@@ -8,7 +8,7 @@ import { stepMaterialsDescription, stepMaterialsLabel, stepMaterialsState } from
 import type { WorkPlan } from "@/lib/types";
 import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
-import { crewSummary, hoursLabel, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
+import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
@@ -48,6 +48,8 @@ export function WorkSteps({
   const pct = total ? Math.round((done.length / total) * 100) : 0;
   const crew = crewSummary(plan.workOrder);
   const totalHours = hoursLabel(crew.totalHours, crew.totalPartial);
+  // Ticks load after mount, so the server render never shows hours left.
+  const leftLine = ready ? hoursLeftLine(hoursLeft(plan.workOrder, done)) : "";
 
   return (
     <>
@@ -119,6 +121,11 @@ export function WorkSteps({
         </p>
         <ClearTicksButton ticked={done} noun="step" onChange={update} />
       </div>
+      {leftLine && (
+        <p className="-mt-2 mb-3 text-sm text-ink/75 tabular-nums print:hidden" data-testid="hours-left">
+          {leftLine}
+        </p>
+      )}
       {done.length > 0 && (
         <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-ink/10 print:hidden" aria-hidden="true">
           <div className="h-full rounded-full bg-safe-dark transition-[width] motion-reduce:transition-none" style={{ width: `${pct}%` }} />
