@@ -3,6 +3,7 @@
 import { useRef, useState, type CSSProperties } from "react";
 import type { Box, PlanFrame } from "@/lib/types";
 import { canToggleOutline, outlineToggleLabel, outlineToggleStatus } from "@/lib/client/outlineToggle";
+import { proofZoom, proofZoomLabel, proofZoomStatus, proofZoomStyle } from "@/lib/client/proofZoom";
 
 /**
  * A proof frame with an optional normalized (0-1000) box drawn on top.
@@ -21,7 +22,8 @@ import { canToggleOutline, outlineToggleLabel, outlineToggleStatus } from "@/lib
  * Tapping the photo opens it full size in a modal dialog (same outline, caption and time), so a
  * judge or crew lead can check the proof on a phone. Esc, the close button or a tap outside closes
  * it, and focus returns to the photo. When the photo has a box, a "Hide outline" toggle in the dialog
- * shows what is under it; the outline comes back each time the dialog opens.
+ * shows what is under it; the outline comes back each time the dialog opens. "Zoom in" enlarges the photo
+ * around the outline (or the middle, with no box) so a small problem can be checked on a phone; it resets on open.
  */
 function OutlineBox({ box, dashed }: { box: Box; dashed: boolean }) {
   return (
@@ -63,6 +65,7 @@ export function ProofFrame({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [outlineHidden, setOutlineHidden] = useState(false);
   const [outlineStatus, setOutlineStatus] = useState("");
+  const [zoomed, setZoomed] = useState(false);
   if (!frame)
     return (
       <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-ink/20 bg-ink/5 px-4 text-center text-sm text-ink/70">
@@ -77,12 +80,19 @@ export function ProofFrame({
   function openFull() {
     setOutlineHidden(false);
     setOutlineStatus("");
+    setZoomed(false);
     dialogRef.current?.showModal();
   }
   function toggleOutline() {
     const next = !outlineHidden;
     setOutlineHidden(next);
     setOutlineStatus(outlineToggleStatus(next, boxSource));
+  }
+  const zoom = proofZoom(box);
+  function toggleZoom() {
+    const next = !zoomed;
+    setZoomed(next);
+    setOutlineStatus(proofZoomStatus(next, zoom, toggleable));
   }
   return (
     <figure className="overflow-hidden rounded-xl bg-black">
@@ -143,6 +153,19 @@ export function ProofFrame({
       >
         <div className="flex flex-col items-center gap-2">
           <div className="flex w-full flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={toggleZoom}
+              aria-pressed={zoomed}
+              data-testid="proof-zoom-toggle"
+              className="flex min-h-11 items-center gap-1.5 rounded-full border border-white/40 bg-black/60 px-4 text-sm font-semibold text-white shadow backdrop-blur-sm hover:bg-black/80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="8.5" cy="8.5" r="5.5" />
+                <path d={zoomed ? "M6 8.5h5M13 13l4 4" : "M6 8.5h5M8.5 6v5M13 13l4 4"} />
+              </svg>
+              {proofZoomLabel(zoomed)}
+            </button>
             {toggleable && (
               <button
                 type="button"
@@ -172,11 +195,17 @@ export function ProofFrame({
           <div
             className={
               sized
-                ? "relative w-[min(calc(100vw-1.5rem),calc((100dvh-8rem)*var(--ar)))] sm:w-[min(calc(100vw-3rem),calc((100dvh-9rem)*var(--ar)))]"
-                : "relative w-fit"
+                ? "relative w-[min(calc(100vw-1.5rem),calc((100dvh-8rem)*var(--ar)))] overflow-hidden rounded-lg sm:w-[min(calc(100vw-3rem),calc((100dvh-9rem)*var(--ar)))]"
+                : "relative w-fit overflow-hidden rounded-lg"
             }
             style={sized ? ({ "--ar": String(frame.width! / frame.height!) } as CSSProperties) : undefined}
           >
+            <div
+              data-testid="proof-zoom-layer"
+              data-zoomed={zoomed ? "true" : "false"}
+              className="relative motion-safe:transition-transform motion-safe:duration-300"
+              style={zoomed ? proofZoomStyle(zoom) : undefined}
+            >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={frame.url}
@@ -192,6 +221,7 @@ export function ProofFrame({
               }
             />
             {box && !(toggleable && outlineHidden) && <OutlineBox box={box} dashed={dashed} />}
+            </div>
           </div>
           <p role="status" aria-live="polite" className="sr-only" data-testid="proof-outline-status">
             {outlineStatus}
