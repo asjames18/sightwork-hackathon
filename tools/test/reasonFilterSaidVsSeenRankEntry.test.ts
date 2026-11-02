@@ -79,7 +79,8 @@ describe("filterAndRenumber saidVsSeen-rank guard", () => {
     const result = filterAndRenumber({
       ...output,
       issues: [issue, demoted],
-      saidVsSeen: [row(1), row(2), row()],
+      // Typed view of the helper rows (type-only; no runtime change).
+      saidVsSeen: [row(1), row(2), row()] as ReasonOutput["saidVsSeen"],
     });
     assert.equal(result.saidVsSeen.length, 2);
     assert.equal(result.saidVsSeen[0].issueRank, 1);
