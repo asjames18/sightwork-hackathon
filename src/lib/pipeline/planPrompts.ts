@@ -1041,6 +1041,16 @@ export function validateReasonPromptInput(input: ReasonInput): void {
  * labor_basis, materials_list, steps_list), so a {{steps_list}} token
  * in an item would print the whole steps list inside that item line;
  * such values now fail fast.
+ * A space type that is only whitespace used to slip past the string,
+ * newline and placeholder checks, so buildCostPrompt silently fell
+ * back to "room" — the caller never learned the type was blank, and
+ * the model priced a generic room rather than the space that was
+ * filmed. runPlan's own validator already rejects a spaces-only
+ * space type when given before any paid call, so a direct
+ * buildCostPrompt caller bypassing runPlan gets the same fail-fast
+ * here, naming the field. An empty string still means "not given"
+ * (runPlan's convention) and falls back to the default, as does an
+ * omitted space type.
  */
 export function validateCostPromptInput(input: CostInput, spaceType?: string): void {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -1063,6 +1073,13 @@ export function validateCostPromptInput(input: CostInput, spaceType?: string): v
   }
   if (typeof spaceType === "string" && /\{\{[a-z_]+\}\}/.test(spaceType)) {
     throw new Error("buildCostPrompt: spaceType must not contain a {{...}} placeholder");
+  }
+  if (
+    typeof spaceType === "string" &&
+    spaceType.length > 0 &&
+    spaceType.trim().length === 0
+  ) {
+    throw new Error("buildCostPrompt: spaceType must not be blank when given");
   }
   if (
     input.laborBasis !== undefined &&
