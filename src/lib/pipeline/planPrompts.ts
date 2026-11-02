@@ -632,6 +632,15 @@ export function hasUnfilledPlaceholders(prompt: string): boolean {
  * 11's Set spaceName to "{{space_name}}"), so such values now fail
  * fast too. spaceType is printed unquoted everywhere in this template,
  * so a quote there is left alone.
+ * A spaceName or spaceType containing a {{placeholder}} would be
+ * expanded by a later fill() pass (fills run in order: space_type,
+ * space_checklist, space_name, duration_sec, frame_count, frame_list,
+ * segmentation_json, transcript), so a {{transcript}} token in the
+ * space name used to print the whole transcript inside the quoted
+ * name, and a {{space_name}} token in the space type used to print
+ * the space name there; such values now fail fast. The transcript
+ * itself is filled last, so a token in it is caught by the final
+ * unfilled-placeholder check instead.
  */
 export function validateReasonPromptInput(input: ReasonInput): void {
   if (!input || typeof input !== "object") {
@@ -671,6 +680,9 @@ export function validateReasonPromptInput(input: ReasonInput): void {
     }
     if (typeof v === "string" && /[\r\n]/.test(v)) {
       throw new Error(`buildReasonPrompt: ${field} must not contain a newline`);
+    }
+    if (typeof v === "string" && /\{\{[a-z_]+\}\}/.test(v)) {
+      throw new Error(`buildReasonPrompt: ${field} must not contain a {{...}} placeholder`);
     }
   }
   if (typeof input.spaceName === "string" && input.spaceName.includes('"')) {
