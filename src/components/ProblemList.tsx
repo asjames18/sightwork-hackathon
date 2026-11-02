@@ -251,7 +251,7 @@ function IssueCard({
   return (
     <li
       id={problemAnchor(issue.rank)}
-      className={`min-w-0 scroll-mt-32 rounded-2xl border-l-4 bg-white p-4 shadow-sm break-inside-avoid ${SEVERITY_BORDER[issue.severity]} ${
+      className={`sw-land min-w-0 scroll-mt-32 rounded-2xl border-l-4 bg-white p-4 shadow-sm break-inside-avoid ${SEVERITY_BORDER[issue.severity]} ${
         seen ? "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] md:items-start md:gap-4" : ""
       }`}
     >

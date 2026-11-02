@@ -125,3 +125,31 @@ html.sw-opening body > header,
 html.sw-opening body > main {
   visibility: hidden;
 }
+
+/* A problem card or work step reached from a link on the plan (#problem-2, #step-3) lights up for a moment,
+   so the eye lands on the right card after the jump. With reduced motion it gets a still outline instead. */
+.sw-land:target {
+  animation: sw-landed 1.8s ease-out 1;
+}
+@keyframes sw-landed {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px var(--color-accent-dark);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-land:target {
+    animation: none;
+    outline: 3px solid var(--color-accent-dark);
+    outline-offset: 2px;
+  }
+}
+@media print {
+  .sw-land:target {
+    animation: none;
+    outline: none;
+  }
+}

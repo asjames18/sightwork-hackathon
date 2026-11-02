@@ -141,7 +141,7 @@ export function WorkSteps({
           const mats = gotReady ? stepMaterialsState(plan, step, got) : null;
           const waiting = stepsWaitingOn(plan.workOrder, step.order).map((s) => s.order);
           return (
-            <li key={step.order} id={stepAnchor(step.order)} className="relative flex scroll-mt-32 gap-3 py-3">
+            <li key={step.order} id={stepAnchor(step.order)} className="sw-land relative flex scroll-mt-32 gap-3 rounded-xl py-3">
               {!last && (
                 <span aria-hidden="true" className="absolute top-12 bottom-0 left-4 w-0.5 -translate-x-1/2 bg-ink/15" />
               )}
