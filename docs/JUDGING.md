@@ -4,7 +4,7 @@ Criteria and weights from the Official Rules embedded on the [Cerebral Valley ev
 
 ## Impact (30%)
 - Who it helps: churches, schools and nonprofits that run on volunteers and have no facilities staff, plus small contractors scoping a job.
-- What changes: a one-minute phone walkthrough becomes a volunteer-ready plan in about 2 to 3 minutes, for under $1 in model calls on real runs: problems worst first with proof frames, who does each step, a shopping list, and a rough local cost.
+- What changes: a one-minute phone walkthrough becomes a volunteer-ready plan in about 2 to 3.5 minutes, for about $1 in model calls on real runs ($0.94 to $1.10 with live price lookup): problems worst first with proof frames, who does each step, a shopping list, and a rough local cost.
 - It travels: Send to your team (share sheet or clipboard), Save PDF, ticks saved per plan for work day.
 - Built for the whole crew: Read it to me (the device's own voice, with a speed choice), Text size (Normal, Large, Extra large), a Contrast button, Windows High Contrast support, a Skip to main content link and axe checks at phone and desktop widths.
 - Built for work day, not just the demo: tick steps off, "If people share it evenly" turns total hours into hours each for 1 to 12 people, and Add to calendar downloads the steps as a calendar file.

@@ -53,11 +53,11 @@ const metaModels = [
   { step: "Picture", name: "Muse Image", role: "Draws an AI concept of the finished space." },
 ];
 
-/** Impact strip. Every number is from real runs on the live site (Oct 29 and 30, 2026). */
+/** Impact strip. Every number is from real runs on the live site (Oct 29 to Nov 3, 2026). */
 const impact = [
   { value: "1 minute", label: "of phone video is all it takes" },
-  { value: "2 to 3 min", label: "from upload to a full plan, in real runs" },
-  { value: "Under $1", label: "in model calls per plan ($0.38 to $0.72 so far)" },
+  { value: "About 3 min", label: "from upload to a full plan, in real runs" },
+  { value: "About $1", label: "in model calls per plan ($0.38 to $1.10 in real runs, most with live prices)" },
   { value: "0", label: "accounts, apps or site visits needed for the first look" },
 ];
 
