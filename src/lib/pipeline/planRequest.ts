@@ -31,8 +31,22 @@ export const MAX_PLAN_FRAMES = 48;
  */
 export const MAX_PLAN_FRAME_IMAGE_BYTES = 5 * 1024 * 1024;
 
-/** True when the raw request text is over the route body cap. */
+/**
+ * True when the raw request text is over the route body cap. A
+ * non-string body from a direct caller used to be silently coerced:
+ * TextEncoder.encode stringifies its argument, so an object became
+ * "[object Object]" (15 bytes) and passed the cap, and the route then
+ * JSON-parsed that string instead of the real body. Reject a
+ * non-string here with a named error, the same named-error rule the
+ * other pipeline guards follow. The route caller is unchanged: it
+ * always passes req.text(), a string.
+ */
 export function planBodyTooLarge(bodyText: string): boolean {
+  if (typeof bodyText !== "string") {
+    throw new Error(
+      `planRequest: bodyText must be a string, got ${JSON.stringify(bodyText) ?? typeof bodyText}`,
+    );
+  }
   return new TextEncoder().encode(bodyText).length > MAX_PLAN_BODY_BYTES;
 }
 
