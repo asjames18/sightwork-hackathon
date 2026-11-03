@@ -1125,6 +1125,22 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   if (typeof deps.prompt !== "string" || deps.prompt.trim().length === 0) {
     throw new Error("reason: prompt must be a non-empty string");
   }
+  // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+  // a finished prompt never carries an unfilled {{...}} placeholder
+  // (the builder throws on one after the last fill), and the
+  // ReasonDeps doc says the prompt arrives with placeholders already
+  // filled. A direct runReason caller passing the raw template, or a
+  // partially filled prompt, used to pass here and ride onto a paid
+  // Spark call with literal {{space_name}} / {{transcript}} slots in
+  // it instead of the space, frames, segmentation and narration. It
+  // gets the same fail-fast here, before any fetch. This sits after
+  // the non-empty check above, so a blank prompt keeps its own
+  // message. Real runs are already clean (the route hands runReason
+  // the finished prompt from buildReasonPrompt), so no current run
+  // changes.
+  if (/\{\{[a-z_]+\}\}/.test(deps.prompt)) {
+    throw new Error("reason: prompt must not contain an unfilled {{...}} placeholder");
+  }
   if (!isRecord(deps.schema)) {
     throw new Error("reason: schema must be an object");
   }
