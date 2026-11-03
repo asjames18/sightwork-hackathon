@@ -348,6 +348,13 @@ export function validatePlanRequest(body: unknown): string[] {
       ) {
         problems.push("transcriptTurns given without transcript");
       }
+      // Time order, like frames above: the plan carries the turns in
+      // order, and the reason step reads narration against frames in
+      // that order, so an out-of-order turn would misalign what was
+      // said with what was seen. Real turns from /api/transcribe are
+      // already sorted (parseTurns sorts by startSec), so no current
+      // run changes; equal startSec passes, as with frames.
+      let prevTurnStartSec = -Infinity;
       req.transcriptTurns.forEach((turn, i) => {
         const t = turn as Record<string, unknown> | null;
         if (
@@ -375,6 +382,23 @@ export function validatePlanRequest(body: unknown): string[] {
           t.endSec < t.startSec
         ) {
           problems.push(`transcriptTurns[${i}].endSec must not be earlier than startSec`);
+        }
+        // Independent of the two checks above, and prevTurnStartSec
+        // advances on every valid startSec — even one whose endSec
+        // failed — so a turn after a bad turn is compared against
+        // the latest timestamp, not an older one (the same rule the
+        // frame-order check above follows).
+        if (
+          t !== null &&
+          typeof t === "object" &&
+          typeof t.startSec === "number" &&
+          Number.isFinite(t.startSec) &&
+          t.startSec >= 0
+        ) {
+          if (t.startSec < prevTurnStartSec) {
+            problems.push(`transcriptTurns[${i}].startSec must not be earlier than the previous turn`);
+          }
+          prevTurnStartSec = t.startSec;
         }
       });
     }
