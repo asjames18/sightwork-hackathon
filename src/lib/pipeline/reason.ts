@@ -865,6 +865,30 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
         throw new Error(`reason: segmentation.counts[${i}] has no valid label/count/confidence`);
       }
     });
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the prompt build rejects a repeated counts label (exact, case, or
+    // surrounding whitespace) instead of printing it twice, where the
+    // model could add the two rows together and overstate the
+    // inventory. A direct runReason caller with a prebuilt prompt
+    // bypasses the prompt build and had no such check here, so a
+    // duplicate label would ride onto a paid Spark call. Labels are
+    // compared trimmed and lowercased, like the prompt build. This
+    // sits after the counts validation above, so a malformed entry
+    // keeps its own message. Real runs are already unique (the
+    // segment step emits one row per label), so no current run
+    // changes.
+    {
+      const seen = new Set<string>();
+      seg.counts.forEach((c, i) => {
+        const key = c.label.trim().toLowerCase();
+        if (seen.has(key)) {
+          throw new Error(
+            `reason: segmentation.counts[${i}].label must be unique`,
+          );
+        }
+        seen.add(key);
+      });
+    }
     if (
       !Array.isArray(seg.flaggedFrames) ||
       seg.flaggedFrames.some((f) => !Number.isInteger(f) || f < 0)
