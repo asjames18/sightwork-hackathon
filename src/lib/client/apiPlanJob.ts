@@ -24,6 +24,10 @@ const CONNECTION_FAIL = "The connection dropped before the plan finished. Try ag
  */
 export const TIME_LIMIT_FAIL = "This run hit the 5-minute limit before it finished. Try again, or film a shorter walkthrough.";
 export const RUN_LIMIT_SEC = 280;
+/** True for the message above, so a retry can go lighter (fewer, smaller frames) when the last run ran out of time. */
+export function isTimeLimitFailure(message: string | undefined): boolean {
+  return message === TIME_LIMIT_FAIL;
+}
 
 /**
  * The narration couldn't go on its own to /api/transcribe, and carrying it in the plan request would put

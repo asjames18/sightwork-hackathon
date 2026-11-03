@@ -37,6 +37,27 @@ const apiPlanJob = createApiPlanJob(
 );
 
 /**
+ * The retry after a run that ran out of time: the same video with fewer, smaller frames, so the reading step
+ * has less to chew through and a slow stretch is less likely to push it past the limit again. The plan says
+ * how many frames it used, so a lighter plan is never passed off as the full one.
+ */
+export const LIGHT_MAX_FRAMES = 20;
+export const LIGHT_LONG_SIDE = 768;
+const lightApiPlanJob = createApiPlanJob(
+  createBuildPlanRequest({
+    maxRequestBytes,
+    narrationSentSeparately: true,
+    runContext: savedSpaceRequestFields,
+    maxFrames: LIGHT_MAX_FRAMES,
+    longSide: LIGHT_LONG_SIDE,
+  }),
+  "/api/plan",
+  "/api/transcribe",
+  maxRequestBytes + 128 * 1024,
+  narrationChunkMaxSec(maxRequestBytes),
+);
+
+/**
  * Which runner a video the user brought (recorded here or chosen) goes to. Unlike pickRunnerKind, an
  * unset NEXT_PUBLIC_SIGHTWORK_RUNNER (the public site) means a real run: someone who films their own
  * space must never be handed the example plan as if it came from their video. The example-plan preview
@@ -60,8 +81,9 @@ export function needsTesterCode(kind: RunnerKind, savedCode: string): boolean {
 }
 
 /** The runner for a kind. Stable references, so a run only restarts when the video or run number changes. */
-export function planJobFor(kind: RunnerKind): PlanJobRunner {
-  return kind === "api" ? apiPlanJob : mockPlanJob;
+export function planJobFor(kind: RunnerKind, light = false): PlanJobRunner {
+  if (kind !== "api") return mockPlanJob;
+  return light ? lightApiPlanJob : apiPlanJob;
 }
 
 /** The runner kind for a video the user brought, read in the browser for this page load. */

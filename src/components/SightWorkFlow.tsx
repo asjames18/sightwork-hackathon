@@ -5,7 +5,7 @@ import Link from "next/link";
 import { RUN_STEPS, type PlanStep, type WorkPlan } from "@/lib/types";
 import { EXAMPLES, findExample, type Example } from "@/lib/examples";
 import { planJobFor, type RunnerKind } from "@/lib/client/selectRunner";
-import { isResumeFailure, isTesterCodeFailure } from "@/lib/client/apiPlanJob";
+import { isResumeFailure, isTesterCodeFailure, isTimeLimitFailure } from "@/lib/client/apiPlanJob";
 import { loadRegion } from "@/lib/client/location";
 import { usePlanJob } from "@/lib/client/usePlanJob";
 import { loadLastPlanAsync, saveLastPlan } from "@/lib/client/lastPlan";
@@ -23,7 +23,8 @@ type Stage =
   // shown again with the code prompt open.
   // `stopped`: the user stopped the run on the processing screen; the same video is shown again, ready to start.
   | { kind: "upload"; resume?: File; stopped?: File }
-  | { kind: "processing"; file: File; run: number; runner: RunnerKind }
+  // `light`: this try uses fewer, smaller frames, set when the run before it ran out of time.
+  | { kind: "processing"; file: File; run: number; runner: RunnerKind; light?: boolean }
   | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example; savedAt?: string };
 
 /** Nothing runs while there's no video; the runner is chosen per run (see UploadStep and ownVideoRunnerKind). */
@@ -38,7 +39,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   });
   // Set when a run finishes into a plan, so only that plan (not an example or a saved plan) gets the tab cue.
   const readyCue = useRef(false);
-  const { status: job, checks } = usePlanJob(stage.kind === "processing" ? planJobFor(stage.runner) : idleJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
+  const { status: job, checks } = usePlanJob(stage.kind === "processing" ? planJobFor(stage.runner, stage.light === true) : idleJob, stage.kind === "processing" ? stage.file : null, stage.kind === "processing" ? stage.run : 0);
 
   useEffect(() => {
     if (stage.kind === "processing" && job?.state === "done") {
@@ -208,7 +209,8 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           videoName={stage.file.name}
           videoFile={stage.file}
           failure={job?.state === "failed" ? { message: job.message, costUsd: job.costUsd, costPartial: job.costPartial } : null}
-          onRetry={() => setStage({ ...stage, run: stage.run + 1 })}
+          onRetry={() => setStage({ ...stage, run: stage.run + 1, light: stage.light || (stage.runner === "api" && job?.state === "failed" && isTimeLimitFailure(job.message)) })}
+          lighterRetry={stage.runner === "api" && !stage.light && job?.state === "failed" && isTimeLimitFailure(job.message)}
           onEnterCode={
             stage.runner === "api" && job?.state === "failed" && isResumeFailure(job.message)
               ? () => setStage({ kind: "upload", resume: stage.file })

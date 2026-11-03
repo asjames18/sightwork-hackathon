@@ -58,6 +58,7 @@ export function ProcessingStep({
   videoFile,
   failure,
   onRetry,
+  lighterRetry = false,
   onExample,
   onStop,
   onEnterCode,
@@ -76,6 +77,8 @@ export function ProcessingStep({
   videoFile?: File | null;
   failure?: StepFailure | null;
   onRetry?: () => void;
+  /** The run before ran out of time: Try again goes lighter (fewer, smaller frames), and the card says so. */
+  lighterRetry?: boolean;
   onExample?: () => void;
   /** Stops the run in progress and goes back to the video (real runs confirm first, see stopRun.ts). */
   onStop?: () => void;
@@ -280,6 +283,11 @@ export function ProcessingStep({
           {failedRunCostLine(failure.costUsd, failure.costPartial) && (
             <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd, failure.costPartial)}</p>
           )}
+          {lighterRetry && !onEnterCode && onRetry && (
+            <p data-testid="lighter-retry-note" className="mt-2 text-sm text-ink/70">
+              Try again, lighter sends fewer, smaller pictures from the same video, so it has a better chance of finishing in time.
+            </p>
+          )}
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             {onEnterCode ? (
               <button
@@ -297,7 +305,7 @@ export function ProcessingStep({
                 onClick={onRetry}
                 className="btn-primary flex-1 active:scale-[.99]"
               >
-                Try again
+                {lighterRetry ? "Try again, lighter" : "Try again"}
               </button>
             )}
             {onExample && (
