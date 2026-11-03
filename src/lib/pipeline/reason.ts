@@ -837,6 +837,29 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
       }
     });
   }
+  // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts)
+  // and the route validator (src/lib/pipeline/planRequest.ts): a
+  // frame's zoneId is optional, but when given it must be a whole
+  // number >= 0, and it prints verbatim in the prompt's frame list
+  // (zone=${f.zoneId}). A direct runReason caller with a prebuilt
+  // prompt bypasses the prompt build, so a bad zone used to ride
+  // into a paid Spark call mislabelled (zone=-1, zone=1.5) instead
+  // of failing fast here. Only frames that are objects are checked,
+  // so a malformed frame keeps its own message from the loop above.
+  // Real runs are already valid (the route validates zoneId before
+  // runPlan hands frames over), so no current run changes.
+  input.frames.forEach((f, i) => {
+    if (
+      f &&
+      typeof f === "object" &&
+      f.zoneId !== undefined &&
+      (!Number.isInteger(f.zoneId) || f.zoneId < 0)
+    ) {
+      throw new Error(
+        `reason: frame ${i} zoneId must be a whole number >= 0 when given`,
+      );
+    }
+  });
   if (input.segmentation !== null) {
     const seg = input.segmentation;
     if (!seg || typeof seg !== "object") {
