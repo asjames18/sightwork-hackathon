@@ -207,7 +207,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           current={current}
           videoName={stage.file.name}
           videoFile={stage.file}
-          failure={job?.state === "failed" ? { message: job.message, costUsd: job.costUsd } : null}
+          failure={job?.state === "failed" ? { message: job.message, costUsd: job.costUsd, costPartial: job.costPartial } : null}
           onRetry={() => setStage({ ...stage, run: stage.run + 1 })}
           onEnterCode={
             stage.runner === "api" && job?.state === "failed" && isResumeFailure(job.message)

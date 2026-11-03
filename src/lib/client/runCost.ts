@@ -21,9 +21,18 @@ export function runCostLine(plan: WorkPlan, opts: { sample?: boolean } = {}): st
 
 /**
  * One plain line for what a run that stopped had already cost, from the failed line's costUsd (server total
- * plus any split transcribe request). null when nothing was billed or the amount is unknown.
+ * plus any split transcribe request). null when nothing was billed or the amount is unknown. When the
+ * connection dropped while the plan request was running (partial), the server's own spend is unknown, so the
+ * line says the count may be low (or, with nothing counted, that steps were already running) rather than
+ * claiming a small amount.
  */
-export function failedRunCostLine(usd: number | undefined): string | null {
-  if (typeof usd !== "number" || !Number.isFinite(usd) || usd <= 0) return null;
+export function failedRunCostLine(usd: number | undefined, partial = false): string | null {
+  const known = typeof usd === "number" && Number.isFinite(usd) && usd > 0;
+  if (partial) {
+    return known
+      ? `The AI model calls we could count cost ${formatRunCost(usd)}. Steps that were already running when the connection dropped may add more.`
+      : "Some AI model steps were already running when the connection dropped, so this run may still have cost something.";
+  }
+  if (!known) return null;
   return `The AI model calls before it stopped cost ${formatRunCost(usd)}.`;
 }

@@ -49,7 +49,7 @@ const STATE_TEXT = {
 } as const;
 
 /** A step that stopped the run. `message` is shown as-is, so keep it plain and free of provider details. */
-export type StepFailure = { message: string; /** What the run billed before it stopped, when known. */ costUsd?: number };
+export type StepFailure = { message: string; /** What the run billed before it stopped, when known. */ costUsd?: number; /** True when the connection dropped mid-run, so the real spend may be higher. */ costPartial?: boolean };
 
 export function ProcessingStep({
   steps,
@@ -277,8 +277,8 @@ export function ProcessingStep({
             </p>
           )}
           {videoFile && <FailedTakeNote file={videoFile} />}
-          {failedRunCostLine(failure.costUsd) && (
-            <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd)}</p>
+          {failedRunCostLine(failure.costUsd, failure.costPartial) && (
+            <p className="mt-1 text-xs text-ink/70" data-testid="failed-run-cost">{failedRunCostLine(failure.costUsd, failure.costPartial)}</p>
           )}
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             {onEnterCode ? (

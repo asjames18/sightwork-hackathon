@@ -19,6 +19,13 @@ const READ_FAIL = "We couldn't read that video. Try a different file, or open th
 const CONNECTION_FAIL = "The connection dropped before the plan finished. Try again.";
 
 /**
+ * The host stops a run at 5 minutes. A run whose stream is cut at about that mark ran out of time rather than
+ * lost its connection, so say that and what helps (a shorter walkthrough) instead of a bare "dropped".
+ */
+export const TIME_LIMIT_FAIL = "This run hit the 5-minute limit before it finished. Try again, or film a shorter walkthrough.";
+export const RUN_LIMIT_SEC = 280;
+
+/**
  * The narration couldn't go on its own to /api/transcribe, and carrying it in the plan request would put
  * that request over the host's body cap (a platform 413 that reads as "too large"). Trying again usually works.
  */
@@ -286,6 +293,8 @@ export function createApiPlanJob(
   maxBodyBytes?: number,
   /** Longest narration chunk per /api/transcribe request (see narrationChunkMaxSec). */
   narrationChunkSec: number = NARRATION_CHUNK_MAX_SEC,
+  /** Clock for the run-length check (milliseconds). Tests pass their own. */
+  now: () => number = Date.now,
 ): PlanJobRunner {
   return async ({ file, onStatus, signal }) => {
     let lastStep: RunStep = "uploading";
@@ -298,6 +307,20 @@ export function createApiPlanJob(
     // what the run billed.
     let transcribeUsd = 0;
     const fail = (message: string) => report(withFailureCost({ state: "failed", step: lastStep, message }, transcribeUsd));
+    // The plan request got through and was running when the stream was cut: its spend is not known here, and a
+    // cut that late is the host's time limit, not a lost signal.
+    let planStartedAt = 0;
+    const failCut = () => {
+      const base = withFailureCost(
+        {
+          state: "failed",
+          step: lastStep,
+          message: planStartedAt && now() - planStartedAt >= RUN_LIMIT_SEC * 1000 ? TIME_LIMIT_FAIL : CONNECTION_FAIL,
+        },
+        transcribeUsd,
+      );
+      report(planStartedAt ? { ...base, costPartial: true } : base);
+    };
 
     report({ state: "running", step: "uploading" });
 
@@ -348,6 +371,7 @@ export function createApiPlanJob(
     }
 
     let res: Response;
+    const startedAt = now();
     try {
       res = await fetch(endpoint, {
         method: "POST",
@@ -366,6 +390,7 @@ export function createApiPlanJob(
       return;
     }
 
+    planStartedAt = startedAt;
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
@@ -400,12 +425,12 @@ export function createApiPlanJob(
       buf += decoder.decode();
       if (!finished && buf) handle(buf);
     } catch {
-      if (!signal.aborted && !finished) fail(CONNECTION_FAIL);
+      if (!signal.aborted && !finished) failCut();
       return;
     } finally {
       reader.cancel().catch(() => {});
     }
 
-    if (!finished && !signal.aborted) fail(CONNECTION_FAIL);
+    if (!finished && !signal.aborted) failCut();
   };
 }

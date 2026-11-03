@@ -427,6 +427,11 @@ export type PlanJobStatus =
       message: string;
       /** What the model calls billed before the failure, in USD, when the server knows it. Omit when unknown. */
       costUsd?: number;
+      /**
+       * Set by the browser (never the server) when the connection dropped after the plan request was already
+       * running, so the server's own spend is unknown and the run may have cost more than costUsd says.
+       */
+      costPartial?: boolean;
     };
 
 // ---------------------------------------------------------------------------
