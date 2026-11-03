@@ -35,6 +35,7 @@ const gets = [
   { title: "Counts.", body: "Fixtures, furniture, equipment and more, counted from the video as an approximate range." },
   { title: "Work steps in order.", body: "Fix the leak before the ceiling tile. Who does it, about how long, and what it fixes." },
   { title: "Materials.", body: "A shopping list for the work." },
+  { title: "Ready for work day.", body: "Tick steps off as they're done, send the plan to your team, add the steps to a calendar, or have it read aloud where your browser can speak." },
 ];
 
 const audiences = [
