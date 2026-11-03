@@ -232,6 +232,14 @@ export function createBasetenClient(opts: BasetenClientOptions = {}): BasetenCli
 
   return {
     async callSpark(req: BasetenCallRequest): Promise<BasetenCallResult> {
+      // A direct caller bypassing the step used to pass a non-object
+      // straight through: a null request reading .prompt threw a bare
+      // TypeError with no step name. Reject it here, before any fetch,
+      // the same named-error rule the SAM, Image, and transcribe
+      // callers follow. Valid requests are unchanged.
+      if (req === null || typeof req !== "object" || Array.isArray(req)) {
+        throw new Error("baseten: request must be an object");
+      }
       // A bad request would otherwise spend a paid Baseten call and only
       // fail downstream, when the step parses an empty or garbage
       // result. Reject it here, before any fetch, mirroring the Meta
