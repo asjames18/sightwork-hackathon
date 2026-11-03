@@ -1030,6 +1030,24 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
         );
       }
     });
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the whole segmentation object is printed verbatim as JSON in
+    // the prompt, so a {{...}} token in any part the per-field guards
+    // above do not cover (an extra field on a counts entry, or an
+    // extra top-level field) would be expanded by the later
+    // transcript fill instead of failing — an entry zone of "stage
+    // {{transcript}}" used to print the whole transcript inside the
+    // SEGMENTATION section. A direct runReason caller with a prebuilt
+    // prompt bypasses the prompt build and had no such check here,
+    // so it gets the same fail-fast before any paid Spark call.
+    // This sits after every per-field check above, so a label token
+    // keeps its label message and a malformed flagged frame keeps
+    // its own message. Real runs are already clean (the segment
+    // step emits only label/count/confidence rows and flagged
+    // frames), so no current run changes.
+    if (/\{\{[a-z_]+\}\}/.test(JSON.stringify(seg))) {
+      throw new Error("reason: segmentation must not contain a {{...}} placeholder");
+    }
   }
   if (input.transcript !== null && typeof input.transcript !== "string") {
     throw new Error("reason: transcript must be a string or null");
