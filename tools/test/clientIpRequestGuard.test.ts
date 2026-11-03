@@ -29,6 +29,14 @@ describe("clientIp request guard", () => {
     );
   });
 
+  test("a real Headers object works (detached get would throw Illegal invocation)", () => {
+    const req = new Request("https://example.com/", {
+      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+    });
+    assert.equal(clientIp(req), "1.2.3.4");
+    assert.equal(clientIp(new Request("https://example.com/")), "unknown");
+  });
+
   test("valid requests still return forwarded, real, or unknown IP", () => {
     const forwarded = (clientIp as (x: unknown) => string)({
       headers: { get: (n: string) => (n === "x-forwarded-for" ? "1.2.3.4, 5.6.7.8" : null) },
