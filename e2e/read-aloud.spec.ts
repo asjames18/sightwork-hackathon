@@ -1,0 +1,85 @@
+import { test, expect, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
+
+// /api stays blocked (helpers.ts) and console errors fail the test.
+test.beforeEach(async ({ apiCalls, pageErrors }) => {
+  void apiCalls;
+  void pageErrors;
+});
+
+// A fake speech voice: records what was spoken and finishes each piece only when the test says so.
+const FAKE_SPEECH = () => {
+  const w = window as unknown as Record<string, unknown>;
+  const spoken: string[] = [];
+  const queue: Array<{ text: string; onend?: () => void; onerror?: (e: { error: string }) => void }> = [];
+  w.__spoken = spoken;
+  w.__finish = () => {
+    const u = queue.shift();
+    if (u) u.onend?.();
+  };
+  const define = (name: string, value: unknown) => Object.defineProperty(window, name, { value, configurable: true, writable: true });
+  define("SpeechSynthesisUtterance", function (this: { text: string }, text: string) {
+    this.text = text;
+  });
+  define("speechSynthesis", {
+    speak: (u: { text: string; onend?: () => void }) => {
+      spoken.push(u.text);
+      queue.push(u);
+    },
+    cancel: () => {
+      const q = queue.splice(0);
+      for (const u of q) u.onerror?.({ error: "canceled" });
+    },
+  });
+};
+
+test("Read it to me: speaks the plan, Stop reading stops it, and it ends on its own", async ({ page }) => {
+  await page.addInitScript(FAKE_SPEECH);
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  const btn = page.getByTestId("read-aloud");
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect(btn).toHaveText("Read it to me");
+    await expect(btn).toHaveAttribute("aria-pressed", "false");
+    await btn.click();
+    await expect(btn).toHaveText("Stop reading");
+    await expect(btn).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("status").filter({ hasText: "Reading the plan aloud" })).toBeVisible();
+    const spoken = await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
+    expect(spoken[0]).toMatch(/^Work plan for /);
+    expect(spoken.some((s) => /^Problem 1, /.test(s))).toBe(true);
+    expect(spoken.some((s) => /^Step 1\. /.test(s))).toBe(true);
+    // The last piece is the cost when the plan has one, else the last step.
+    expect(spoken.at(-1)).toMatch(/^(Rough cost: |Step \d+\. )/);
+    expect(spoken.some((s) => s.startsWith("Said at"))).toBe(false);
+    for (const s of spoken) expect(s.length).toBeLessThanOrEqual(220);
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `read aloud ${width}`);
+    // Stop.
+    await btn.click();
+    await expect(btn).toHaveText("Read it to me");
+    await expect(page.getByRole("status").filter({ hasText: "Stopped reading." })).toBeVisible();
+    // Start again and let it run to the end: the button goes back by itself.
+    await btn.click();
+    await expect(btn).toHaveText("Stop reading");
+    const total = await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken.length);
+    expect(total).toBeGreaterThan(spoken.length);
+    await page.evaluate(() => {
+      const w = window as unknown as { __finish: () => void };
+      for (let i = 0; i < 200; i++) w.__finish();
+    });
+    await expect(btn).toHaveText("Read it to me");
+  }
+});
+
+test("Read it to me is left out when the browser has no speech voice", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    delete w.speechSynthesis;
+    Object.defineProperty(window, "speechSynthesis", { value: undefined, configurable: true });
+  });
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send to your team" })).toBeVisible();
+  await expect(page.getByTestId("read-aloud")).toHaveCount(0);
+});

@@ -5,6 +5,7 @@ import { noNarrationNote, noNarrationTag } from "@/lib/client/narrationNote";
 import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
+import { ReadAloudButton } from "./ReadAloudButton";
 import { WorkSteps } from "./WorkSteps";
 import { FixFirst } from "./FixFirst";
 import { NextUp } from "./NextUp";
@@ -222,7 +223,10 @@ export function PlanView({
         plan.generatedFrom && <p className="mt-1 text-sm text-ink/70">{plan.generatedFrom}</p>
       )}
 
-      <SharePlanButton plan={plan} sample={sample} example={example} />
+      <div className="flex flex-wrap items-start gap-x-3">
+        <SharePlanButton plan={plan} sample={sample} example={example} />
+        <ReadAloudButton plan={plan} />
+      </div>
       {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
       {plan.issues.length > 0 && (

@@ -27,7 +27,8 @@ test("the Problems filter shows only what the narration never mentioned, and bac
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await filter.scrollIntoViewIfNeeded();
+    // Centered, so the sticky section chips never sit on top of the walk marks above the filter while axe measures targets.
+    await filter.evaluate((el) => el.scrollIntoView({ block: "center" }));
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `unmentioned filter ${width}`);
   }
