@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
+import { keepScreenOn } from "@/lib/client/wakeLock";
 import { canReadAloud, readAloudProgress, readAloudStatus, speakPlanParts } from "@/lib/client/speakPlan";
 
 /**
@@ -28,6 +29,13 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
       stop();
     };
   }, []);
+
+  // A phone that locks its screen would cut the reading off, so keep it awake while the plan is being read
+  // (a no-op where the browser has no wake lock; released when the reading stops or ends).
+  useEffect(() => {
+    if (state !== "reading") return;
+    return keepScreenOn();
+  }, [state]);
 
   if (!supported) return null;
 

@@ -90,3 +90,48 @@ test("Read it to me is left out when the browser has no speech voice", async ({ 
   await expect(page.getByRole("button", { name: "Send to your team" })).toBeVisible();
   await expect(page.getByTestId("read-aloud")).toHaveCount(0);
 });
+
+test("Read it to me keeps the screen awake while reading and lets go when it stops", async ({ page }) => {
+  await page.addInitScript(FAKE_SPEECH);
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>;
+    const log = { requests: 0, releases: 0 };
+    w.__wake = log;
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: {
+        request: async () => {
+          log.requests++;
+          const sentinel = {
+            released: false,
+            release: async () => {
+              sentinel.released = true;
+              log.releases++;
+            },
+          };
+          return sentinel;
+        },
+      },
+    });
+  });
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  const wake = () => page.evaluate(() => (window as unknown as { __wake: { requests: number; releases: number } }).__wake);
+  const btn = page.getByTestId("read-aloud");
+  expect(await wake()).toEqual({ requests: 0, releases: 0 });
+  await btn.click();
+  await expect(btn).toHaveText("Stop reading");
+  await expect.poll(async () => (await wake()).requests).toBe(1);
+  await btn.click();
+  await expect(btn).toHaveText("Read it to me");
+  await expect.poll(async () => (await wake()).releases).toBe(1);
+  // Reading to the end lets go too.
+  await btn.click();
+  await expect.poll(async () => (await wake()).requests).toBe(2);
+  await page.evaluate(() => {
+    const w = window as unknown as { __finish: () => void };
+    for (let i = 0; i < 200; i++) w.__finish();
+  });
+  await expect(btn).toHaveText("Read it to me");
+  await expect.poll(async () => (await wake()).releases).toBe(2);
+});
