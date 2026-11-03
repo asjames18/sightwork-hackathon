@@ -449,12 +449,22 @@ export function formatReasonSubsetFlagged(
  * a long stretch of the walk unseen in time. Returns null when the
  * subset has fewer than two frames or any referenced time is not a
  * finite, non-decreasing value, so uncapped and malformed runs stay
- * quiet. Frame indices and seconds only, nothing user-identifying.
+ * quiet. Returns null on a non-array side, the same quiet rule the
+ * sibling subset lines follow, so a bad diagnostic input never throws
+ * out of the server log. Frame indices and seconds only, nothing
+ * user-identifying.
  */
 export function formatReasonSubsetSpacing(
   tSecs: number[],
   subset: number[],
 ): string | null {
+  // The sibling subset lines all stay quiet on malformed input
+  // (zones, flagged, remap), and this one did not: a non-array
+  // subset threw in the spread (a number or object) instead of
+  // staying quiet, so a bad diagnostic input could throw out of
+  // the server log. Return null on a non-array side, the same
+  // quiet rule the siblings follow. Valid inputs are unchanged.
+  if (!Array.isArray(tSecs) || !Array.isArray(subset)) return null;
   if (subset.length < 2) return null;
   const ordered = [...subset].sort((a, b) => a - b);
   let maxGap = -1;
