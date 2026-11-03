@@ -118,10 +118,15 @@ export function createUsageTracker(opts?: {
       // a raw TypeError reading .model off it, surfacing internals
       // instead of the caller and the cause — the same named-error
       // rule the field checks below already follow. Reject it here,
-      // before any field is read.
-      if (input === null || typeof input !== "object") {
+      // before any field is read. An array slips past that check
+      // alone (arrays are objects): one carrying every field
+      // (including a parseable at, overriding Array.prototype.at)
+      // would otherwise be recorded as a call, and any other array
+      // throws a misleading field error instead of this named one
+      // — the same array hole the opts guard above already closes.
+      if (input === null || typeof input !== "object" || Array.isArray(input)) {
         throw new Error(
-          `usage: record input must be an object, got ${input === null ? "null" : typeof input}`,
+          `usage: record input must be an object, got ${input === null ? "null" : Array.isArray(input) ? "array" : typeof input}`,
         );
       }
       // Normalize before validating: a padded label (" muse-spark ")
