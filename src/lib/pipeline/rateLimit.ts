@@ -93,12 +93,29 @@ export function createRateLimiter(limit: number, windowMs: number): RateLimiter 
  * bucket for non-Vercel hosts, shared across headerless callers.
  */
 export function clientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
+  // A null, non-object, or headerless request would otherwise throw
+  // a raw TypeError reading .headers or .get, surfacing internals
+  // instead of the caller and the cause — the same named-error rule
+  // the check() guard above already follows. Reject it here, before
+  // any header is read. Valid route callers are unchanged: a real
+  // Request always carries headers.get.
+  const headers = (
+    req as unknown as { headers?: { get?: unknown } } | null | undefined
+  )?.headers;
+  if (
+    typeof headers !== "object" ||
+    headers === null ||
+    typeof headers.get !== "function"
+  ) {
+    throw new Error(`rateLimit: request must have headers, got ${JSON.stringify(req)}`);
+  }
+  const getHeader = (headers as { get: (name: string) => string | null }).get;
+  const forwarded = getHeader("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;
   }
-  const real = req.headers.get("x-real-ip")?.trim();
+  const real = getHeader("x-real-ip")?.trim();
   if (real) return real;
   return "unknown";
 }
