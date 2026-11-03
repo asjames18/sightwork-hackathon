@@ -82,9 +82,8 @@ describe("filterAndRenumber issues-rank guard", () => {
       ],
       materials: [
         {
-          label: "tape",
-          count: 1,
-          unit: "roll",
+          item: "tape",
+          qty: "1 roll",
           forIssues: [9, 5],
         },
       ],
