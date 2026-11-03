@@ -12,6 +12,7 @@ import { PERMIT_CHIP_HINT, PERMIT_CHIP_LABEL, tradeMayNeedPermit } from "@/lib/c
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
 import { VolunteerCallButton } from "@/components/VolunteerCallButton";
+import { QuoteRequestButton } from "@/components/QuoteRequestButton";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
@@ -134,6 +135,7 @@ export function WorkSteps({
                     <CrewSendButton plan={plan} crew={row} />
                     <CrewCalendarButton plan={plan} crew={row} />
                     <VolunteerCallButton plan={plan} crew={row} />
+                    <QuoteRequestButton plan={plan} crew={row} />
                   </span>
                 </li>
               );

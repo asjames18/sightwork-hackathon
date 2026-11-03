@@ -25,6 +25,7 @@ test("crew size stepper turns the total hours into hours each", async ({ page })
     await expect(box.getByTestId("crew-size-count")).toHaveText("12");
     await expect(box.getByTestId("crew-size-more")).toBeDisabled();
     await expectNoSideScroll(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expectNoAxeViolations(page, `crew size ${width}`);
   }
 });
