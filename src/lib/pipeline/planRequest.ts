@@ -400,6 +400,26 @@ export function validatePlanRequest(body: unknown): string[] {
           }
           prevTurnStartSec = t.startSec;
         }
+        // Like frames above: a turn that starts after the video ends
+        // cannot line up with anything seen, so it would mislabel
+        // narration on the plan screen. Real turns from
+        // /api/transcribe start inside the audio, so no current run
+        // changes. Only the start is checked: an endSec past
+        // durationSec is harmless for alignment, since the turn
+        // itself still starts inside the video.
+        if (
+          t !== null &&
+          typeof t === "object" &&
+          typeof t.startSec === "number" &&
+          Number.isFinite(t.startSec) &&
+          t.startSec >= 0 &&
+          typeof req.durationSec === "number" &&
+          Number.isFinite(req.durationSec) &&
+          req.durationSec >= 0 &&
+          t.startSec > req.durationSec
+        ) {
+          problems.push(`transcriptTurns[${i}].startSec must not exceed durationSec`);
+        }
       });
     }
   }
