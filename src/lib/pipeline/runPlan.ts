@@ -604,6 +604,24 @@ export function formatReviewCoverage(
   issues: Pick<Issue, "rank" | "frameIndex" | "proofFrames">[],
   selected: number[],
 ): string | null {
+  // The sibling diagnostic lines all stay quiet on malformed input,
+  // and this one did not: a non-array side threw in .map/.filter
+  // (a number or null), a null issue threw on .frameIndex, and a
+  // non-array proofFrames side (or a null proof entry) threw in
+  // .map instead of staying quiet, so a bad diagnostic input could
+  // throw out of the server log. Return null on malformed input,
+  // the same quiet rule the siblings follow. Valid inputs are
+  // unchanged: the lines below still read exactly the same fields.
+  if (!Array.isArray(issues) || !Array.isArray(selected)) return null;
+  for (const issue of issues) {
+    if (!issue || typeof issue !== "object") return null;
+    const proofFrames = issue.proofFrames;
+    if (proofFrames !== undefined && proofFrames !== null && !Array.isArray(proofFrames))
+      return null;
+    for (const pf of proofFrames ?? []) {
+      if (!pf || typeof pf !== "object") return null;
+    }
+  }
   const chosen = new Set(
     selected.filter((f) => Number.isInteger(f) && f >= 0),
   );
