@@ -247,6 +247,14 @@ export function createImageCaller(opts: ImageClientOptions = {}): ImageCaller {
   }
 
   return async (req) => {
+    // A direct caller bypassing the renderAfter step used to get a raw
+    // TypeError here: a null request reading .model, with no step
+    // name. Fail fast with a named image error, before any fetch,
+    // the same named-error rule the SAM caller follows for its
+    // request. Valid requests are unchanged.
+    if (req === null || typeof req !== "object" || Array.isArray(req)) {
+      throw new Error("image: request must be an object");
+    }
     // A bad request would otherwise spend a paid Image call and only
     // fail downstream, when the renderAfter step finds no completed
     // image. Reject it here, before any fetch, like the SAM caller
