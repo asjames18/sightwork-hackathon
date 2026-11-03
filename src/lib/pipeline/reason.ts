@@ -889,6 +889,23 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
       }
     });
     // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the prompt build rejects a {{...}} placeholder in a counts
+    // label, since the prompt template fills {{...}} slots itself
+    // and a label carrying one would print as an unfilled slot in
+    // the finished prompt. A direct runReason caller with a prebuilt
+    // prompt bypasses the prompt build and had no such check here,
+    // so a placeholder label would ride onto a paid Spark call.
+    // This sits after the counts validation above, so a malformed
+    // entry keeps its own message. Real runs are already clean (the
+    // segment step emits plain labels), so no current run changes.
+    seg.counts.forEach((c, i) => {
+      if (/\{\{[a-z_]+\}\}/.test(c.label)) {
+        throw new Error(
+          `reason: segmentation.counts[${i}].label must not contain a {{...}} placeholder`,
+        );
+      }
+    });
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
     // the prompt build rejects a repeated counts label (exact, case, or
     // surrounding whitespace) instead of printing it twice, where the
     // model could add the two rows together and overstate the
