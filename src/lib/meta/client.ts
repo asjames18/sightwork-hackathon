@@ -215,6 +215,14 @@ export function createMetaClient(opts: MetaClientOptions = {}): MetaClient {
 
   return {
     async callSpark(req: SparkCallRequest): Promise<SparkCallResult> {
+      // A direct caller bypassing the step used to pass a non-object
+      // straight through: a null request reading .model threw a bare
+      // TypeError with no step name. Reject it here, before any fetch,
+      // the same named-error rule the SAM, Image, Baseten, and
+      // transcribe callers follow. Valid requests are unchanged.
+      if (req === null || typeof req !== "object" || Array.isArray(req)) {
+        throw new Error("meta: request must be an object");
+      }
       // A bad request would otherwise spend a paid Spark call and only
       // fail downstream, when the step parses an empty or garbage
       // result. Reject it here, before any fetch, like the SAM, Image,
