@@ -109,13 +109,18 @@ export function clientIp(req: Request): string {
   ) {
     throw new Error(`rateLimit: request must have headers, got ${JSON.stringify(req)}`);
   }
-  const getHeader = (headers as { get: (name: string) => string | null }).get;
-  const forwarded = getHeader("x-forwarded-for");
+  // Call get ON the headers object: detaching it (const getHeader =
+  // headers.get; getHeader(...)) throws "Illegal invocation" on a real
+  // Request's Headers, which binds the method to its receiver. A plain
+  // object fake in tests hides that, so the guard below must keep the
+  // receiver.
+  const hdrs = headers as { get: (name: string) => string | null };
+  const forwarded = hdrs.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;
   }
-  const real = getHeader("x-real-ip")?.trim();
+  const real = hdrs.get("x-real-ip")?.trim();
   if (real) return real;
   return "unknown";
 }
