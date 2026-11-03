@@ -413,12 +413,24 @@ export function formatReasonSubsetZones(
  * subset member is already an endpoint or a flagged frame, which
  * happens when flagged frames outnumber the free slots). Returns
  * null when no frame is flagged, so unflagged runs stay quiet.
- * Frame indices only, nothing user-identifying.
+ * Frame indices only, nothing user-identifying. Returns null on
+ * malformed input (a non-array side), the same quiet rule the
+ * sibling subset lines follow, so a bad diagnostic input never
+ * throws out of the server log.
  */
 export function formatReasonSubsetFlagged(
   flaggedFrames: number[],
   subset: number[],
 ): string | null {
+  // The sibling subset lines all stay quiet on malformed input
+  // (zones, spacing, remap), and this one did not: a non-array side
+  // either threw in the Set spread (a number or object) or silently
+  // miscounted (a string subset never matches a flagged frame, so
+  // every flagged frame read as left out). Return null on
+  // malformed input, the same quiet rule the siblings follow.
+  // Valid inputs are unchanged: flagged frames are still filtered
+  // to non-negative integers, counted once, and named when left out.
+  if (!Array.isArray(flaggedFrames) || !Array.isArray(subset)) return null;
   const flagged = [...new Set(flaggedFrames)].filter(
     (f) => Number.isInteger(f) && f >= 0,
   );
