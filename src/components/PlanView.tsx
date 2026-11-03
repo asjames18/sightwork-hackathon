@@ -9,6 +9,7 @@ import { ReadAloudButton } from "./ReadAloudButton";
 import { TextSizeButton } from "./TextSizeButton";
 import { ContrastButton } from "./ContrastButton";
 import { PlanAgeNote } from "./PlanAgeNote";
+import { AfterPictureNote } from "./AfterPictureNote";
 import { WorkSteps } from "./WorkSteps";
 import { FixFirst } from "./FixFirst";
 import { NextUp } from "./NextUp";
@@ -236,6 +237,7 @@ export function PlanView({
         <ContrastButton />
       </div>
       {!sample && !example && !plan.meta?.isExample && <PlanAgeNote savedAt={savedAt} onFilmAgain={onMakeYourOwn} />}
+      {!sample && !example && !plan.meta?.isExample && <AfterPictureNote plan={plan} onFilmAgain={onMakeYourOwn} />}
       {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
       {plan.issues.length > 0 && (
