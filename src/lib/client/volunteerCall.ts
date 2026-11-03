@@ -1,9 +1,10 @@
 import type { WorkPlan, WorkStep } from "@/lib/types";
 import { crewSizeLine, hoursLabel, type CrewRow } from "./crewSummary";
+import { SIGNOFF_LINE } from "./siteUrl";
 import { MAX_SHARE_CHARS, planLocation, shareDate } from "./planText";
 
 /** Sign-off for the call for help: a full link, so people who get it in a group text can tap through. */
-export const VOLUNTEER_SIGNOFF = "Made with SightWork \u00B7 https://sightwork.melanatedintech.com";
+export const VOLUNTEER_SIGNOFF = SIGNOFF_LINE;
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`);

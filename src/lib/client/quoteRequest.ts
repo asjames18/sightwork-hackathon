@@ -1,10 +1,11 @@
 import type { WorkPlan, WorkStep } from "@/lib/types";
 import { hoursLabel, type CrewRow } from "./crewSummary";
+import { SIGNOFF_LINE } from "./siteUrl";
 import { MAX_SHARE_CHARS, planLocation, shareDate } from "./planText";
 import { tradeMayNeedPermit } from "./permitTrade";
 
 /** Sign-off for the quote request: a full link, so a trade who gets it by text can tap through. */
-export const QUOTE_SIGNOFF = "Made with SightWork \u00B7 https://sightwork.melanatedintech.com";
+export const QUOTE_SIGNOFF = SIGNOFF_LINE;
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`);

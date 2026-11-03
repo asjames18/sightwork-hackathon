@@ -28,6 +28,7 @@ import { nextUpShareLine } from "./nextUp";
 import { problemFixTag, shareFixedLine } from "./problemsFixed";
 import { countMethodNote, countsFootnote, sharedCountMethod } from "./countMethod";
 import { stepsWaitingOn, waitersChipLabel } from "./stepWaiters";
+import { SITE_HOST } from "./siteUrl";
 
 export type JsPdfCtor = new (options?: { unit?: "pt"; format?: string; orientation?: "portrait"; compress?: boolean }) => JsPdfDoc;
 
@@ -711,7 +712,7 @@ export function buildPlanPdf(JsPDF: JsPdfCtor, plan: WorkPlan, opts: PlanPdfOpti
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
     font(8, "normal", MUTED);
-    const left = sample ? `SightWork \u00B7 ${PDF_SAMPLE_LABEL}` : "SightWork \u00B7 sightwork.vercel.app \u00B7 Check everything in person before work starts";
+    const left = sample ? `SightWork \u00B7 ${PDF_SAMPLE_LABEL}` : `SightWork \u00B7 ${SITE_HOST} \u00B7 Check everything in person before work starts`;
     doc.text(pdfSafe(left), M, PAGE_H - 24);
     doc.text(`Page ${p} of ${pages}`, M + W, PAGE_H - 24, { align: "right" });
   }
