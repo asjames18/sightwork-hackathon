@@ -807,6 +807,36 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
       }
     }
   });
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+  // the reason frame list rides into the prompt in array order, so
+  // an out-of-order frame would mislabel what was seen when against
+  // the transcript's said-vs-saw alignment, and a direct runReason
+  // caller bypassing the route had no order check here. Frames must
+  // be non-decreasing in tSec, like the route's frames and the
+  // transcript turns; equal tSec passes, and prevTsec advances on
+  // every valid tSec, so a malformed frame keeps its own message
+  // from the loop above instead of also drawing an order one.
+  // Real runs are already ordered (runPlan hands the reason step the
+  // route-validated frames in order), so no current run changes.
+  {
+    let prevTsec = -Infinity;
+    input.frames.forEach((f, i) => {
+      if (
+        f &&
+        typeof f === "object" &&
+        typeof f.tSec === "number" &&
+        Number.isFinite(f.tSec) &&
+        f.tSec >= 0
+      ) {
+        if (f.tSec < prevTsec) {
+          throw new Error(
+            `reason: frame ${i} tSec must not be earlier than the previous frame`,
+          );
+        }
+        prevTsec = f.tSec;
+      }
+    });
+  }
   if (input.segmentation !== null) {
     const seg = input.segmentation;
     if (!seg || typeof seg !== "object") {
@@ -941,6 +971,7 @@ export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<R
   if (best !== null) return { ...best.output, warnings: best.errs };
   throw new Error(`reason: no schema-valid result after retry:\n${lastErrors.map((e) => `- ${e}`).join("\n")}`);
 }
+
 
 
 
