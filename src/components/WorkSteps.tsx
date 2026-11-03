@@ -20,6 +20,7 @@ import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, sh
 import { CrewSizeLine } from "@/components/CrewSizeLine";
 import { VolunteerCallButton } from "@/components/VolunteerCallButton";
 import { QuoteRequestButton } from "@/components/QuoteRequestButton";
+import { BeforeStart } from "@/components/BeforeStart";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
@@ -162,6 +163,7 @@ export function WorkSteps({
         </div>
       )}
       {showCrewSummary(crew) && totalHours && <CrewSizeLine total={crew.totalHours} partial={crew.totalPartial} />}
+      <BeforeStart steps={plan.workOrder} />
       <div className="mb-3 flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 print:hidden">
         <p className="text-sm text-ink/75" aria-live="polite">
           {ready && line ? line : "Tick steps off as you go. Saved on this device."}
