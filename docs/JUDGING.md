@@ -8,7 +8,7 @@ Criteria and weights from the Official Rules embedded on the [Cerebral Valley ev
 - It travels: Send to your team (share sheet or clipboard), Save PDF, ticks saved per plan for work day.
 - Built for the whole crew: Read it to me (the device's own voice, with a speed choice), Text size (Normal, Large, Extra large), a Contrast button, Windows High Contrast support, a Skip to main content link and axe checks at phone and desktop widths.
 - Built for work day, not just the demo: tick steps off, "If people share it evenly" turns total hours into hours each for 1 to 12 people, and Add to calendar downloads the steps as a calendar file.
-- Safe and affordable for volunteers: a Permit may apply chip, a Shut off first chip (power, water or gas) and a Check for lead or asbestos chip and a Working up high chip appear on the steps that need them, as reminders and not test results; a budget box shows how many steps, in work order, a typed amount covers; Ask for a quote, Ask for volunteers and Ask a store to donate send a plain request by the share sheet.
+- Safe and affordable for volunteers: a Permit may apply chip, a Shut off first chip (power, water or gas) and a Check for lead or asbestos chip a Working up high chip and a Ventilate while working chip appear on the steps that need them, as reminders and not test results; a budget box shows how many steps, in work order, a typed amount covers; Ask for a quote, Ask for volunteers and Ask a store to donate send a plain request by the share sheet.
 
 ## Demo (25%)
 - Live site with a real run on the landing page (a church sanctuary stage, nothing edited but a covered logo) and four labeled samples.
