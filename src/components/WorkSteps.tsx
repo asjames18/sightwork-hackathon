@@ -9,6 +9,7 @@ import type { WorkPlan } from "@/lib/types";
 import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
+import { CrewSizeLine } from "@/components/CrewSizeLine";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
@@ -148,6 +149,7 @@ export function WorkSteps({
           )}
         </div>
       )}
+      {showCrewSummary(crew) && totalHours && <CrewSizeLine total={crew.totalHours} partial={crew.totalPartial} />}
       <div className="mb-3 flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 print:hidden">
         <p className="text-sm text-ink/75" aria-live="polite">
           {ready && line ? line : "Tick steps off as you go. Saved on this device."}
