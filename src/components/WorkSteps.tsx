@@ -9,6 +9,7 @@ import type { WorkPlan } from "@/lib/types";
 import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { shutOffFirst } from "@/lib/client/shutOffFirst";
+import { OLD_MATERIAL_HINT, OLD_MATERIAL_LABEL, disturbsOldMaterial } from "@/lib/client/oldMaterialCheck";
 import { PERMIT_CHIP_HINT, PERMIT_CHIP_LABEL, tradeMayNeedPermit } from "@/lib/client/permitTrade";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
@@ -226,7 +227,7 @@ export function WorkSteps({
                   {step.title}
                 </p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats) && (
+                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats || disturbsOldMaterial(step)) && (
                   <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
                     {step.trade && (
                       <li
@@ -247,6 +248,12 @@ export function WorkSteps({
                       <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-shutoff" title={shutOffFirst(step.trade)!.hint}>
                         <span aria-hidden="true">{shutOffFirst(step.trade)!.label}</span>
                         <span className="sr-only">{shutOffFirst(step.trade)!.label}. {shutOffFirst(step.trade)!.hint}</span>
+                      </li>
+                    )}
+                    {disturbsOldMaterial(step) && (
+                      <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-old-material" title={OLD_MATERIAL_HINT}>
+                        <span aria-hidden="true">{OLD_MATERIAL_LABEL}</span>
+                        <span className="sr-only">{OLD_MATERIAL_LABEL}. {OLD_MATERIAL_HINT}</span>
                       </li>
                     )}
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
