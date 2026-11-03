@@ -10,6 +10,7 @@ import { aimRange, aimRangeSpoken, checkDuration, DEFAULT_ROOM_SIZE, durationRul
 import { loadRoomSize, saveRoomSize } from "@/lib/client/roomSize";
 import { resolveVideoDuration } from "@/lib/client/videoDuration";
 import { lightMessage, lightVerdict, type LightVerdict } from "@/lib/client/lightCheck";
+import { sidewaysTip } from "@/lib/client/takeOrientation";
 import { sampleVideoLuma } from "@/lib/client/sampleVideoLuma";
 import { interruptedTakeNote } from "@/lib/client/recorder";
 import { CameraRecorder, canRecordInPage, type RecordingInfo } from "./CameraRecorder";
@@ -248,6 +249,10 @@ export function UploadStep({
     return () => ctl.abort();
   }, [previewSrc, durationSec]);
   const lightNote = light && light.url === previewSrc && check.kind !== "block" ? lightMessage(light.verdict) : null;
+  // Orientation tip: an upright take of a room that is not small loses the width of the room in every frame.
+  const [shape, setShape] = useState<{ url: string; w: number; h: number } | null>(null);
+  const orientationNote =
+    shape && shape.url === previewSrc && check.kind !== "block" ? sidewaysTip(shape.w, shape.h, roomSize) : null;
   const canSend = check.kind === "ok" || check.kind === "warn";
   // Polite announcement for the length check; warnings and blocks have their own status/alert below.
   const liveText =
@@ -381,6 +386,7 @@ export function UploadStep({
             className="max-h-[60vh] w-full bg-black object-contain [@media(min-width:640px)_and_(max-height:820px)]:max-h-[38vh]"
             onLoadedMetadata={(e) => {
               const url = preview.url;
+              setShape({ url, w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight });
               // In-page recordings (WebM) report an unknown length until scanned; work it out first.
               void resolveVideoDuration(e.currentTarget).then((d) => {
                 if (previewUrl.current === url) setLen({ state: "known", sec: d });
@@ -436,6 +442,11 @@ export function UploadStep({
           {lightNote && (
             <p role="status" data-testid="light-warning" className="mx-4 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {lightNote}
+            </p>
+          )}
+          {orientationNote && (
+            <p role="status" data-testid="orientation-tip" className="mx-4 mb-3 rounded-lg bg-ink/[.04] px-3 py-2 text-sm text-ink/80">
+              {orientationNote}
             </p>
           )}
           <div className="px-4 pb-4">
