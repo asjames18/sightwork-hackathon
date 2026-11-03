@@ -8,6 +8,7 @@ import { stepMaterialsDescription, stepMaterialsLabel, stepMaterialsState } from
 import type { WorkPlan } from "@/lib/types";
 import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
+import { shutOffFirst } from "@/lib/client/shutOffFirst";
 import { PERMIT_CHIP_HINT, PERMIT_CHIP_LABEL, tradeMayNeedPermit } from "@/lib/client/permitTrade";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
@@ -240,6 +241,12 @@ export function WorkSteps({
                       <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-permit" title={PERMIT_CHIP_HINT}>
                         <span aria-hidden="true">{PERMIT_CHIP_LABEL}</span>
                         <span className="sr-only">{PERMIT_CHIP_LABEL}. {PERMIT_CHIP_HINT}</span>
+                      </li>
+                    )}
+                    {shutOffFirst(step.trade) && (
+                      <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-shutoff" title={shutOffFirst(step.trade)!.hint}>
+                        <span aria-hidden="true">{shutOffFirst(step.trade)!.label}</span>
+                        <span className="sr-only">{shutOffFirst(step.trade)!.label}. {shutOffFirst(step.trade)!.hint}</span>
                       </li>
                     )}
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}

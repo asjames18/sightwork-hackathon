@@ -24,7 +24,7 @@ test("a step that others wait on says so, on screen and in Send this step", asyn
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await chip.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await chip.evaluate((el) => el.scrollIntoView({ block: "end" }));
     await expect(chip).toBeVisible();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `step waiters ${width}`);
