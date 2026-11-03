@@ -3,6 +3,7 @@ import type { RunStep, StepCheck } from "@/lib/types";
 import { currentStepEngines, OPTIONAL_STEPS, planningNowLine, REVIEW_ONLY_STEPS, type ScreenStep } from "@/lib/client/engines";
 import { advanceClock, formatClock, formatStepTime, spokenClock, startClock, stepDuration, type StepClock } from "@/lib/client/elapsed";
 import { canKeepScreenOn, keepScreenOn } from "@/lib/client/wakeLock";
+import { guardLeave, shouldGuardLeave } from "@/lib/client/leaveGuard";
 import { runTimeHint } from "@/lib/client/runTimeHint";
 import { failedRunCostLine } from "@/lib/client/runCost";
 import { narrationPartLine } from "@/lib/client/narrationChunks";
@@ -120,6 +121,9 @@ export function ProcessingStep({
   const hint = runTimeHint(elapsedMs, { real: realRun, region });
   // Keep the phone screen on while the plan runs: auto-lock can suspend the tab and drop the request.
   useEffect(() => (failed ? undefined : keepScreenOn()), [failed]);
+  // A real run costs money and minutes: ask before a reload or swipe back throws it away.
+  const guardRun = shouldGuardLeave({ realRun, failed });
+  useEffect(() => (guardRun ? guardLeave() : undefined), [guardRun]);
   const [screenStaysOn, setScreenStaysOn] = useState(false);
   useEffect(() => setScreenStaysOn(canKeepScreenOn()), []);
   // A real run is one long streamed request, so say so when the phone drops its connection mid-run.
