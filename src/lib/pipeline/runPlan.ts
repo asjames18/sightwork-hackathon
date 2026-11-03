@@ -495,9 +495,10 @@ export function formatReasonSubsetSpacing(
  * cap is the binding constraint (the held SAM-cap scaling decision
  * needs exactly this: if the cap already bites, 450 buys coverage;
  * if it never bites, the reason-subset lines bind instead).
- * Returns null on quiet runs and malformed counts, so ordinary
- * runs stay out of the server log. Counts and label names only,
- * nothing user-identifying.
+ * Returns null on quiet runs, malformed counts, and a non-array
+ * dropped-labels side, so ordinary and malformed runs stay out of
+ * the server log. Counts and label names only, nothing
+ * user-identifying.
  */
 export function formatSegmentBudget(
   frameCount: number,
@@ -506,7 +507,15 @@ export function formatSegmentBudget(
   budgetExceeded: boolean,
   droppedLabels: string[],
 ): string | null {
+  // The sibling diagnostic lines all stay quiet on malformed input,
+  // and this one did not: a non-array dropped-labels side threw in
+  // .filter (a number, null, or string) instead of staying quiet,
+  // so a bad diagnostic input could throw out of the server log.
+  // Return null on a non-array side, the same quiet rule the
+  // siblings follow. Valid inputs are unchanged.
+  if (!Array.isArray(droppedLabels)) return null;
   const labels = droppedLabels.filter(
+
     (l) => typeof l === "string" && l.length > 0,
   );
   if (!budgetExceeded && labels.length === 0) return null;
