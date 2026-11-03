@@ -17,6 +17,7 @@ import { firstNeededLine, materialsNeededBy, neededByLine } from "@/lib/client/m
 import { sharePlanText, type ShareResult } from "@/lib/client/planText";
 import { fixLinks, problemAnchor } from "@/lib/client/stepLinks";
 import { ClearTicksButton } from "@/components/ClearTicksButton";
+import { DonationRequestButton } from "@/components/DonationRequestButton";
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -110,6 +111,7 @@ export function MaterialsList({
             </button>
           )}
           <ClearTicksButton ticked={got} noun="item" onChange={setTicks} />
+          <DonationRequestButton plan={plan} got={got} sample={sample} />
           <button
             type="button"
             onClick={onSend}
