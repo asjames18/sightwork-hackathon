@@ -122,3 +122,32 @@ export function hoursLeftLine(left: ReturnType<typeof hoursLeft>): string {
   const where = left.steps === 1 ? "the last step" : `the ${left.steps} steps not ticked yet`;
   return `${label.charAt(0).toUpperCase()}${label.slice(1)} of work left on ${where}.`;
 }
+
+/** Most people the crew-size stepper offers. */
+export const MAX_CREW_SIZE = 12;
+
+/** Whole number from 1 to MAX_CREW_SIZE; anything else (NaN, fractions, out of range) is pulled in. */
+export function clampCrewSize(n: number): number {
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(MAX_CREW_SIZE, Math.max(1, Math.round(n)));
+}
+
+/**
+ * What the total hours come to per person if a crew of this size shares the work evenly, or null when the
+ * plan has no hours. Waiting between steps and steps that need the one before are not counted, so the line says so.
+ * "3 people: about 2–4 h each, roughly 1 working day." / "1 person: at least 6–12 h, roughly 2 working days."
+ */
+export function crewSizeLine(total: [number, number] | null, partial: boolean, people: number): string | null {
+  if (!total || !Number.isFinite(total[0]) || !Number.isFinite(total[1])) return null;
+  const n = clampCrewSize(people);
+  const half = (x: number) => Math.round((x / n) * 2) / 2;
+  const lo = half(Math.min(total[0], total[1]));
+  const hi = half(Math.max(total[0], total[1]));
+  const range = lo === hi ? `${hi}` : `${lo}–${hi}`;
+  const lead = n === 1 ? "1 person" : `${n} people`;
+  const prefix = partial ? "at least" : "about";
+  const each = n === 1 ? "" : " each";
+  const days = Math.max(1, Math.ceil(hi / 8));
+  const daysText = hi >= 6 ? `, roughly ${days} working ${days === 1 ? "day" : "days"}` : "";
+  return `${lead}: ${prefix} ${range} h${each}${daysText}.`;
+}
