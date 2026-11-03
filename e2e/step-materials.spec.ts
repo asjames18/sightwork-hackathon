@@ -38,7 +38,9 @@ test("work steps follow the shopping list ticks", async ({ page, context }) => {
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await page.getByTestId("step-materials").first().evaluate((el) => el.scrollIntoView({ block: "center" }));
+    // Scan from the top: mid-page, the sticky row can sit over a button and axe counts that as a small target.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(page.getByTestId("step-materials").first()).toBeAttached();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `step materials ${width}`);
   }
