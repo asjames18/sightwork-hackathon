@@ -371,6 +371,18 @@ export function validatePlanRequest(body: unknown): string[] {
         ) {
           problems.push(`transcriptTurns[${i}] is not a valid turn`);
         } else if (
+          // A turn with no words carries no narration: parseTurns
+          // (src/lib/pipeline/transcribe.ts) already drops blank
+          // turns and trims the rest, so a blank turn here comes
+          // only from a direct caller, and the reason step would
+          // otherwise carry an empty line into the "said vs saw"
+          // alignment. Real turns from /api/transcribe are never
+          // blank, so no current run changes.
+          typeof t.text === "string" &&
+          t.text.trim().length === 0
+        ) {
+          problems.push(`transcriptTurns[${i}].text must not be blank`);
+        } else if (
           // A turn that ends before it starts is malformed, not just
           // out of order: the "said vs saw" alignment reads turns in
           // time order, so an inverted turn would misplace narration
@@ -433,5 +445,6 @@ export function validatePlanRequest(body: unknown): string[] {
   }
   return problems;
 }
+
 
 
