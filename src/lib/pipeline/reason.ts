@@ -888,6 +888,30 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
         );
       }
     });
+    // The segment step returns flaggedFrames sorted and unique (see
+    // src/lib/pipeline/segment.ts), so a duplicate would double-count
+    // a flagged frame in the reason prompt and an out-of-order list
+    // would misstate which frames SAM flagged first. A direct
+    // runReason caller bypassing the segment step had no order check
+    // here, so flaggedFrames must be strictly increasing. Only valid
+    // integer indices are checked, so a malformed or out-of-range
+    // entry keeps its own message from the checks above. Real runs
+    // are already sorted and unique, so no current run changes.
+    seg.flaggedFrames.forEach((f, i) => {
+      const prev = seg.flaggedFrames[i - 1];
+      if (
+        i > 0 &&
+        Number.isInteger(f) &&
+        f >= 0 &&
+        Number.isInteger(prev) &&
+        prev >= 0 &&
+        f <= prev
+      ) {
+        throw new Error(
+          `reason: segmentation.flaggedFrames[${i}] must be greater than the previous flagged frame`,
+        );
+      }
+    });
   }
   if (input.transcript !== null && typeof input.transcript !== "string") {
     throw new Error("reason: transcript must be a string or null");
