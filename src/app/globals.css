@@ -167,3 +167,37 @@ html[data-contrast="high"] :is(a, button, input, select, summary):focus-visible 
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
+
+/* Windows High Contrast and other forced-colors modes replace every background, so a fill drawn only as a
+   background color vanishes. Give the progress bars an outline and a system-color fill, and mark the pressed
+   and current states with a visible border so they don't depend on a color the system just overrode. */
+@media (forced-colors: active) {
+  [role="progressbar"],
+  [data-testid="read-aloud-progress"] > span {
+    border: 1px solid CanvasText;
+  }
+  [role="progressbar"] > *,
+  [data-testid="read-aloud-progress"] > span > span {
+    forced-color-adjust: none;
+    background-color: Highlight;
+  }
+  [role="progressbar"] > [data-testid="take-meter-aim"] {
+    background-color: GrayText;
+  }
+  /* Buttons, summaries and button-like links drawn only with a fill (the main calls to action, the example
+     cards, the problem and step links) get a hairline so they still read as controls. */
+  :where(button, summary, a[class*="rounded"]):not([class*="border"]):not(.sr-only) {
+    outline: 1px solid ButtonText;
+    outline-offset: 1px;
+  }
+  :is(a, button, input, select, summary, textarea, [tabindex]):focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+  button[aria-pressed="true"],
+  [aria-current="location"],
+  [aria-current="step"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}
