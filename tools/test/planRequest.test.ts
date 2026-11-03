@@ -18,7 +18,7 @@ test("valid turns pass: with endSec, without endSec, and zero-length", () => {
   const turns = [
     { startSec: 0, endSec: 2.5, text: "This is the stage." },
     { startSec: 3, text: "Cables by the steps." },
-    { startSec: 4, endSec: 4, text: "" },
+    { startSec: 4, endSec: 4, text: "Done." },
   ];
   assert.deepEqual(validatePlanRequest(req({ transcript: "This is the stage.", transcriptTurns: turns })), []);
 });
