@@ -12,6 +12,8 @@ const FAKE_SPEECH = () => {
   const spoken: string[] = [];
   const queue: Array<{ text: string; onstart?: () => void; onend?: () => void; onerror?: (e: { error: string }) => void }> = [];
   w.__spoken = spoken;
+  const rates: Array<number | undefined> = [];
+  w.__rates = rates;
   w.__finish = () => {
     const u = queue.shift();
     if (u) u.onend?.();
@@ -22,8 +24,9 @@ const FAKE_SPEECH = () => {
     this.text = text;
   });
   define("speechSynthesis", {
-    speak: (u: { text: string; onstart?: () => void; onend?: () => void }) => {
+    speak: (u: { text: string; rate?: number; onstart?: () => void; onend?: () => void }) => {
       spoken.push(u.text);
+      rates.push(u.rate);
       queue.push(u);
       if (queue.length === 1) u.onstart?.();
     },
@@ -134,4 +137,51 @@ test("Read it to me keeps the screen awake while reading and lets go when it sto
   });
   await expect(btn).toHaveText("Read it to me");
   await expect.poll(async () => (await wake()).releases).toBe(2);
+});
+
+test("Read it to me speed: Slower, Normal and Faster change the voice rate, are kept on the device, and fit every width", async ({ page }) => {
+  await page.addInitScript(FAKE_SPEECH);
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  const btn = page.getByTestId("read-aloud");
+  const speed = page.getByTestId("read-speed");
+  const rates = () => page.evaluate(() => (window as unknown as { __rates: Array<number | undefined> }).__rates);
+  await expect(speed).toHaveText("Speed: Normal");
+  await btn.click();
+  expect(new Set(await rates())).toEqual(new Set([1]));
+  // Pressing while reading keeps the current reading's pace and says so.
+  await speed.click();
+  await expect(speed).toHaveText("Speed: Faster");
+  await expect(page.getByRole("status").filter({ hasText: "starts with the next reading" })).toHaveCount(1);
+  expect(new Set(await rates())).toEqual(new Set([1]));
+  await btn.click();
+  await expect(btn).toHaveText("Read it to me");
+  // The next reading uses the new pace.
+  const before = (await rates()).length;
+  await btn.click();
+  const after = await rates();
+  expect(after.length).toBeGreaterThan(before);
+  expect(new Set(after.slice(before))).toEqual(new Set([1.25]));
+  await btn.click();
+  // Faster, then Slower.
+  await speed.click();
+  await expect(speed).toHaveText("Speed: Slower");
+  // Kept on this device.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await expect(speed).toHaveText("Speed: Slower");
+  await btn.click();
+  expect(new Set(await rates())).toEqual(new Set([0.8]));
+  await btn.click();
+  for (const width of [375, 768, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect(speed).toBeVisible();
+    await expectNoSideScroll(page);
+    await expectNoAxeViolations(page, `read speed ${width}`);
+  }
+  // Back to normal clears the saved choice.
+  await speed.click();
+  await expect(speed).toHaveText("Speed: Normal");
+  await page.reload();
+  await expect(speed).toHaveText("Speed: Normal");
 });

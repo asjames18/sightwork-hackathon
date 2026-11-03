@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
 import { keepScreenOn } from "@/lib/client/wakeLock";
+import { loadReadSpeed, nextReadSpeed, readSpeedLabel, readSpeedRate, readSpeedStatus, saveReadSpeed, type ReadSpeed } from "@/lib/client/readSpeed";
 import { canReadAloud, readAloudProgress, readAloudStatus, speakPlanParts } from "@/lib/client/speakPlan";
 
 /**
@@ -14,11 +15,15 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
   const [state, setState] = useState<"idle" | "reading" | "stopped">("idle");
   // Which spoken piece is being read now (1-based) and how many there are, for the progress line.
   const [progress, setProgress] = useState({ part: 0, total: 0 });
+  // How fast to speak (Slower / Normal / Faster), kept on this device. A reading under way keeps its pace.
+  const [speed, setSpeed] = useState<ReadSpeed>("normal");
+  const [speedNote, setSpeedNote] = useState("");
   // Bumped on every start and stop, so a late "ended" from a cancelled run can't flip the button back.
   const run = useRef(0);
 
   useEffect(() => {
     setSupported(canReadAloud(window as unknown as Parameters<typeof canReadAloud>[0]));
+    setSpeed(loadReadSpeed());
     const stop = () => {
       run.current++;
       window.speechSynthesis?.cancel();
@@ -55,6 +60,7 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
     parts.forEach((text, i) => {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "en-US";
+      u.rate = readSpeedRate(speed);
       const last = i === parts.length - 1;
       u.onstart = () => run.current === mine && setProgress({ part: i + 1, total: parts.length });
       if (last) u.onend = () => run.current === mine && setState("idle");
@@ -64,6 +70,13 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
       };
       synth.speak(u);
     });
+  }
+
+  function pressSpeed() {
+    const next = nextReadSpeed(speed);
+    setSpeed(next);
+    saveReadSpeed(next);
+    setSpeedNote(readSpeedStatus(next, state === "reading"));
   }
 
   const reading = state === "reading";
@@ -88,8 +101,19 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
         </svg>
         {reading ? "Stop reading" : "Read it to me"}
       </button>
+      <button
+        type="button"
+        onClick={pressSpeed}
+        data-testid="read-speed"
+        className="inline-flex min-h-11 items-center rounded-full border border-ink/20 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+      >
+        {readSpeedLabel(speed)}
+      </button>
       <p role="status" aria-live="polite" className="text-sm text-ink/70">
         {readAloudStatus(state)}
+      </p>
+      <p role="status" aria-live="polite" className="sr-only">
+        {speedNote}
       </p>
       {reading && readAloudProgress(progress.part, progress.total) ? (
         <p aria-hidden="true" data-testid="read-aloud-progress" className="flex items-center gap-2 text-sm text-ink/70">
