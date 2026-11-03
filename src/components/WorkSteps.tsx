@@ -12,6 +12,7 @@ import { shutOffFirst } from "@/lib/client/shutOffFirst";
 import { OLD_MATERIAL_HINT, OLD_MATERIAL_LABEL, disturbsOldMaterial } from "@/lib/client/oldMaterialCheck";
 import { HEIGHT_HINT, HEIGHT_LABEL, worksUpHigh } from "@/lib/client/workAtHeight";
 import { FUMES_HINT, FUMES_LABEL, usesFumeProduct } from "@/lib/client/fumesCheck";
+import { DUST_HINT, DUST_LABEL, makesDust } from "@/lib/client/dustCheck";
 import { PERMIT_CHIP_HINT, PERMIT_CHIP_LABEL, tradeMayNeedPermit } from "@/lib/client/permitTrade";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
@@ -229,7 +230,7 @@ export function WorkSteps({
                   {step.title}
                 </p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats || disturbsOldMaterial(step) || worksUpHigh(step) || usesFumeProduct(step)) && (
+                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats || disturbsOldMaterial(step) || worksUpHigh(step) || usesFumeProduct(step) || (makesDust(step) && !disturbsOldMaterial(step))) && (
                   <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
                     {step.trade && (
                       <li
@@ -268,6 +269,12 @@ export function WorkSteps({
                       <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-fumes" title={FUMES_HINT}>
                         <span aria-hidden="true">{FUMES_LABEL}</span>
                         <span className="sr-only">{FUMES_LABEL}. {FUMES_HINT}</span>
+                      </li>
+                    )}
+                    {makesDust(step) && !disturbsOldMaterial(step) && (
+                      <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-dust" title={DUST_HINT}>
+                        <span aria-hidden="true">{DUST_LABEL}</span>
+                        <span className="sr-only">{DUST_LABEL}. {DUST_HINT}</span>
                       </li>
                     )}
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
