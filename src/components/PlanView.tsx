@@ -8,6 +8,7 @@ import { SharePlanButton } from "./SharePlanButton";
 import { ReadAloudButton } from "./ReadAloudButton";
 import { TextSizeButton } from "./TextSizeButton";
 import { ContrastButton } from "./ContrastButton";
+import { PlanAgeNote } from "./PlanAgeNote";
 import { WorkSteps } from "./WorkSteps";
 import { FixFirst } from "./FixFirst";
 import { NextUp } from "./NextUp";
@@ -116,10 +117,13 @@ export function PlanView({
   plan,
   videoName,
   example,
+  savedAt,
   onMakeYourOwn,
 }: {
   plan: WorkPlan;
   videoName: string | null;
+  /** When this plan was saved on the device (set on a reopened plan); a week or more ago adds an "old plan" note. */
+  savedAt?: string;
   /** Set when this plan was opened from the examples list: drives the "Real run" or "Sample" banner. */
   example?: Example;
   /** Example banner's "Make your own": back to the empty upload stage. */
@@ -231,6 +235,7 @@ export function PlanView({
         <TextSizeButton />
         <ContrastButton />
       </div>
+      {!sample && !example && !plan.meta?.isExample && <PlanAgeNote savedAt={savedAt} onFilmAgain={onMakeYourOwn} />}
       {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
       {plan.issues.length > 0 && (

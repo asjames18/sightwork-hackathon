@@ -24,7 +24,7 @@ type Stage =
   // `stopped`: the user stopped the run on the processing screen; the same video is shown again, ready to start.
   | { kind: "upload"; resume?: File; stopped?: File }
   | { kind: "processing"; file: File; run: number; runner: RunnerKind }
-  | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example };
+  | { kind: "plan"; plan: WorkPlan; videoName: string | null; example?: Example; savedAt?: string };
 
 /** Nothing runs while there's no video; the runner is chosen per run (see UploadStep and ownVideoRunnerKind). */
 const idleJob = planJobFor("mock");
@@ -60,7 +60,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
   // A big real run is kept in IndexedDB, so this can take a moment.
   const showLastPlan = () => {
     void loadLastPlanAsync().then((saved) => {
-      if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+      if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName, savedAt: saved.savedAt });
     });
   };
 
@@ -74,7 +74,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
     if (view === "example" && !initialExampleId) showExample(new URLSearchParams(window.location.search).get("ex") ?? undefined);
     if (view === "last") {
       void loadLastPlanAsync().then((saved) => {
-        if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName });
+        if (saved) setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName, savedAt: saved.savedAt });
         else document.documentElement.classList.remove("sw-opening");
       });
     }
@@ -197,8 +197,8 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           stoppedFile={stage.stopped}
           onExample={showExample}
           onLastPlan={showLastPlan}
-          recent={<RecentPlans onOpen={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })} />}
-          onOpenPlan={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName })}
+          recent={<RecentPlans onOpen={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName, savedAt: saved.savedAt })} />}
+          onOpenPlan={(saved) => setStage({ kind: "plan", plan: saved.plan, videoName: saved.videoName, savedAt: saved.savedAt })}
         />
       )}
       {stage.kind === "processing" && (
@@ -224,7 +224,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
           narrationPart={job?.state === "running" && job.step === "listening" ? (job.part ?? null) : null}
         />
       )}
-      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} onMakeYourOwn={startOver} />}
+      {stage.kind === "plan" && <PlanView plan={stage.plan} videoName={stage.videoName} example={stage.example} savedAt={stage.savedAt} onMakeYourOwn={startOver} />}
       </main>
     </>
   );
