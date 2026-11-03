@@ -305,6 +305,21 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
         );
       }
     }
+    // A non-signal passed as signal used to ride through here: a
+    // string or number has no .aborted, so the aborted check below
+    // passed it and the real fetch threw a bare TypeError with no
+    // step name, after validation had otherwise passed. Reject a
+    // present signal that is not signal-like (an object with a
+    // boolean aborted) here, before any fetch, the same named-error
+    // rule the request checks above follow. Null/undefined still
+    // mean no signal, as before.
+    if (
+      req.signal !== undefined &&
+      req.signal !== null &&
+      (typeof req.signal !== "object" || typeof req.signal.aborted !== "boolean")
+    ) {
+      throw new Error("sam: signal must be an AbortSignal");
+    }
     // A stopped run must not start (or pay for) a call it no
     // longer needs: an already-aborted signal throws here,
     // before any fetch, with the same AbortError name the
