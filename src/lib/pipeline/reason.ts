@@ -286,10 +286,13 @@ export function formatReasonStability(
   // A non-object segmentation, a non-array flaggedFrames/counts, a
   // null counts entry, or a non-object output / non-array issues used
   // to throw a raw TypeError reading .length / .map / .label / .issues
-  // off null, with no argument named. Reject all of them here with a
-  // named reason error, the same named-error rule the other pipeline
-  // entry guards follow. Valid inputs are unchanged: the line below
-  // still reads exactly the same fields.
+  // off null, with no argument named. A counts entry with a non-string
+  // label or a non-whole count was worse: it printed straight into the
+  // stability line ("2.5 chairs", "NaN") with no entry named, and
+  // that line is what a repeat-run swing is diagnosed from. Reject all
+  // of them here with a named reason error, the same named-error rule
+  // the other pipeline entry guards follow. Valid inputs are unchanged:
+  // the line below still reads exactly the same fields.
   if (
     segmentation !== null &&
     (typeof segmentation !== "object" || Array.isArray(segmentation))
@@ -306,6 +309,15 @@ export function formatReasonStability(
     segmentation.counts.forEach((c, i) => {
       if (c === null || typeof c !== "object" || Array.isArray(c)) {
         throw new Error(`reason: formatReasonStability segmentation.counts[${i}] must be an object`);
+      }
+      if (
+        typeof c.label !== "string" ||
+        c.label.trim().length === 0 ||
+        typeof c.count !== "number" ||
+        !Number.isInteger(c.count) ||
+        c.count < 0
+      ) {
+        throw new Error(`reason: formatReasonStability segmentation.counts[${i}] must have a non-empty string label and a whole-number count >= 0`);
       }
     });
   }
