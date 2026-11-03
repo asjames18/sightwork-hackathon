@@ -868,6 +868,27 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
     if (!Array.isArray(seg.counts)) {
       throw new Error("reason: segmentation.counts must be an array");
     }
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the prompt build rejects a counts entry that is an array at
+    // all, because arrays are objects in JavaScript and the per-field
+    // guards read label, count and confidence straight off the array
+    // — so an entry carrying those fields as array properties passed
+    // every check here, yet JSON.stringify drops array properties and
+    // it would print as an empty "[]" with its count silently lost.
+    // A direct runReason caller with a prebuilt prompt bypasses the
+    // prompt build and had no such check here, so it gets the same
+    // fail-fast before any paid Spark call. This sits before the
+    // counts validation below, so an array entry names itself instead
+    // of drawing the generic label/count/confidence message. Real
+    // runs are already clean (the segment step emits plain objects),
+    // so no current run changes.
+    seg.counts.forEach((c, i) => {
+      if (Array.isArray(c)) {
+        throw new Error(
+          `reason: segmentation.counts[${i}] must be an object, not an array`,
+        );
+      }
+    });
     seg.counts.forEach((c, i) => {
       // Counts are whole instances (the segment step takes a max over
       // frames): a fractional count used to pass this check and ride
