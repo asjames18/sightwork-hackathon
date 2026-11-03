@@ -159,6 +159,9 @@ const SPARK_TEMPERATURE = 0.2;
 /** Max decoded bytes per reason frame, same shape as the Spark caller's 5 MB image cap. */
 const MAX_REASON_IMAGE_BYTES = 5 * 1024 * 1024;
 
+/** Max frames handed to the reason step, same cap as the route (MAX_PLAN_FRAMES in ./planRequest.ts). */
+const MAX_REASON_FRAMES = 48;
+
 /**
  * Inline local `#/$defs/<name>` references and drop `$defs`.
  * Anything else (including `anyOf`) is passed through unchanged.
@@ -751,6 +754,18 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   }
   if (!Array.isArray(input.frames) || input.frames.length === 0) {
     throw new Error("reason: frames must be a non-empty array");
+  }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts)
+  // and validateRunPlanRequest (src/lib/pipeline/runPlan.ts): the
+  // browser builder sends at most 48 frames (prompt 02, under the
+  // 50-images-per-request limit), and the meta path hands the reason
+  // step every request frame, so a direct runReason caller with 49+
+  // frames used to pass here and ride onto a paid Spark call with
+  // more images than any real run ever sends. Reject it here, before
+  // any fetch, like the route and runPlan do. Real runs are already
+  // capped, so no current run changes.
+  if (input.frames.length > MAX_REASON_FRAMES) {
+    throw new Error(`reason: frames must not exceed ${MAX_REASON_FRAMES}`);
   }
   input.frames.forEach((f, i) => {
     if (
