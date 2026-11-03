@@ -1,4 +1,4 @@
-import { test, expect, expectNoAxeViolations, expectNoSideScroll } from "./helpers";
+import { test, expect, expectNoAxeViolations, expectNoSideScroll, openDisplaySettings } from "./helpers";
 
 // /api stays blocked (helpers.ts) and console errors fail the test.
 test.beforeEach(async ({ apiCalls, pageErrors }) => {
@@ -143,6 +143,7 @@ test("Read it to me speed: Slower, Normal and Faster change the voice rate, are 
   await page.addInitScript(FAKE_SPEECH);
   await page.goto("/start?view=example&ex=sanctuary");
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await openDisplaySettings(page);
   const btn = page.getByTestId("read-aloud");
   const speed = page.getByTestId("read-speed");
   const rates = () => page.evaluate(() => (window as unknown as { __rates: Array<number | undefined> }).__rates);
@@ -169,6 +170,7 @@ test("Read it to me speed: Slower, Normal and Faster change the voice rate, are 
   // Kept on this device.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
+  await openDisplaySettings(page);
   await expect(speed).toHaveText("Speed: Slower");
   await btn.click();
   expect(new Set(await rates())).toEqual(new Set([0.8]));
@@ -183,5 +185,6 @@ test("Read it to me speed: Slower, Normal and Faster change the voice rate, are 
   await speed.click();
   await expect(speed).toHaveText("Speed: Normal");
   await page.reload();
+  await openDisplaySettings(page);
   await expect(speed).toHaveText("Speed: Normal");
 });

@@ -32,7 +32,7 @@ export function TextSizeButton() {
   }
 
   return (
-    <div className="mt-4 print:hidden">
+    <div className="print:hidden">
       <button
         type="button"
         onClick={press}

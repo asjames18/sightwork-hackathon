@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { WorkPlan } from "@/lib/types";
 import { keepScreenOn } from "@/lib/client/wakeLock";
 import { loadReadSpeed, nextReadSpeed, readSpeedLabel, readSpeedRate, readSpeedStatus, saveReadSpeed, type ReadSpeed } from "@/lib/client/readSpeed";
@@ -8,9 +9,10 @@ import { canReadAloud, readAloudProgress, readAloudStatus, speakPlanParts } from
 
 /**
  * Reads the plan aloud with the browser's own speech voice (nothing leaves the device), one short piece at a
- * time. A second press stops it. Hidden where the browser can't speak, and never in print.
+ * time. A second press stops it. Hidden where the browser can't speak, and never in print. The pace button sits
+ * beside the main button, or inside `speedHost` (the plan's display settings) when one is given.
  */
-export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
+export function ReadAloudButton({ plan, speedHost = null }: { plan: WorkPlan; speedHost?: HTMLElement | null }) {
   const [supported, setSupported] = useState(false);
   const [state, setState] = useState<"idle" | "reading" | "stopped">("idle");
   // Which spoken piece is being read now (1-based) and how many there are, for the progress line.
@@ -80,6 +82,16 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
   }
 
   const reading = state === "reading";
+  const speedButton = (
+    <button
+      type="button"
+      onClick={pressSpeed}
+      data-testid="read-speed"
+      className="inline-flex min-h-11 items-center rounded-full border border-ink/20 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
+    >
+      {readSpeedLabel(speed)}
+    </button>
+  );
   return (
     <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
       <button
@@ -101,14 +113,7 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
         </svg>
         {reading ? "Stop reading" : "Read it to me"}
       </button>
-      <button
-        type="button"
-        onClick={pressSpeed}
-        data-testid="read-speed"
-        className="inline-flex min-h-11 items-center rounded-full border border-ink/20 bg-white px-4 text-sm font-semibold text-ink hover:border-ink/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-dark"
-      >
-        {readSpeedLabel(speed)}
-      </button>
+      {speedHost ? createPortal(speedButton, speedHost) : speedButton}
       <p role="status" aria-live="polite" className="text-sm text-ink/70">
         {readAloudStatus(state)}
       </p>

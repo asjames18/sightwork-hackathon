@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { noStepsCostLine, noStepsLine } from "@/lib/client/planEmpty";
 import { WalkTimeline } from "./WalkTimeline";
 import { AFTER_IMAGE_LABEL, masksAvailable, type Issue, type PlanFrame, type WorkPlan } from "@/lib/types";
@@ -8,6 +9,7 @@ import { SharePlanButton } from "./SharePlanButton";
 import { ReadAloudButton } from "./ReadAloudButton";
 import { TextSizeButton } from "./TextSizeButton";
 import { ContrastButton } from "./ContrastButton";
+import { DisplaySettings } from "./DisplaySettings";
 import { PlanAgeNote } from "./PlanAgeNote";
 import { AfterPictureNote } from "./AfterPictureNote";
 import { WorkSteps } from "./WorkSteps";
@@ -130,6 +132,8 @@ export function PlanView({
   /** Example banner's "Make your own": back to the empty upload stage. */
   onMakeYourOwn?: () => void;
 }) {
+  // Where the read-aloud pace button goes: into the display settings (set once that box is on the page).
+  const [speedHost, setSpeedHost] = useState<HTMLElement | null>(null);
   const frames = plan.frames ?? [];
   const narrated = isNarrated(plan);
   // Ranked problems only: anything the server marked watch: true shows under "Worth a closer look" instead.
@@ -232,9 +236,11 @@ export function PlanView({
 
       <div className="flex flex-wrap items-start gap-x-3">
         <SharePlanButton plan={plan} sample={sample} example={example} />
-        <ReadAloudButton plan={plan} />
-        <TextSizeButton />
-        <ContrastButton />
+        <ReadAloudButton plan={plan} speedHost={speedHost} />
+        <DisplaySettings hostRef={setSpeedHost}>
+          <TextSizeButton />
+          <ContrastButton />
+        </DisplaySettings>
       </div>
       {!sample && !example && !plan.meta?.isExample && <PlanAgeNote savedAt={savedAt} onFilmAgain={onMakeYourOwn} />}
       {!sample && !example && !plan.meta?.isExample && <AfterPictureNote plan={plan} onFilmAgain={onMakeYourOwn} />}

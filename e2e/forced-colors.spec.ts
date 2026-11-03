@@ -1,4 +1,4 @@
-import { test, expect, expectNoSideScroll } from "./helpers";
+import { test, expect, expectNoSideScroll, openDisplaySettings } from "./helpers";
 
 /**
  * Forced-colors modes (Windows High Contrast) replace every background, so controls drawn only with a fill
@@ -21,6 +21,7 @@ for (const width of [375, 768, 1280]) {
   test(`fill-only buttons keep a visible edge and a pressed button is marked (${width} px)`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/start?view=example&ex=sanctuary");
+    await openDisplaySettings(page);
     await expect(page.getByTestId("contrast")).toBeVisible();
 
     const makeYourOwn = page.getByRole("button", { name: "Make your own" });

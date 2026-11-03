@@ -56,3 +56,11 @@ export async function expectNoAxeViolations(page: Page, label: string) {
 export async function expectNoSideScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 }
+
+/** Opens the plan header's "Display and voice" box (pace, text size and contrast buttons) if it is closed. */
+export async function openDisplaySettings(page: Page) {
+  const box = page.getByTestId("display-settings");
+  await expect(box).toBeVisible();
+  if (!(await box.evaluate((el) => (el as HTMLDetailsElement).open))) await box.locator("summary").click();
+  await expect(box.locator("summary ~ div")).toBeVisible();
+}
