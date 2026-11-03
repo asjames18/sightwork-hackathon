@@ -6,6 +6,7 @@ import { ProofFrame } from "./ProofFrame";
 import { BeforeAfter } from "./BeforeAfter";
 import { SharePlanButton } from "./SharePlanButton";
 import { ReadAloudButton } from "./ReadAloudButton";
+import { TextSizeButton } from "./TextSizeButton";
 import { WorkSteps } from "./WorkSteps";
 import { FixFirst } from "./FixFirst";
 import { NextUp } from "./NextUp";
@@ -226,6 +227,7 @@ export function PlanView({
       <div className="flex flex-wrap items-start gap-x-3">
         <SharePlanButton plan={plan} sample={sample} example={example} />
         <ReadAloudButton plan={plan} />
+        <TextSizeButton />
       </div>
       {!sample && !example && !plan.meta?.isExample && <SinceLastVisit plan={plan} />}
 
