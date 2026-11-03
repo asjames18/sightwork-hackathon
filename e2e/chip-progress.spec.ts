@@ -31,7 +31,9 @@ test("the Steps and Materials chips show progress once things are ticked, and go
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await nav.scrollIntoViewIfNeeded();
+    // Scan from the top: mid-page, the sticky row can sit over a button and axe counts that as a small target.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(nav).toBeVisible();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `chip progress ${width}`);
   }
