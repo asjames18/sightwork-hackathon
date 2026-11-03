@@ -172,6 +172,13 @@ export interface RunPlanDeps {
   onStatus?: (status: PlanJobStatus) => void;
   /** When aborted, the run stops with an AbortError. */
   signal?: AbortSignal;
+  /**
+   * Wall-clock ms when the run started (the route passes its handler
+   * start, so the elapsed time counts against the host's function
+   * limit, not just the pipeline's own start). When omitted, runPlan's
+   * own start is used. Drives the picturing time-limit skip below.
+   */
+  startedAtMs?: number;
 }
 
 function assertNotAborted(signal: AbortSignal | undefined): void {
@@ -727,6 +734,30 @@ export function formatCostPricing(
 }
 
 /**
+ * Picturing time limit (2026-11-03: a live hosted run was cut at
+ * 312 s on a slow comparing step, before picturing, so no plan
+ * shipped). When the run is already past this age at picturing, the
+ * Image and review calls are skipped so the plan still ships inside
+ * the 300 s host limit, with meta.skipped.afterImage and a
+ * ran:false review. 230 s leaves ~70 s of headroom for the plan
+ * assembly and the response.
+ */
+export const PICTURING_TIME_LIMIT_MS = 230_000;
+
+/**
+ * Pure check for the picturing time-limit skip: true once the run is
+ * at least PICTURING_TIME_LIMIT_MS old. nowMs defaults to Date.now
+ * so runPlan reads the clock at picturing; tests pass it explicitly
+ * for an exact boundary.
+ */
+export function picturingTimeLimitExceeded(
+  startedAtMs: number,
+  nowMs: number = Date.now(),
+): boolean {
+  return nowMs - startedAtMs >= PICTURING_TIME_LIMIT_MS;
+}
+
+/**
  * Server-log-only summary of why the picturing step produced no
  * after picture. Pure, and it changes no plan output: runPlan logs
  * it only when renderAfter skipped, so a real run says whether the
@@ -982,6 +1013,12 @@ export function validateRunPlanDeps(deps: RunPlanDeps): void {
   }
   if (deps.signal !== undefined && (deps.signal === null || typeof deps.signal !== "object")) {
     throw new Error("runPlan: signal must be an object when given");
+  }
+  if (
+    deps.startedAtMs !== undefined &&
+    (!Number.isFinite(deps.startedAtMs) || deps.startedAtMs < 0)
+  ) {
+    throw new Error("runPlan: startedAtMs must be a finite number >= 0 when given");
   }
 }
 
@@ -1477,6 +1514,9 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // so its skip has no later running line and still arrives only via
   // the done plan's meta.skipped.
   const skippedSteps: Exclude<PlanStep, "done">[] = [];
+  // Run start for the picturing time-limit skip: the route's handler
+  // start when given, else this function's own start.
+  const runStartedAtMs = deps.startedAtMs ?? Date.now();
   /**
    * One running line, optionally carrying the check for the step it
    * names (2026-10-30: after a step's output is checked and
@@ -1943,10 +1983,28 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // of shipping a plan with a silently skipped picture.
   assertNotAborted(deps.signal);
   emit("picturing");
-  const rendered = await runRenderAfter(
-    { plan: draft, spaceType: request.spaceType },
-    { ...deps.renderAfter, signal: deps.signal },
-  );
+  // Time-limit skip (2026-11-03 live run cut at 312 s before
+  // picturing): past ~230 s the Image call plus the review call
+  // would push the run past the 300 s host limit, so skip both and
+  // ship the plan — no call, no cost — with meta.skipped.afterImage
+  // and a ran:false review below, instead of no plan at all. A
+  // time-skipped picturing arrives only via the done plan's
+  // meta.skipped, like every other picturing skip (see above).
+  const picturingTimeSkipped = picturingTimeLimitExceeded(runStartedAtMs);
+  if (picturingTimeSkipped) {
+    console.log(
+      `runPlan: picturing skipped: time-limit (elapsed ${Date.now() - runStartedAtMs} ms)`,
+    );
+  }
+  const rendered: Awaited<ReturnType<typeof runRenderAfter>> = picturingTimeSkipped
+    ? { afterImageUrl: null, heroFrameIndex: null, visibleChanges: [] }
+    : await runRenderAfter(
+        { plan: draft, spaceType: request.spaceType },
+        { ...deps.renderAfter, signal: deps.signal },
+      );
+  // afterImage is skipped when picturing was time-skipped or when the
+  // render step itself produced no image; both ride the same flag.
+  const afterImageSkipped = picturingTimeSkipped || rendered.skipped !== undefined;
   // Server log only: why the after picture was skipped, when it was.
   // No plan output, no UI change. The finished plan's meta.skipped
   // keeps only a boolean, so without this line a real run never says
@@ -1960,7 +2018,7 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     afterImageUrl: rendered.afterImageUrl,
     ...(rendered.afterImageUrl ? { afterImageLabel: AFTER_IMAGE_LABEL } : {}),
     heroFrameIndex: rendered.heroFrameIndex ?? reason.heroFrameIndex,
-    meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped, transcribeSkipped),
+    meta: planMeta(segmentation === null, afterImageSkipped, costSkipped, transcribeSkipped),
   };
   const errs = checkWorkPlan(plan);
   const unexplained = errs.filter((e) => !explainedByReasonWarnings(e, reason.warnings ?? []));
@@ -1990,8 +2048,11 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   // failure, and the plan still ships with "Review didn't run".
   // When the review dep is absent, the run ends here with no review
   // field, as before, and the processing screen's Reviewing row
-  // simply completes when the done plan arrives.
-  if (deps.review && deps.reviewPrompt) {
+  // simply completes when the done plan arrives. When picturing was
+  // time-skipped (above), reviewing is skipped too — the call would
+  // push the run past the host limit — and the plan below ships the
+  // same "Review didn't run" shape instead.
+  if (deps.review && deps.reviewPrompt && !picturingTimeSkipped) {
     assertNotAborted(deps.signal);
     emit("reviewing");
     const photos = buildReviewPhotos(plan.issues, plan.frames ?? []);
@@ -2051,9 +2112,15 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
     // reviewed run, and the run-cost line would undercount.
     return {
       ...plan,
-      meta: planMeta(segmentation === null, rendered.skipped !== undefined, costSkipped, transcribeSkipped),
+      meta: planMeta(segmentation === null, afterImageSkipped, costSkipped, transcribeSkipped),
       review: review.ran ? { ...review, source: "model" as const } : review,
     };
+  }
+  // Time-limit skip: reviewing is skipped with picturing, so the
+  // plan ships the same "Review didn't run" shape a failed review
+  // ships — no call, no cost — instead of no plan at all.
+  if (picturingTimeSkipped && deps.review && deps.reviewPrompt) {
+    return { ...plan, review: { ran: false, items: [] } };
   }
   return plan;
 }
