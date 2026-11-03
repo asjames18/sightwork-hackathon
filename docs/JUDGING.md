@@ -13,7 +13,7 @@ Criteria and weights from the Official Rules embedded on the [Cerebral Valley ev
 - Live site with a real run on the landing page (a church sanctuary stage, nothing edited but a covered logo) and four labeled samples.
 - Processing screen names the Meta model behind each step with a running clock.
 - `/status` shows the live build and config at a glance, with no model calls.
-- Holds up live: a real run keeps the phone screen on, says so when the connection drops, asks before a reload or swipe back can throw the run away, and has a Stop this run button; a page that fails shows a plain message with Try again instead of a bare error.
+- Holds up live: a real run keeps the phone screen on, says so when the connection drops, asks before a reload or swipe back can throw the run away, and has a Stop this run button; a page that fails shows a plain message with Try again instead of a bare error. A run cut by the 5-minute host limit says so, and Try again, lighter retries the same video with fewer, smaller frames.
 
 ## Use of Meta AI tooling (25%)
 - Four Meta models chained in one agent run, one job each: Muse Voice Transcribe, SAM 3.1, Muse Spark Open (Meta open weights on Baseten, the default plan engine) and Muse Image; Muse Spark with web search prices the work.
