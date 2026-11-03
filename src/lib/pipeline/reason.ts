@@ -291,7 +291,10 @@ export function formatReasonStability(
   // stability line ("2.5 chairs", "NaN") with no entry named, and
   // that line is what a repeat-run swing is diagnosed from. Reject all
   // of them here with a named reason error, the same named-error rule
-  // the other pipeline entry guards follow. Valid inputs are unchanged:
+  // the other pipeline entry guards follow. A non-whole heroFrameIndex
+  // was the same class of bug one field over: it printed straight into
+  // the line ("hero frame NaN", "hero frame 2.5") with no error
+  // named, so it is rejected here too. Valid inputs are unchanged:
   // the line below still reads exactly the same fields.
   if (
     segmentation !== null &&
@@ -329,6 +332,15 @@ export function formatReasonStability(
   }
   if (output.watch !== undefined && !Array.isArray(output.watch)) {
     throw new Error("reason: formatReasonStability output.watch must be an array");
+  }
+  if (
+    typeof output.heroFrameIndex !== "number" ||
+    !Number.isInteger(output.heroFrameIndex) ||
+    output.heroFrameIndex < 0
+  ) {
+    throw new Error(
+      "reason: formatReasonStability output.heroFrameIndex must be a whole-number frame index >= 0",
+    );
   }
   const sam =
     segmentation === null
