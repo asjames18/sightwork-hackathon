@@ -865,6 +865,24 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
     if (!seg || typeof seg !== "object") {
       throw new Error("reason: segmentation must be an object or null");
     }
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the prompt build rejects a segmentation value that is an array
+    // at all, because arrays are objects in JavaScript and the object
+    // check above lets them through — so an array segmentation used
+    // to draw the generic "counts must be an array" message here
+    // (an array has no counts property), hiding that the whole
+    // segmentation value was the wrong shape. A direct runReason
+    // caller with a prebuilt prompt bypasses the prompt build and
+    // had no such named check here, so it gets the same fail-fast
+    // before any paid Spark call. This sits before the counts check
+    // below, so an array segmentation names itself instead of
+    // drawing the counts message, and a non-object segmentation
+    // keeps its own message from the check above. Real runs are
+    // already clean (the segment step emits a plain object), so no
+    // current run changes.
+    if (Array.isArray(seg)) {
+      throw new Error("reason: segmentation must be an object, not an array");
+    }
     if (!Array.isArray(seg.counts)) {
       throw new Error("reason: segmentation.counts must be an array");
     }
