@@ -366,13 +366,32 @@ export function pickReasonFrames(
  * endpoint, a flagged frame, or its own zone's sole representative,
  * and when zones outnumber slots the earliest zones win). Returns
  * null when no frame carries a zoneId, so uncapped and unzoned runs
- * stay quiet. Frame indices and zone numbers only, nothing
- * user-identifying.
+ * stay quiet, and on malformed input (a non-array side, a
+ * non-integer or negative zone id, or a subset index outside the
+ * take), the same quiet rule the sibling subset lines follow.
+ * Frame indices and zone numbers only, nothing user-identifying.
  */
 export function formatReasonSubsetZones(
   zoneIds: Array<number | undefined>,
   subset: number[],
 ): string | null {
+  // The sibling subset lines all stay quiet on malformed input
+  // (spacing, segment budget, remap), and this one did not: a
+  // non-integer or negative zone id, or a subset index outside the
+  // take, used to print straight into the coverage line ("left out:
+  // 2.5", or a covered count quietly short by the out-of-range
+  // member) with nothing named — and that line is what a capped-run
+  // coverage swing is diagnosed from. Return null on malformed
+  // input, the same quiet rule the siblings follow. Valid inputs
+  // are unchanged: the line below still reads exactly the same
+  // fields, and unzoned (undefined) entries still do not count.
+  if (!Array.isArray(zoneIds) || !Array.isArray(subset)) return null;
+  for (const z of zoneIds) {
+    if (z !== undefined && (!Number.isInteger(z) || z < 0)) return null;
+  }
+  for (const i of subset) {
+    if (!Number.isInteger(i) || i < 0 || i >= zoneIds.length) return null;
+  }
   const zones = new Set<number>();
   for (const z of zoneIds) if (z !== undefined) zones.add(z);
   if (zones.size === 0) return null;
