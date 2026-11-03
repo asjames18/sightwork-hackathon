@@ -845,6 +845,19 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   if (input.transcript !== null && typeof input.transcript !== "string") {
     throw new Error("reason: transcript must be a string or null");
   }
+  // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts)
+  // and the route/runPlan validators: null means no narration, but
+  // a blank string is neither a transcript nor null, so a direct
+  // runReason caller gets the same fail-fast here instead of only
+  // via the prompt build — or, with a prebuilt prompt, carrying a
+  // blank transcript into the finished plan. Real transcripts from
+  // /api/transcribe are never blank, so no current run changes.
+  if (
+    typeof input.transcript === "string" &&
+    input.transcript.trim().length === 0
+  ) {
+    throw new Error("reason: transcript must not be blank");
+  }
   for (const field of ["spaceName", "spaceType"] as const) {
     const v = input[field];
     if (v !== undefined && (typeof v !== "string" || v.trim().length === 0)) {
