@@ -189,7 +189,7 @@ export function SightWorkFlow({ initialExampleId }: { initialExampleId?: string 
         </div>
       </header>
 
-      <main className={`mx-auto w-full px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pt-10 ${width}`}>
+      <main id="main-content" tabIndex={-1} className={`outline-none mx-auto w-full px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pt-10 ${width}`}>
       {stage.kind === "upload" && (
         <UploadStep
           onVideo={(file, runner) => setStage({ kind: "processing", file, run: 1, runner })}

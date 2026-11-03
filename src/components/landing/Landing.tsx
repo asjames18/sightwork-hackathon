@@ -89,6 +89,7 @@ export function Landing() {
       </header>
 
       <main id="top">
+        <span id="main-content" tabIndex={-1} className="block outline-none" />
         <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 md:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-14">
           <div>
           <h1 className="max-w-2xl text-[32px] font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">

@@ -19,7 +19,7 @@ export default function NotFound() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-xl px-4 pb-16 pt-12 sm:px-6 md:pt-16">
+      <main id="main-content" tabIndex={-1} className="outline-none mx-auto w-full max-w-xl px-4 pb-16 pt-12 sm:px-6 md:pt-16">
         <p className="text-sm font-semibold uppercase tracking-wide text-accent-dark">404</p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight">We couldn&apos;t find that page.</h1>
         <p className="mt-3 text-base text-ink/75">The link may be old or mistyped. You can start a walkthrough or look at an example plan.</p>

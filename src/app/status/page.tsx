@@ -28,7 +28,7 @@ export default function StatusPage() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:px-6">
+      <main id="main-content" tabIndex={-1} className="outline-none mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:px-6">
         <h1 className="text-3xl font-extrabold tracking-tight">Status</h1>
         <p className="mt-3 flex items-center gap-2 text-lg font-semibold" data-testid="status-summary">
           <span aria-hidden="true" className={`h-3 w-3 rounded-full ${allOk ? "bg-safe" : "bg-amber-500"}`} />

@@ -57,7 +57,7 @@ export default function Credits() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:px-6">
+      <main id="main-content" tabIndex={-1} className="outline-none mx-auto w-full max-w-3xl px-4 pb-16 pt-10 sm:px-6">
         <h1 className="text-3xl font-extrabold tracking-tight">Example image credits</h1>
         <p className="mt-3 text-base text-ink/75">
           The sample plans are written by hand on free-to-use photos, to show what a plan looks like. They are not SightWork runs. The one real run
