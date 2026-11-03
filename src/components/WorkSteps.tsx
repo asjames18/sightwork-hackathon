@@ -13,6 +13,7 @@ import { OLD_MATERIAL_HINT, OLD_MATERIAL_LABEL, disturbsOldMaterial } from "@/li
 import { HEIGHT_HINT, HEIGHT_LABEL, worksUpHigh } from "@/lib/client/workAtHeight";
 import { FUMES_HINT, FUMES_LABEL, usesFumeProduct } from "@/lib/client/fumesCheck";
 import { DUST_HINT, DUST_LABEL, makesDust } from "@/lib/client/dustCheck";
+import { DRY_HINT, DRY_LABEL, needsDryTime } from "@/lib/client/dryTime";
 import { PERMIT_CHIP_HINT, PERMIT_CHIP_LABEL, tradeMayNeedPermit } from "@/lib/client/permitTrade";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
@@ -275,6 +276,12 @@ export function WorkSteps({
                       <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-dust" title={DUST_HINT}>
                         <span aria-hidden="true">{DUST_LABEL}</span>
                         <span className="sr-only">{DUST_LABEL}. {DUST_HINT}</span>
+                      </li>
+                    )}
+                    {needsDryTime(step) && (
+                      <li className={`${chip} border border-dashed border-ink/30 bg-white text-ink/80`} data-testid="step-dry" title={DRY_HINT}>
+                        <span aria-hidden="true">{DRY_LABEL}</span>
+                        <span className="sr-only">{DRY_LABEL}. {DRY_HINT}</span>
                       </li>
                     )}
                     {step.hours && <li className={`${chip} bg-ink/[0.06] text-ink/80 tabular-nums`}>About {range(step.hours, " h")}</li>}
