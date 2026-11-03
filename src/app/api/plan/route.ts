@@ -78,8 +78,11 @@ export const runtime = "nodejs";
 
 // Explicit Vercel function duration: 300 s is the Hobby maximum and
 // the Pro default, so this states the platform limit rather than
-// raising it. Plan runs take ~45-51 s, so time is not the binding
-// limit on a hosted run; the 4.5 MB request-body cap is (see the
+// raising it. Plan runs no longer always fit it: a live hosted run
+// was cut at 312 s on 2026-11-03 (slow comparing), so the limit IS
+// binding on slow runs — runPlan skips picturing and reviewing past
+// ~230 s from the handler start so a slow run still ships a plan.
+// The 4.5 MB request-body cap is the other binding limit (see the
 // 10 MB route cap below, which only applies before the platform cap).
 export const maxDuration = 300;
 
@@ -156,6 +159,11 @@ function isAbort(err: unknown): boolean {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  // Handler start for runPlan's picturing time-limit skip: the 300 s
+  // host limit counts from invocation, so the elapsed time must
+  // include the body read and validation below, not just the
+  // pipeline's own start.
+  const handlerStartedAtMs = Date.now();
   let bodyText: string;
   try {
     bodyText = await req.text();
@@ -260,14 +268,14 @@ export async function POST(req: Request): Promise<Response> {
           // Open in baseten mode, Meta Muse Spark in meta mode) with
           // the buildReviewPrompt builder, so a finished plan
           // carries plan.review. Reviewing never fails a run: runPlan
-          // ships ran:false on any review failure. No timeout is
-          // plumbed here: prompt 06 suggests 60 s (measured max 29 s),
-          // and racing the call would drop its usage record, so the
-          // route relies on maxDuration above; the stop signal IS
+          // ships ran:false on any review failure. Slow-run guard
+          // (2026-11-03: a live run was cut at 312 s before picturing):
+          // runPlan skips picturing and reviewing once the run is past
+          // ~230 s from the handler start passed below, so a slow run
+          // still ships a plan inside maxDuration; the stop signal IS
           // plumbed (2026-11-01: every pipeline leg, segment
           // included, forwards deps.signal to its model calls, and
           // runPlan rethrows aborts as a stop, not a step failure).
-          // Plumbing a real timeout is an open question.
           review: { callSpark: reasonCaller },
           reviewPrompt: buildReviewPrompt,
         };
@@ -283,6 +291,7 @@ export async function POST(req: Request): Promise<Response> {
           reasonMaxFrames: provider === "baseten" ? REASON_MAX_FRAMES : undefined,
           onStatus: (status) => push(status),
           signal: req.signal,
+          startedAtMs: handlerStartedAtMs,
         });
         push({ state: "done", plan });
         console.log(
