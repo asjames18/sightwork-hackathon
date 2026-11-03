@@ -794,8 +794,8 @@ export function formatExplainedContractErrors(
  * transcribe already warns separately, so neither of those paths
  * logs here). Returns null when audio was not supplied, when a
  * transcript was supplied with the request, when transcribe failed,
- * when any words came back, and on malformed word counts, so
- * ordinary runs stay out of the server log. No audio content, no
+ * when any words came back, and on malformed word counts or
+ * non-boolean sides, so ordinary runs stay out of the server log. No audio content, no
  * transcript text, nothing user-identifying.
  */
 export function formatTranscribeEmpty(
@@ -804,6 +804,20 @@ export function formatTranscribeEmpty(
   transcribeFailed: boolean,
   words: number,
 ): string | null {
+  // The sibling diagnostic lines all stay quiet on malformed input,
+  // and this one never checked its boolean sides: a truthy
+  // non-boolean (1, "yes") printed the line and a falsy one (0, "")
+  // silently passed as false, so a bad diagnostic input could
+  // misreport an empty transcription instead of staying quiet.
+  // Return null unless all three sides are real booleans, the same
+  // quiet rule the siblings follow. Valid inputs are unchanged:
+  // the call site passes real booleans already.
+  if (
+    typeof audioSupplied !== "boolean" ||
+    typeof transcriptSupplied !== "boolean" ||
+    typeof transcribeFailed !== "boolean"
+  )
+    return null;
   if (!audioSupplied || transcriptSupplied || transcribeFailed) return null;
   if (!Number.isInteger(words) || words < 0) return null;
   if (words > 0) return null;
