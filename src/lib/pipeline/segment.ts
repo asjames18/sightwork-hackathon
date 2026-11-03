@@ -376,10 +376,11 @@ export function planSegmentFrames(opts: {
   zoneIds?: (number | undefined)[];
 }): SegmentPlan {
   // A direct caller bypassing runSegment's input validation used to
-  // get a raw TypeError here: null opts reading .frameCount, or a
-  // non-array sceneFrameIndices that is not iterable. Fail fast with
-  // named segment errors, the same named-error rule the rest of this
-  // module follows. Valid inputs are unchanged.
+  // get a raw TypeError here: null opts reading .frameCount, a
+  // non-array sceneFrameIndices that is not iterable, or a null
+  // zoneIds reading .length. Fail fast with named segment errors,
+  // the same named-error rule the rest of this module follows.
+  // Valid inputs are unchanged.
   if (opts === null || typeof opts !== "object" || Array.isArray(opts)) {
     throw new Error("segment: planSegmentFrames opts must be an object");
   }
@@ -388,6 +389,9 @@ export function planSegmentFrames(opts: {
     !Array.isArray(opts.sceneFrameIndices)
   ) {
     throw new Error("segment: sceneFrameIndices must be an array when given");
+  }
+  if (opts.zoneIds !== undefined && !Array.isArray(opts.zoneIds)) {
+    throw new Error("segment: zoneIds must be an array when given");
   }
   const frameCount = opts.frameCount;
   const maxRequests = opts.maxRequests ?? DEFAULT_MAX_SAM_REQUESTS;
