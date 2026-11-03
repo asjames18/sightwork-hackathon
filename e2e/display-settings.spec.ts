@@ -18,6 +18,12 @@ for (const width of [375, 768, 1280]) {
     await expect(page.getByTestId("text-size")).toBeHidden();
     await expect(page.getByTestId("contrast")).toBeHidden();
     await expect(page.getByRole("button", { name: /^Send to your team/ })).toBeVisible();
+    if (width >= 768) {
+      // With room to spare, the closed box sits in the same row as Send and Read it to me.
+      const sendTop = (await page.getByRole("button", { name: /^Send to your team/ }).boundingBox())!.y;
+      const boxTop = (await box.locator("summary").boundingBox())!.y;
+      expect(Math.abs(boxTop - sendTop)).toBeLessThan(6);
+    }
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `display box closed ${width}`);
     // The summary opens it from the keyboard and every button is inside.
