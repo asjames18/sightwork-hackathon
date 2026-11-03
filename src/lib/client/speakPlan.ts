@@ -151,3 +151,9 @@ export function readAloudStatus(state: "idle" | "reading" | "stopped"): string {
   if (state === "stopped") return "Stopped reading.";
   return "";
 }
+
+/** Where the reading is, as a short line like "Part 3 of 14". Empty until a piece has started. */
+export function readAloudProgress(part: number, total: number): string {
+  if (!Number.isInteger(part) || !Number.isInteger(total) || total < 1 || part < 1) return "";
+  return `Part ${Math.min(part, total)} of ${total}`;
+}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SPEAK_MAX_CHARS, canReadAloud, readAloudStatus, shortDetail, speakPlanParts, splitForSpeech } from "../../src/lib/client/speakPlan";
+import { SPEAK_MAX_CHARS, canReadAloud, readAloudProgress, readAloudStatus, shortDetail, speakPlanParts, splitForSpeech } from "../../src/lib/client/speakPlan";
 import { EXAMPLES } from "../../src/lib/examples";
 import type { WorkPlan } from "../../src/lib/types";
 
@@ -75,4 +75,13 @@ test("canReadAloud and readAloudStatus", () => {
   assert.equal(readAloudStatus("idle"), "");
   assert.match(readAloudStatus("reading"), /Stop reading/);
   assert.equal(readAloudStatus("stopped"), "Stopped reading.");
+});
+
+test("readAloudProgress: a short Part N of M line, empty until a piece starts, never past the total", () => {
+  assert.equal(readAloudProgress(3, 14), "Part 3 of 14");
+  assert.equal(readAloudProgress(20, 14), "Part 14 of 14");
+  assert.equal(readAloudProgress(0, 14), "");
+  assert.equal(readAloudProgress(1, 0), "");
+  assert.equal(readAloudProgress(Number.NaN, 5), "");
+  assert.equal(readAloudProgress(1.5, 5), "");
 });

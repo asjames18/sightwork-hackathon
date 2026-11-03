@@ -10,20 +10,22 @@ test.beforeEach(async ({ apiCalls, pageErrors }) => {
 const FAKE_SPEECH = () => {
   const w = window as unknown as Record<string, unknown>;
   const spoken: string[] = [];
-  const queue: Array<{ text: string; onend?: () => void; onerror?: (e: { error: string }) => void }> = [];
+  const queue: Array<{ text: string; onstart?: () => void; onend?: () => void; onerror?: (e: { error: string }) => void }> = [];
   w.__spoken = spoken;
   w.__finish = () => {
     const u = queue.shift();
     if (u) u.onend?.();
+    queue[0]?.onstart?.();
   };
   const define = (name: string, value: unknown) => Object.defineProperty(window, name, { value, configurable: true, writable: true });
   define("SpeechSynthesisUtterance", function (this: { text: string }, text: string) {
     this.text = text;
   });
   define("speechSynthesis", {
-    speak: (u: { text: string; onend?: () => void }) => {
+    speak: (u: { text: string; onstart?: () => void; onend?: () => void }) => {
       spoken.push(u.text);
       queue.push(u);
+      if (queue.length === 1) u.onstart?.();
     },
     cancel: () => {
       const q = queue.splice(0);
@@ -52,6 +54,11 @@ test("Read it to me: speaks the plan, Stop reading stops it, and it ends on its 
     // The last piece is the cost when the plan has one, else the last step.
     expect(spoken.at(-1)).toMatch(/^(Rough cost: |Step \d+\. )/);
     expect(spoken.some((s) => s.startsWith("Said at"))).toBe(false);
+    // The progress line starts at part 1 and moves on when the voice finishes a piece.
+    const progress = page.getByTestId("read-aloud-progress");
+    await expect(progress).toHaveText(/^Part 1 of \d+$/);
+    await page.evaluate(() => (window as unknown as { __finish: () => void }).__finish());
+    await expect(progress).toHaveText(/^Part 2 of \d+$/);
     for (const s of spoken) expect(s.length).toBeLessThanOrEqual(220);
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `read aloud ${width}`);

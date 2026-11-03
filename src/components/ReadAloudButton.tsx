@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkPlan } from "@/lib/types";
-import { canReadAloud, readAloudStatus, speakPlanParts } from "@/lib/client/speakPlan";
+import { canReadAloud, readAloudProgress, readAloudStatus, speakPlanParts } from "@/lib/client/speakPlan";
 
 /**
  * Reads the plan aloud with the browser's own speech voice (nothing leaves the device), one short piece at a
@@ -11,6 +11,8 @@ import { canReadAloud, readAloudStatus, speakPlanParts } from "@/lib/client/spea
 export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
   const [supported, setSupported] = useState(false);
   const [state, setState] = useState<"idle" | "reading" | "stopped">("idle");
+  // Which spoken piece is being read now (1-based) and how many there are, for the progress line.
+  const [progress, setProgress] = useState({ part: 0, total: 0 });
   // Bumped on every start and stop, so a late "ended" from a cancelled run can't flip the button back.
   const run = useRef(0);
 
@@ -41,10 +43,12 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
     synth.cancel();
     const parts = speakPlanParts(plan);
     setState("reading");
+    setProgress({ part: 0, total: parts.length });
     parts.forEach((text, i) => {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "en-US";
       const last = i === parts.length - 1;
+      u.onstart = () => run.current === mine && setProgress({ part: i + 1, total: parts.length });
       if (last) u.onend = () => run.current === mine && setState("idle");
       u.onerror = (e) => {
         // "canceled" and "interrupted" are our own stop; anything else ends the run quietly.
@@ -79,6 +83,14 @@ export function ReadAloudButton({ plan }: { plan: WorkPlan }) {
       <p role="status" aria-live="polite" className="text-sm text-ink/70">
         {readAloudStatus(state)}
       </p>
+      {reading && readAloudProgress(progress.part, progress.total) ? (
+        <p aria-hidden="true" data-testid="read-aloud-progress" className="flex items-center gap-2 text-sm text-ink/70">
+          <span className="h-1.5 w-20 overflow-hidden rounded-full bg-ink/10">
+            <span className="block h-full rounded-full bg-accent-dark" style={{ width: `${Math.round((progress.part / progress.total) * 100)}%` }} />
+          </span>
+          {readAloudProgress(progress.part, progress.total)}
+        </p>
+      ) : null}
     </div>
   );
 }
