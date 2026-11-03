@@ -897,6 +897,31 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   if (typeof input.durationSec !== "number" || !Number.isFinite(input.durationSec) || input.durationSec < 0) {
     throw new Error(`reason: durationSec must be a finite number >= 0, got ${input.durationSec}`);
   }
+  // Parity with the route validator (src/lib/pipeline/planRequest.ts)
+  // and validateRunPlanRequest: a frame timestamp past durationSec
+  // would mislabel a proof frame as coming from inside a video that
+  // had already ended, and a direct runReason caller bypassing the
+  // route had no such check here. Frames must not exceed durationSec;
+  // a frame exactly at durationSec passes, like the route's frames.
+  // This sits after the durationSec check above, so an invalid
+  // duration keeps its own message, and only valid tSec frames are
+  // checked, so a malformed frame keeps its own message from the
+  // loop above. Real runs are already in range (runPlan hands the
+  // reason step the route-validated frames), so no current run changes.
+  input.frames.forEach((f, i) => {
+    if (
+      f &&
+      typeof f === "object" &&
+      typeof f.tSec === "number" &&
+      Number.isFinite(f.tSec) &&
+      f.tSec >= 0 &&
+      f.tSec > input.durationSec
+    ) {
+      throw new Error(
+        `reason: frame ${i} tSec must not exceed durationSec`,
+      );
+    }
+  });
   if (!deps || typeof deps !== "object") {
     throw new Error("reason: deps must be an object");
   }
