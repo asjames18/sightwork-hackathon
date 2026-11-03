@@ -1,6 +1,9 @@
 import type { WorkPlan, WorkStep } from "@/lib/types";
 import { crewSizeLine, hoursLabel, type CrewRow } from "./crewSummary";
-import { MAX_SHARE_CHARS, SHARE_SIGNOFF, planLocation, shareDate } from "./planText";
+import { MAX_SHARE_CHARS, planLocation, shareDate } from "./planText";
+
+/** Sign-off for the call for help: a full link, so people who get it in a group text can tap through. */
+export const VOLUNTEER_SIGNOFF = "Made with SightWork \u00B7 https://sightwork.melanatedintech.com";
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const span = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}-${r[1]}`);
@@ -84,11 +87,11 @@ export function volunteerCallText(
     for (const m of supplies) lines.push(`- ${clean(m.item)}: ${clean(m.qty)}`);
   }
 
-  lines.push("", "Reply if you can help, and tell us which days work for you.", "", SHARE_SIGNOFF);
+  lines.push("", "Reply if you can help, and tell us which days work for you.", "", VOLUNTEER_SIGNOFF);
 
   const text = lines.join("\n");
   if (text.length <= maxChars) return text;
-  const tail = `\n...\nShortened for a text.\n\n${SHARE_SIGNOFF}`;
+  const tail = `\n...\nShortened for a text.\n\n${VOLUNTEER_SIGNOFF}`;
   const body = lines.slice(0, -2).join("\n");
   const cut = body.slice(0, Math.max(0, maxChars - tail.length));
   const atLine = cut.lastIndexOf("\n");

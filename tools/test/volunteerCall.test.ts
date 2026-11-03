@@ -3,7 +3,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { volunteerCallText, volunteerCallTitle } from "@/lib/client/volunteerCall";
 import { crewSummary } from "@/lib/client/crewSummary";
-import { SHARE_SIGNOFF } from "@/lib/client/planText";
 import type { WorkPlan } from "@/lib/types";
 
 const date = new Date(2026, 9, 31);
@@ -49,7 +48,8 @@ test("call for help names the work, the hours, the sharing, the wait on a trade 
   assert.match(text, /Supplies we will need:\n- Cable cover: 2\n- Eggshell paint: 1 gal/);
   assert.doesNotMatch(text, /exit sign: 1|LED exit sign/);
   assert.match(text, /Reply if you can help, and tell us which days work for you\./);
-  assert.ok(text.endsWith(SHARE_SIGNOFF));
+  assert.ok(text.endsWith("Made with SightWork \u00B7 https://sightwork.melanatedintech.com"));
+  assert.doesNotMatch(text, /vercel\.app/);
 });
 
 test("the sample plan says it is a sample", () => {
@@ -92,7 +92,8 @@ test("a long call is cut at a line under the limit and keeps the sign-off", () =
   const text = volunteerCallText(p, volunteers(p), { date, maxChars: 600 })!;
   assert.ok(text.length <= 600);
   assert.match(text, /Shortened for a text\./);
-  assert.ok(text.endsWith(SHARE_SIGNOFF));
+  assert.ok(text.endsWith("Made with SightWork \u00B7 https://sightwork.melanatedintech.com"));
+  assert.doesNotMatch(text, /vercel\.app/);
 });
 
 test("title names the space, with a fallback", () => {
