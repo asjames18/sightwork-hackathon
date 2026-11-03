@@ -981,6 +981,26 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
     if (v !== undefined && (typeof v !== "string" || v.trim().length === 0)) {
       throw new Error(`reason: ${field} must be a non-empty string when given`);
     }
+    // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+    // the prompt build interpolates these names into the prompt text,
+    // so it rejects a newline, a {{...}} placeholder, and (for
+    // spaceName only) a double quote. A direct runReason caller with a
+    // prebuilt prompt bypasses the prompt build and had no such check
+    // here, so a bad name would ride onto a paid Spark call and come
+    // back printed in the finished plan. Only given strings are
+    // checked, so an omitted name keeps its message from the check
+    // above, and a blank one keeps that message too. Real runs are
+    // already valid (the prompt build rejects these before runReason
+    // is ever reached), so no current run changes.
+    if (typeof v === "string" && /[\r\n]/.test(v)) {
+      throw new Error(`reason: ${field} must not contain a newline`);
+    }
+    if (typeof v === "string" && /\{\{[a-z_]+\}\}/.test(v)) {
+      throw new Error(`reason: ${field} must not contain a {{...}} placeholder`);
+    }
+  }
+  if (typeof input.spaceName === "string" && input.spaceName.includes('"')) {
+    throw new Error('reason: spaceName must not contain a double quote');
   }
   if (typeof input.durationSec !== "number" || !Number.isFinite(input.durationSec) || input.durationSec < 0) {
     throw new Error(`reason: durationSec must be a finite number >= 0, got ${input.durationSec}`);
