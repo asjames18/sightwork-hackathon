@@ -198,6 +198,30 @@ function inputProblems(input: ReviewInput): string[] {
       errs.push(`review: issues[${i}].detail must be a non-empty string`);
     }
   });
+  // A repeated rank would give the reviewer two problems under one
+  // problemId: prompt 06 lists "id <rank>" and asks for one verdict
+  // per id, so the second problem would ride in unreviewed while
+  // parseReview keeps only the first verdict for that id. The
+  // wiring passes a finished plan whose ranks checkWorkPlan already
+  // keeps unique, but a direct caller gets the same fail-fast here,
+  // before any call is spent. Only valid ranks are compared, so a
+  // bad rank keeps its own message instead of also drawing a
+  // duplicate one.
+  {
+    const seenRanks = new Set<number>();
+    input.issues.forEach((issue, i) => {
+      if (
+        isRecord(issue) &&
+        Number.isInteger(issue.rank) &&
+        (issue.rank as number) >= 1
+      ) {
+        if (seenRanks.has(issue.rank as number)) {
+          errs.push(`review: issues[${i}].rank duplicates an earlier issue`);
+        }
+        seenRanks.add(issue.rank as number);
+      }
+    });
+  }
   if (input.frames.length > MAX_REVIEW_IMAGES) {
     errs.push(`review: at most ${MAX_REVIEW_IMAGES} frames per request, got ${input.frames.length}`);
   }
