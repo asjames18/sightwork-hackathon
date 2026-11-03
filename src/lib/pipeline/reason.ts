@@ -489,6 +489,19 @@ export function filterAndRenumber(output: ReasonOutput): ReasonOutput {
       throw new Error(`reason: filterAndRenumber output.issues[${i}].confidence must be a finite number`);
     }
   });
+  // The keep bar below reads `unmentioned` only for truthiness, so a
+  // non-boolean value used to silently pick the wrong bar: the string
+  // "false" is truthy and raised the bar to 0.6, dropping an issue
+  // that should have stayed ranked, with no entry named. Guard it
+  // the same way: an undefined unmentioned stays (it still takes
+  // the 0.5 bar below), anything else must be a boolean.
+  output.issues.forEach((issue, i) => {
+    const unmentioned = (issue as { unmentioned?: unknown }).unmentioned;
+    if (unmentioned === undefined) return;
+    if (typeof unmentioned !== "boolean") {
+      throw new Error(`reason: filterAndRenumber output.issues[${i}].unmentioned must be a boolean`);
+    }
+  });
   // Issues are renumbered below through a remap keyed on rank, so a
   // non-number rank used to silently break every rank reference to
   // that issue: a string key never matches a numeric forIssues/fixes
