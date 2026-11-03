@@ -1411,6 +1411,19 @@ export function validateRunPlanRequest(request: PlanRequest): void {
           `runPlan: transcriptTurns[${i}].startSec must not be earlier than the previous turn`,
         );
       }
+      // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+      // a turn that starts after the video ends cannot line up with
+      // anything seen, so it would mislabel narration on the plan
+      // screen, while the route already fails fast on the same input.
+      // Only the start is checked: an endSec past durationSec is
+      // harmless for alignment, since the turn itself still starts
+      // inside the video. Real turns from /api/transcribe start
+      // inside the audio, so no current run changes.
+      if (turn.startSec > request.durationSec) {
+        throw new Error(
+          `runPlan: transcriptTurns[${i}].startSec must not exceed durationSec`,
+        );
+      }
       prevTurnStartSec = turn.startSec;
     });
   }
