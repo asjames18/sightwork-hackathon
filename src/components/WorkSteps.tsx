@@ -232,7 +232,7 @@ export function WorkSteps({
                   {step.title}
                 </p>
                 <p className="text-sm text-ink/75">{step.detail}</p>
-                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats || disturbsOldMaterial(step) || worksUpHigh(step) || usesFumeProduct(step) || (makesDust(step) && !disturbsOldMaterial(step))) && (
+                {(step.trade || step.hours || step.dependsOn || waiting.length > 0 || (step.fixes && step.fixes.length > 0) || stepCosts?.has(step.order) || mats || disturbsOldMaterial(step) || worksUpHigh(step) || usesFumeProduct(step) || (makesDust(step) && !disturbsOldMaterial(step)) || needsDryTime(step) || needsDryWeather(step)) && (
                   <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Step details">
                     {step.trade && (
                       <li
