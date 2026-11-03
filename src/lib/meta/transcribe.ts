@@ -193,6 +193,14 @@ export function createAsrTranscribeCaller(opts: AsrClientOptions = {}): AsrTrans
   }
 
   return async (req) => {
+    // A direct caller bypassing the transcribe step used to get a raw
+    // TypeError here: a null request reading .model, with no step
+    // name. Fail fast with a named asr error, before any fetch,
+    // the same named-error rule the SAM and Image callers follow
+    // for their requests. Valid requests are unchanged.
+    if (req === null || typeof req !== "object" || Array.isArray(req)) {
+      throw new Error("asr: request must be an object");
+    }
     // A bad request would otherwise spend a paid ASR call and only
     // fail downstream, when the transcribe step parses an empty or
     // garbage result. Reject it here, before any fetch, like the
