@@ -1150,6 +1150,28 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   if (!deps.tracker || typeof deps.tracker.record !== "function") {
     throw new Error("reason: tracker.record must be a function");
   }
+  // Parity with the Meta client (src/lib/meta/client.ts), which passes
+  // the signal straight to fetch: a direct runReason caller handing
+  // over a non-signal (a string, a number, a plain object) used to
+  // pass here and ride onto a paid Spark call that fetch would then
+  // reject with a bare TypeError — or, for a plain object, never
+  // abort at all, since signal.aborted reads undefined and the stop
+  // never reaches the in-flight call. A signal, when given, must
+  // look like an AbortSignal (a boolean aborted plus
+  // addEventListener), so a bad one fails fast here, before any
+  // fetch. Omitted stays omitted, and a real AbortController signal
+  // passes unchanged. Real runs are already clean (runPlan hands
+  // over the route's request signal), so no current run changes.
+  const signal = deps.signal as unknown;
+  if (
+    signal !== undefined &&
+    (signal === null ||
+      typeof signal !== "object" ||
+      typeof (signal as { aborted?: unknown }).aborted !== "boolean" ||
+      typeof (signal as { addEventListener?: unknown }).addEventListener !== "function")
+  ) {
+    throw new Error("reason: signal must be an AbortSignal when given");
+  }
 }
 
 export async function runReason(input: ReasonInput, deps: ReasonDeps): Promise<ReasonOutput> {
