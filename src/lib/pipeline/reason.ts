@@ -871,6 +871,23 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
     ) {
       throw new Error("reason: segmentation.flaggedFrames must be an array of integers >= 0");
     }
+    // A flagged frame is an index into input.frames (the segment step
+    // returns sorted, unique indices of frames with a hazard-concept
+    // instance), so an index at or past frames.length names a frame
+    // that does not exist, and a direct runReason caller bypassing
+    // the segment step had no range check here — the prompt would
+    // then claim SAM flagged a frame outside the video. Only valid
+    // integer indices are checked, so a malformed entry keeps its
+    // message from the check above. Real runs are already in range
+    // (the segment step flags only frames it was given), so no
+    // current run changes.
+    seg.flaggedFrames.forEach((f, i) => {
+      if (Number.isInteger(f) && f >= 0 && f >= input.frames.length) {
+        throw new Error(
+          `reason: segmentation.flaggedFrames[${i}] must refer to an existing frame`,
+        );
+      }
+    });
   }
   if (input.transcript !== null && typeof input.transcript !== "string") {
     throw new Error("reason: transcript must be a string or null");
