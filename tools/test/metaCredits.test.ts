@@ -71,10 +71,10 @@ test("hand-written samples never claim a model ran", () => {
   }
 });
 
-test("the real sanctuary run credits SAM 3.1, Muse Spark Open and Muse Image", () => {
+test("the real sanctuary run credits every Meta model it ran", () => {
   const real = EXAMPLES.find((e) => e.id === "sanctuary")!;
   const ran = modelsThatRan(metaCredits(real.plan, { sample: false }));
-  assert.deepEqual(ran, ["SAM 3.1", "Muse Spark Open", "Muse Image"]);
+  assert.deepEqual(ran, ["Muse Voice Transcribe", "SAM 3.1", "Muse Spark Open", "Muse Spark", "Muse Image"]);
 });
 
 test("a sample with explicit skip flags (the ?mock=nometa preview) still shows those steps as off", () => {

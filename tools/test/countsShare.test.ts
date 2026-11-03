@@ -45,8 +45,19 @@ test("every example's shared text stays under the cap and is not shortened", () 
   for (const ex of EXAMPLES) {
     const t = planToText(ex.plan, { date: DAY });
     assert.ok(t.length <= MAX_SHARE_CHARS, `length ${t.length}`);
-    if (ex.id !== "kitchen") assert.doesNotMatch(t, /Shortened/); // the kitchen sample was already cut before counts were added
+    // The kitchen sample was already cut before counts were added; the real sanctuary run is a long narrated plan, so its
+    // text takes the compact form and is cut after the cost line, as any long real plan is.
+    if (ex.id !== "kitchen" && ex.id !== "sanctuary") assert.doesNotMatch(t, /Shortened/);
   }
+});
+
+test("the real sanctuary run's shared text keeps every problem, every step and the cost before it is cut", () => {
+  const t = planToText(EXAMPLES.find((e) => e.id === "sanctuary")!.plan, { date: DAY });
+  assert.ok(t.length <= MAX_SHARE_CHARS, `length ${t.length}`);
+  assert.match(t, /^6\. Unsecured equipment and tangled cords on stage \(medium\)$/m);
+  assert.match(t, /^6\. Organize and secure stage equipment /m);
+  assert.match(t, /^Cost: \$260-\$460 for Sebring, FL\./m);
+  assert.match(t, /Made with SightWork \u00B7 sightwork\.vercel\.app$/);
 });
 
 test("when the text runs long the counts line is dropped before anything is cut", () => {

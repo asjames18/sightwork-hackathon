@@ -73,13 +73,14 @@ test("summary wording when every problem went unsaid, and marker labels", () => 
   assert.equal(markLabel({ atSec: 9.6, pct: 20, ranks: [5], tier: "later", unsaid: false }, "Can wait"), "Problem 5: seen at 10 s, Can wait");
 });
 
-test("the real sanctuary run (no narration): 4 problems across 44 s, nothing called unsaid", () => {
+test("the real sanctuary run: 6 problems across the 148 s narrated walk, 3 never mentioned", () => {
   const p = findExample("sanctuary").plan;
   const t = walkTimeline(p, rankedIssues(p), false)!;
-  assert.equal(t.lengthSec, 44);
-  assert.deepEqual(t.marks.map((m) => m.ranks), [[3], [2, 4], [1]]);
-  assert.equal(walkSummary(t), "4 problems spotted across the 44 s walk.");
-  assert.deepEqual(t.marks.map(markText), ["3", "2, 4", "1"]);
+  assert.equal(t.lengthSec, 148.18);
+  assert.deepEqual(t.marks.map((m) => m.ranks), [[2], [3], [5, 1], [6], [4]]);
+  assert.equal(walkSummary(t), "6 problems spotted across the 148 s walk.");
+  assert.deepEqual(t.marks.map(markText), ["2", "3", "5, 1", "6", "4"]);
+  assert.equal(walkSummary(walkTimeline(p, rankedIssues(p), true)!), "6 problems spotted across the 148 s walk, 3 of them never mentioned.");
 });
 
 test("hand-written single-photo samples get no timeline", () => {

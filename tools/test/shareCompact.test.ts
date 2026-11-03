@@ -34,7 +34,7 @@ test("plans that already fit keep the full form", () => {
   assert.match(full, /^ {3}High priority\. Spotted on video, not mentioned on the walk\.$/m);
   assert.match(full, /^Start here: /m);
   assert.ok(!/^- Measure on site:/m.test(full));
-  for (const e of EXAMPLES.filter((x) => x.id !== "kitchen")) {
+  for (const e of EXAMPLES.filter((x) => x.id !== "kitchen" && x.id !== "sanctuary")) {
     const t = planToText(e.plan as WorkPlan, { date: DAY });
     assert.ok(!/\(high[,)]|\(medium[,)]|\(low[,)]/.test(t.split("Do the work")[0]), e.id);
   }

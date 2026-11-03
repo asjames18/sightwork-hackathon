@@ -1,0 +1,1082 @@
+{
+  "spaceName": "Sanctuary",
+  "generatedFrom": "Walkthrough video, 8 frames, 148.18 s, narrated",
+  "inventory": [
+    {
+      "label": "Padded chairs (main floor)",
+      "count": 69,
+      "confidence": 0.74,
+      "method": "sam",
+      "zone": "main floor"
+    },
+    {
+      "label": "Ceiling light fixtures",
+      "count": 4,
+      "confidence": 0.67,
+      "method": "sam",
+      "zone": "ceiling"
+    },
+    {
+      "label": "Exit signs",
+      "count": 2,
+      "confidence": 0.85,
+      "range": [
+        1,
+        2
+      ],
+      "method": "sam+model",
+      "zone": "egress doors"
+    },
+    {
+      "label": "Speakers",
+      "count": 4,
+      "confidence": 0.72,
+      "method": "sam",
+      "zone": "stage and sanctuary"
+    },
+    {
+      "label": "Projection screens",
+      "count": 1,
+      "confidence": 0.9,
+      "method": "sam",
+      "zone": "stage"
+    },
+    {
+      "label": "Plants (potted and floral)",
+      "count": 5,
+      "confidence": 0.94,
+      "method": "sam",
+      "zone": "stage and rear"
+    },
+    {
+      "label": "Stage platform sections",
+      "count": 1,
+      "confidence": 0.66,
+      "method": "sam",
+      "zone": "stage"
+    },
+    {
+      "label": "Fire extinguishers",
+      "count": 2,
+      "confidence": 0.88,
+      "method": "model",
+      "zone": "walls near exits"
+    }
+  ],
+  "issues": [
+    {
+      "rank": 1,
+      "title": "Loose cables creating trip hazard on stage",
+      "detail": "Black cables and cords are loose and crossed across the stage floor from the rear wall toward the front edge and around equipment. Speaker mentioned wires and cables in this area. May extend under keyboards, drum cage and along stage steps; check in person.",
+      "severity": "high",
+      "frameIndex": 24,
+      "frameTimeSec": 75.66,
+      "unmentioned": false,
+      "status": "mentioned",
+      "mention": {
+        "quote": "we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage",
+        "saidAtSec": 79.8
+      },
+      "proofFrames": [
+        {
+          "frameIndex": 24,
+          "tSec": 75.66,
+          "caption": "black cables stretched across stage floor near speaker and wall outlet",
+          "box": [
+            457,
+            421,
+            780,
+            499
+          ]
+        },
+        {
+          "frameIndex": 21,
+          "tSec": 66.23,
+          "caption": "coiled cable on stage floor near drum cage and mic stands",
+          "box": [
+            227,
+            426,
+            363,
+            461
+          ]
+        },
+        {
+          "frameIndex": 34,
+          "tSec": 107.08,
+          "caption": "tangled cables under and around chair on stage",
+          "box": [
+            330,
+            835,
+            634,
+            999
+          ]
+        }
+      ],
+      "confidence": 0.85,
+      "category": "safety",
+      "hazard": "trip_cable",
+      "tier": "urgent",
+      "area": "stage, center and rear",
+      "evidence": "black cables coiled and stretched across dirty stage floor",
+      "checklistKey": "trip_cable"
+    },
+    {
+      "rank": 2,
+      "title": "Bags and clutter on floor near exit door",
+      "detail": "Two bags, including a patterned blue tote, sit on the carpet against the wall near the exit door and fire extinguisher, encroaching on the egress path. Speaker noted bags on the ground.",
+      "severity": "high",
+      "frameIndex": 4,
+      "frameTimeSec": 12.82,
+      "unmentioned": false,
+      "status": "mentioned",
+      "mention": {
+        "quote": "we do have a couple bags in the ground",
+        "saidAtSec": 0.4
+      },
+      "proofFrames": [
+        {
+          "frameIndex": 4,
+          "tSec": 12.82,
+          "caption": "patterned bag and plastic bag on carpet near wall and fire extinguisher",
+          "box": [
+            260,
+            620,
+            470,
+            750
+          ]
+        }
+      ],
+      "confidence": 0.9,
+      "category": "safety",
+      "hazard": "egress",
+      "tier": "urgent",
+      "area": "main floor, near east exit door",
+      "evidence": "patterned blue bag and plastic bag on carpet near wall",
+      "checklistKey": "blocked_aisle"
+    },
+    {
+      "rank": 3,
+      "title": "Fire extinguisher partially blocked by stool and signage",
+      "detail": "Red fire extinguisher mounted on wall is partially hidden behind a round chrome stool and yellow Hope City sign, reducing visibility and access. May extend to other extinguishers; check in person.",
+      "severity": "high",
+      "frameIndex": 15,
+      "frameTimeSec": 47.38,
+      "unmentioned": true,
+      "status": "unmentioned",
+      "mention": null,
+      "proofFrames": [
+        {
+          "frameIndex": 15,
+          "tSec": 47.38,
+          "caption": "red fire extinguisher partially hidden behind stool and yellow sign",
+          "box": [
+            753,
+            468,
+            813,
+            572
+          ]
+        },
+        {
+          "frameIndex": 4,
+          "tSec": 12.82,
+          "caption": "fire extinguisher mounted on wall near exit door, unobstructed for comparison",
+          "box": [
+            184,
+            451,
+            250,
+            554
+          ]
+        }
+      ],
+      "confidence": 0.75,
+      "category": "safety",
+      "hazard": "fire_extinguisher",
+      "tier": "urgent",
+      "area": "sanctuary wall, near podium",
+      "evidence": "red extinguisher behind stool and yellow sign, only side visible",
+      "checklistKey": "fire_extinguisher"
+    },
+    {
+      "rank": 4,
+      "title": "Unmarked stage edge with drop-off",
+      "detail": "Stage platform has a dark front edge with corrugated metal facing and no contrasting nosing, tape, or rail to mark the drop to the main floor. May extend along entire stage perimeter; check in person.",
+      "severity": "high",
+      "frameIndex": 47,
+      "frameTimeSec": 147.93,
+      "unmentioned": true,
+      "status": "unmentioned",
+      "mention": null,
+      "proofFrames": [
+        {
+          "frameIndex": 47,
+          "tSec": 147.93,
+          "caption": "dark stage front edge with corrugated metal and no marking above carpet"
+        },
+        {
+          "frameIndex": 21,
+          "tSec": 66.23,
+          "caption": "stage edge viewed from above, no contrast strip"
+        },
+        {
+          "frameIndex": 24,
+          "tSec": 75.66,
+          "caption": "stage edge near speaker, drop-off to floor"
+        }
+      ],
+      "confidence": 0.8,
+      "category": "safety",
+      "tier": "urgent",
+      "area": "stage, front edge",
+      "evidence": "dark stage platform edge with no marking above green carpet",
+      "checklistKey": "stage_edge"
+    },
+    {
+      "rank": 5,
+      "title": "Stage floor worn, dirty with debris and scuffs",
+      "detail": "Black stage floor is heavily scuffed with white paint chips, dust, and debris scattered across the surface, indicating wear and poor cleaning. May extend under drum cage and equipment; check in person.",
+      "severity": "medium",
+      "frameIndex": 21,
+      "frameTimeSec": 66.23,
+      "unmentioned": true,
+      "status": "unmentioned",
+      "mention": null,
+      "proofFrames": [
+        {
+          "frameIndex": 21,
+          "tSec": 66.23,
+          "caption": "black stage floor with white scuffs and debris near drum cage"
+        },
+        {
+          "frameIndex": 24,
+          "tSec": 75.66,
+          "caption": "stage floor with dust and paint chips near cables"
+        },
+        {
+          "frameIndex": 47,
+          "tSec": 147.93,
+          "caption": "wide view of worn stage floor"
+        }
+      ],
+      "confidence": 0.78,
+      "category": "damage",
+      "tier": "soon",
+      "area": "stage, entire floor",
+      "evidence": "black stage floor with white debris and scuff marks",
+      "checklistKey": "flooring"
+    },
+    {
+      "rank": 6,
+      "title": "Unsecured equipment and tangled cords on stage",
+      "detail": "Speaker cabinet, mic stands, guitar stand, chairs, and keyboards are placed on stage with tangled cords and no cable management, creating clutter in walkways. Speaker mentioned speaker, keyboards, mics and drum cage in this area.",
+      "severity": "medium",
+      "frameIndex": 34,
+      "frameTimeSec": 107.08,
+      "unmentioned": false,
+      "status": "mentioned",
+      "mention": {
+        "quote": "we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage",
+        "saidAtSec": 79.8
+      },
+      "proofFrames": [
+        {
+          "frameIndex": 34,
+          "tSec": 107.08,
+          "caption": "chair and keyboard surrounded by tangled cords on dark stage",
+          "box": [
+            0,
+            725,
+            89,
+            799
+          ]
+        },
+        {
+          "frameIndex": 24,
+          "tSec": 75.66,
+          "caption": "speaker cabinet, guitar stand and loose cords on stage",
+          "box": [
+            193,
+            397,
+            458,
+            628
+          ]
+        },
+        {
+          "frameIndex": 21,
+          "tSec": 66.23,
+          "caption": "mic stands and cables scattered on stage rear"
+        }
+      ],
+      "confidence": 0.7,
+      "category": "function",
+      "tier": "soon",
+      "area": "stage, rear and sides",
+      "evidence": "black speaker, guitar stand, and tangled cords on stage floor",
+      "checklistKey": "clutter"
+    }
+  ],
+  "materials": [
+    {
+      "item": "Cable cover kit / cord protectors",
+      "qty": "2",
+      "forIssues": [
+        1
+      ],
+      "note": "for main stage walkways",
+      "unitCost": [
+        12.98,
+        17.98
+      ]
+    },
+    {
+      "item": "Gaffer tape / cable tape",
+      "qty": "2 rolls",
+      "forIssues": [
+        1,
+        6
+      ],
+      "note": "to secure cables along walls",
+      "unitCost": [
+        12.87,
+        23.76
+      ]
+    },
+    {
+      "item": "Zip ties / Velcro straps",
+      "qty": "1 pack",
+      "forIssues": [
+        1,
+        6
+      ],
+      "unitCost": [
+        5.92,
+        12.85
+      ]
+    },
+    {
+      "item": "Storage bins for bags and loose items",
+      "qty": "2",
+      "forIssues": [
+        2
+      ],
+      "note": "move bags off egress path",
+      "unitCost": [
+        8.89,
+        16.81
+      ]
+    },
+    {
+      "item": "Fire extinguisher signage and mounting hardware",
+      "qty": "1 set",
+      "forIssues": [
+        3
+      ],
+      "note": "relocate stool and sign to make extinguisher visible",
+      "unitCost": [
+        6.48,
+        12.98
+      ]
+    },
+    {
+      "item": "High-visibility stage edge tape",
+      "qty": "1 roll",
+      "forIssues": [
+        4
+      ],
+      "unitCost": [
+        8.89,
+        18.79
+      ]
+    },
+    {
+      "item": "Non-slip stair nosing",
+      "qty": "1 set",
+      "forIssues": [
+        4
+      ],
+      "note": "for stage steps if present",
+      "unitCost": [
+        16.81,
+        34.63
+      ]
+    },
+    {
+      "item": "Heavy-duty floor cleaner",
+      "qty": "1 bottle",
+      "forIssues": [
+        5
+      ],
+      "unitCost": [
+        13.98,
+        17.98
+      ]
+    },
+    {
+      "item": "Black stage floor paint",
+      "qty": "1 gallon",
+      "forIssues": [
+        5
+      ],
+      "note": "for touch-up after cleaning",
+      "unitCost": [
+        36.98,
+        44.98
+      ]
+    },
+    {
+      "item": "Equipment storage rack / cases",
+      "qty": "1",
+      "forIssues": [
+        6
+      ],
+      "note": "for mics, stands, keyboards",
+      "unitCost": [
+        78.21,
+        137.61
+      ]
+    }
+  ],
+  "workOrder": [
+    {
+      "order": 1,
+      "title": "Clear egress path and store bags",
+      "detail": "Remove patterned bag and other bags from floor near exit door and fire extinguisher; place in storage closet or bins away from egress path to keep exit clear.",
+      "fixes": [
+        2
+      ],
+      "trade": "volunteer",
+      "hours": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Secure and cover stage cables",
+      "detail": "Gather loose black cables on stage, route along walls, bundle with zip ties and cover walkway crossings with cable covers and gaffer tape to eliminate trip hazard.",
+      "fixes": [
+        1
+      ],
+      "trade": "volunteer",
+      "hours": [
+        1,
+        2
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Make fire extinguisher accessible",
+      "detail": "Move stool and yellow Hope City sign away from wall, ensure extinguisher is fully visible, mounted at proper height, and signed; verify second extinguisher is also clear.",
+      "fixes": [
+        3
+      ],
+      "trade": "volunteer",
+      "hours": [
+        0.5,
+        1
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Mark stage edge and steps",
+      "detail": "Apply high-visibility edge tape or paint to front edge of stage platform and nosing to steps to warn of drop-off.",
+      "fixes": [
+        4
+      ],
+      "trade": "volunteer",
+      "hours": [
+        1,
+        1.5
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Clean and refinish stage floor",
+      "detail": "Sweep and mop stage floor to remove debris and scuffs, then touch up black paint where worn. Do after cables are secured to avoid painting over cords.",
+      "dependsOn": 2,
+      "fixes": [
+        5
+      ],
+      "trade": "painter",
+      "hours": [
+        3,
+        5
+      ]
+    },
+    {
+      "order": 6,
+      "title": "Organize and secure stage equipment",
+      "detail": "Return speaker, mic stands, guitar stand, chairs and keyboards to designated storage or marked positions; coil and label cords, store cases off walkways.",
+      "dependsOn": 2,
+      "fixes": [
+        6
+      ],
+      "trade": "volunteer",
+      "hours": [
+        1,
+        2
+      ]
+    }
+  ],
+  "afterImageUrl": "/examples/sanctuary-walk/after.webp",
+  "transcript": "[0.4] so I am in a sanctuary and I am doing a recording you can see this I'm going to kind of pan the room slowly so you can see we do have a couple bags in the ground and then we're panning this is the right side of the room and then we're going to walk across to the left side of the room\n[31.1] I don't know if I need to zoom in a little bit so you can see\n[35.7] so we'll walk walk across\n[37.8] so that you can see the left side of the room\n[44.1] And we're going to pan across\n[46.8] again\n[48.9] and then now we're in front of where the stage is\n[54.5] so we'll zoom out on the stage so you can see the stage and we're just walking across the stage right now\n[66.2] so you're able to see to see the stage\n[70.7] alright you see the stage now we're going to walk up the steps\n[75.5] on the stage\n[78.0] so that you can see\n[79.8] WhatWhat we have so we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage\n[117.8] there\n[120.3] and we're backing up um um and then then the keyboards are right there we're walking back across you can see some tables\n[132.6] and we're walking down the stage\n[139.6] backing up and give you you another view of the stage",
+  "frames": [
+    {
+      "index": 0,
+      "tSec": 0.25,
+      "url": "/examples/sanctuary-walk/f0.webp"
+    },
+    {
+      "index": 1,
+      "tSec": 3.39,
+      "url": "/examples/sanctuary-walk/f1.webp"
+    },
+    {
+      "index": 2,
+      "tSec": 6.23,
+      "url": "/examples/sanctuary-walk/f2.webp"
+    },
+    {
+      "index": 3,
+      "tSec": 9.68,
+      "url": "/examples/sanctuary-walk/f3.webp"
+    },
+    {
+      "index": 4,
+      "tSec": 12.82,
+      "url": "/examples/sanctuary-walk/f4.webp"
+    },
+    {
+      "index": 5,
+      "tSec": 15.96,
+      "url": "/examples/sanctuary-walk/f5.webp"
+    },
+    {
+      "index": 6,
+      "tSec": 19.1,
+      "url": "/examples/sanctuary-walk/f6.webp"
+    },
+    {
+      "index": 7,
+      "tSec": 22.24,
+      "url": "/examples/sanctuary-walk/f7.webp"
+    },
+    {
+      "index": 8,
+      "tSec": 25.39,
+      "url": "/examples/sanctuary-walk/f8.webp"
+    },
+    {
+      "index": 9,
+      "tSec": 28.53,
+      "url": "/examples/sanctuary-walk/f9.webp"
+    },
+    {
+      "index": 10,
+      "tSec": 31.67,
+      "url": "/examples/sanctuary-walk/f10.webp"
+    },
+    {
+      "index": 11,
+      "tSec": 34.81,
+      "url": "/examples/sanctuary-walk/f11.webp"
+    },
+    {
+      "index": 12,
+      "tSec": 37.96,
+      "url": "/examples/sanctuary-walk/f12.webp"
+    },
+    {
+      "index": 13,
+      "tSec": 41.1,
+      "url": "/examples/sanctuary-walk/f13.webp"
+    },
+    {
+      "index": 14,
+      "tSec": 44.24,
+      "url": "/examples/sanctuary-walk/f14.webp"
+    },
+    {
+      "index": 15,
+      "tSec": 47.38,
+      "url": "/examples/sanctuary-walk/f15.webp"
+    },
+    {
+      "index": 16,
+      "tSec": 50.22,
+      "url": "/examples/sanctuary-walk/f16.webp"
+    },
+    {
+      "index": 17,
+      "tSec": 53.67,
+      "url": "/examples/sanctuary-walk/f17.webp"
+    },
+    {
+      "index": 18,
+      "tSec": 56.81,
+      "url": "/examples/sanctuary-walk/f18.webp"
+    },
+    {
+      "index": 19,
+      "tSec": 59.95,
+      "url": "/examples/sanctuary-walk/f19.webp"
+    },
+    {
+      "index": 20,
+      "tSec": 63.09,
+      "url": "/examples/sanctuary-walk/f20.webp"
+    },
+    {
+      "index": 21,
+      "tSec": 66.23,
+      "url": "/examples/sanctuary-walk/f21.webp"
+    },
+    {
+      "index": 22,
+      "tSec": 69.38,
+      "url": "/examples/sanctuary-walk/f22.webp"
+    },
+    {
+      "index": 23,
+      "tSec": 72.52,
+      "url": "/examples/sanctuary-walk/f23.webp"
+    },
+    {
+      "index": 24,
+      "tSec": 75.66,
+      "url": "/examples/sanctuary-walk/f24.webp"
+    },
+    {
+      "index": 25,
+      "tSec": 78.8,
+      "url": "/examples/sanctuary-walk/f25.webp"
+    },
+    {
+      "index": 26,
+      "tSec": 81.95,
+      "url": "/examples/sanctuary-walk/f26.webp"
+    },
+    {
+      "index": 27,
+      "tSec": 85.09,
+      "url": "/examples/sanctuary-walk/f27.webp"
+    },
+    {
+      "index": 28,
+      "tSec": 88.23,
+      "url": "/examples/sanctuary-walk/f28.webp"
+    },
+    {
+      "index": 29,
+      "tSec": 91.37,
+      "url": "/examples/sanctuary-walk/f29.webp"
+    },
+    {
+      "index": 30,
+      "tSec": 94.51,
+      "url": "/examples/sanctuary-walk/f30.webp"
+    },
+    {
+      "index": 31,
+      "tSec": 97.66,
+      "url": "/examples/sanctuary-walk/f31.webp"
+    },
+    {
+      "index": 32,
+      "tSec": 100.8,
+      "url": "/examples/sanctuary-walk/f32.webp"
+    },
+    {
+      "index": 33,
+      "tSec": 103.94,
+      "url": "/examples/sanctuary-walk/f33.webp"
+    },
+    {
+      "index": 34,
+      "tSec": 107.08,
+      "url": "/examples/sanctuary-walk/f34.webp"
+    },
+    {
+      "index": 35,
+      "tSec": 110.22,
+      "url": "/examples/sanctuary-walk/f35.webp"
+    },
+    {
+      "index": 36,
+      "tSec": 113.07,
+      "url": "/examples/sanctuary-walk/f36.webp"
+    },
+    {
+      "index": 37,
+      "tSec": 116.51,
+      "url": "/examples/sanctuary-walk/f37.webp"
+    },
+    {
+      "index": 38,
+      "tSec": 119.65,
+      "url": "/examples/sanctuary-walk/f38.webp"
+    },
+    {
+      "index": 39,
+      "tSec": 122.79,
+      "url": "/examples/sanctuary-walk/f39.webp"
+    },
+    {
+      "index": 40,
+      "tSec": 125.94,
+      "url": "/examples/sanctuary-walk/f40.webp"
+    },
+    {
+      "index": 41,
+      "tSec": 129.08,
+      "url": "/examples/sanctuary-walk/f41.webp"
+    },
+    {
+      "index": 42,
+      "tSec": 131.92,
+      "url": "/examples/sanctuary-walk/f42.webp"
+    },
+    {
+      "index": 43,
+      "tSec": 135.36,
+      "url": "/examples/sanctuary-walk/f43.webp"
+    },
+    {
+      "index": 44,
+      "tSec": 138.5,
+      "url": "/examples/sanctuary-walk/f44.webp"
+    },
+    {
+      "index": 45,
+      "tSec": 141.65,
+      "url": "/examples/sanctuary-walk/f45.webp"
+    },
+    {
+      "index": 46,
+      "tSec": 144.79,
+      "url": "/examples/sanctuary-walk/f46.webp"
+    },
+    {
+      "index": 47,
+      "tSec": 147.93,
+      "url": "/examples/sanctuary-walk/f47.webp"
+    }
+  ],
+  "transcriptTurns": [
+    {
+      "startSec": 0.38,
+      "endSec": 27.26,
+      "text": "so I am in a sanctuary and I am doing a recording you can see this I'm going to kind of pan the room slowly so you can see we do have a couple bags in the ground and then we're panning this is the right side of the room and then we're going to walk across to the left side of the room"
+    },
+    {
+      "startSec": 31.1,
+      "endSec": 33.9,
+      "text": "I don't know if I need to zoom in a little bit so you can see"
+    },
+    {
+      "startSec": 35.66,
+      "endSec": 37.34,
+      "text": "so we'll walk walk across"
+    },
+    {
+      "startSec": 37.82,
+      "endSec": 41.74,
+      "text": "so that you can see the left side of the room"
+    },
+    {
+      "startSec": 44.06,
+      "endSec": 46.14,
+      "text": "And we're going to pan across"
+    },
+    {
+      "startSec": 46.78,
+      "endSec": 47.58,
+      "text": "again"
+    },
+    {
+      "startSec": 48.86,
+      "endSec": 52.62,
+      "text": "and then now we're in front of where the stage is"
+    },
+    {
+      "startSec": 54.46,
+      "endSec": 63.34,
+      "text": "so we'll zoom out on the stage so you can see the stage and we're just walking across the stage right now"
+    },
+    {
+      "startSec": 66.22,
+      "endSec": 68.54,
+      "text": "so you're able to see to see the stage"
+    },
+    {
+      "startSec": 70.7,
+      "endSec": 74.38,
+      "text": "alright you see the stage now we're going to walk up the steps"
+    },
+    {
+      "startSec": 75.5,
+      "endSec": 76.7,
+      "text": "on the stage"
+    },
+    {
+      "startSec": 77.98,
+      "endSec": 79.42,
+      "text": "so that you can see"
+    },
+    {
+      "startSec": 79.85,
+      "endSec": 115.83,
+      "text": "WhatWhat we have so we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage"
+    },
+    {
+      "startSec": 117.75,
+      "endSec": 118.55,
+      "text": "there"
+    },
+    {
+      "startSec": 120.31,
+      "endSec": 131.19,
+      "text": "and we're backing up um um and then then the keyboards are right there we're walking back across you can see some tables"
+    },
+    {
+      "startSec": 132.63,
+      "endSec": 135.03,
+      "text": "and we're walking down the stage"
+    },
+    {
+      "startSec": 139.51,
+      "endSec": 146.07,
+      "text": "backing up and give you you another view of the stage"
+    }
+  ],
+  "transcriptSummary": "The speaker narrated a continuous walkthrough of the sanctuary, panning from the right side to the left side and then across the stage. He noted bags on the floor, speakers, multiple wires and cables, keyboards, mics, the drum cage, and tables.",
+  "saidVsSeen": [
+    {
+      "status": "mentioned",
+      "said": {
+        "quote": "we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage",
+        "atSec": 79.8
+      },
+      "seen": {
+        "summary": "black cables stretched and coiled across stage floor",
+        "frameIndex": 24
+      },
+      "issueRank": 1
+    },
+    {
+      "status": "mentioned",
+      "said": {
+        "quote": "we do have a couple bags in the ground",
+        "atSec": 0.4
+      },
+      "seen": {
+        "summary": "patterned bag and plastic bag on carpet near exit door",
+        "frameIndex": 4
+      },
+      "issueRank": 2
+    },
+    {
+      "status": "unmentioned",
+      "said": null,
+      "seen": {
+        "summary": "red fire extinguisher partially hidden behind stool and yellow sign",
+        "frameIndex": 15
+      },
+      "issueRank": 3
+    },
+    {
+      "status": "unmentioned",
+      "said": null,
+      "seen": {
+        "summary": "dark stage front edge with no marking above carpet",
+        "frameIndex": 47
+      },
+      "issueRank": 4
+    },
+    {
+      "status": "unmentioned",
+      "said": null,
+      "seen": {
+        "summary": "black stage floor with white scuffs and debris",
+        "frameIndex": 21
+      },
+      "issueRank": 5
+    },
+    {
+      "status": "mentioned",
+      "said": {
+        "quote": "we have a speaker and some wires and we have some stuff over here um we're walking across have some more wires there and we have a couple keyboards right here have some more wires we go back here couple keyboards and mic some more cables back here you can see that um inside you can see the drum cage",
+        "atSec": 79.8
+      },
+      "seen": {
+        "summary": "speaker, guitar stand, chairs and tangled cords cluttering stage",
+        "frameIndex": 34
+      },
+      "issueRank": 6
+    }
+  ],
+  "costRange": {
+    "low": 260,
+    "high": 460,
+    "currency": "USD",
+    "label": "Rough estimate, not a quote",
+    "region": "Sebring, FL",
+    "laborBasis": "volunteer",
+    "assumptions": [
+      "Region is Sebring, FL and nearby Highlands County retail at home-improvement stores serving Sebring.",
+      "Prices are mid-grade materials bought retail before sales tax.",
+      "Labor basis is volunteer: volunteer trade steps are unpaid at zero cost and only the painter step is paid.",
+      "One cable-cover kit means one 5-ft over-floor channel; gaffer tape is one 2-inch by 30-yard roll; zip ties means one pack of ties or Velcro straps.",
+      "Storage bin means one 19 to 27 gallon latching tote; signage set means one wall sign plus screws and anchors; edge tape is one roll; stair nosing is one adhesive set for one to two steps; cleaner is one 1-gallon bottle; paint is one gallon of porch and floor enamel; rack means one freestanding metal storage rack.",
+      "Grounded prices are cable cover kit, fire extinguisher sign, heavy-duty floor cleaner, black floor paint, and Sebring painter wage; gaffer tape, zip ties, storage bins, stage edge tape, stair nosing, and equipment rack are not grounded and use wide estimate ranges.",
+      "Total = materials + labor + contingency, computed from the line items",
+      "Ungrounded price for Gaffer tape / cable tape (state-adjusted estimate)",
+      "Ungrounded price for Zip ties / Velcro straps (state-adjusted estimate)",
+      "Ungrounded price for Storage bins for bags and loose items (state-adjusted estimate)",
+      "Ungrounded price for High-visibility stage edge tape (state-adjusted estimate)",
+      "Ungrounded price for Non-slip stair nosing (state-adjusted estimate)",
+      "Ungrounded price for Equipment storage rack / cases (state-adjusted estimate)",
+      "Adjusted for Florida with state averages (estimate)"
+    ],
+    "sources": [
+      {
+        "title": "Wiremold Corduct 5 ft. 1-Channel Over-Floor Cord Protector, Black",
+        "url": "https://www.homedepot.com/p/Legrand-Wiremold-Corduct-5-ft-1-Channel-Over-Floor-Cord-Protector-Black-CDBK-5/205485211"
+      },
+      {
+        "title": "Pro HD Heavy-Duty Cleaner 1 Gallon",
+        "url": "https://www.homedepot.com/p/Simple-Green-Pro-HD-Heavy-Duty-Cleaner-1-Gallon-2110000413421/100550784"
+      },
+      {
+        "title": "1 gal. #PFC-75 Tar Black Low-Lustre Enamel Interior/Exterior Porch and Patio Floor Paint",
+        "url": "https://www.homedepot.com/p/BEHR-PREMIUM-1-gal-PFC-75-Tar-Black-Low-Lustre-Enamel-Interior-Exterior-Porch-and-Patio-Floor-Paint-630001/203939762"
+      },
+      {
+        "title": "4 in. x 18 in. Fire Extinguisher Sign",
+        "url": "https://www.homedepot.com/p/4-in-x-18-in-Fire-Extinguisher-Sign-844112/100197218"
+      },
+      {
+        "title": "Painter/Paperhanger Salary in Sebring, Florida, United States",
+        "url": "https://www.erieri.com/salary/job/painter-paperhanger/united-states/florida/sebring"
+      }
+    ],
+    "byIssue": [
+      {
+        "rank": 1,
+        "low": 45.89,
+        "high": 76.66
+      },
+      {
+        "rank": 2,
+        "low": 19.53,
+        "high": 38.96
+      },
+      {
+        "rank": 3,
+        "low": 7.12,
+        "high": 15.04
+      },
+      {
+        "rank": 4,
+        "low": 28.22,
+        "high": 61.91
+      },
+      {
+        "rank": 5,
+        "low": 55.96,
+        "high": 72.97
+      },
+      {
+        "rank": 6,
+        "low": 103.28,
+        "high": 194.46
+      }
+    ],
+    "byStep": [
+      {
+        "order": 1,
+        "low": 19.53,
+        "high": 38.96
+      },
+      {
+        "order": 2,
+        "low": 45.89,
+        "high": 76.66
+      },
+      {
+        "order": 3,
+        "low": 7.12,
+        "high": 15.04
+      },
+      {
+        "order": 4,
+        "low": 28.22,
+        "high": 61.91
+      },
+      {
+        "order": 5,
+        "low": 55.96,
+        "high": 72.97
+      },
+      {
+        "order": 6,
+        "low": 103.28,
+        "high": 194.46
+      }
+    ],
+    "pricing": {
+      "priced": 10,
+      "grounded": 4
+    }
+  },
+  "heroFrameIndex": 47,
+  "meta": {
+    "costUsd": 1.0787,
+    "models": {
+      "segment": "sam-3.1",
+      "reason": "meta-models/muse-spark-open-1026",
+      "cost": "muse-spark-1.3",
+      "image": "muse-image-1.0",
+      "review": "meta-models/muse-spark-open-1026"
+    },
+    "planProvider": "baseten",
+    "region": "Sebring, FL"
+  },
+  "afterImageLabel": "AI concept, not a render",
+  "review": {
+    "ran": true,
+    "items": [
+      {
+        "problemId": "1",
+        "verified": true,
+        "reason": "Photo D shows black cables stretched across stage floor near speaker and wall outlet."
+      },
+      {
+        "problemId": "2",
+        "verified": true,
+        "reason": "Photo A shows patterned blue tote and plastic bag on carpet near exit door and fire extinguisher."
+      },
+      {
+        "problemId": "3",
+        "verified": true,
+        "reason": "Photo B shows red fire extinguisher partially hidden behind chrome stool and yellow Hope City sign."
+      },
+      {
+        "problemId": "4",
+        "verified": true,
+        "reason": "Photo F shows dark stage front edge with corrugated metal and no contrasting marking above carpet."
+      },
+      {
+        "problemId": "5",
+        "verified": true,
+        "reason": "Photo C shows black stage floor with white scuffs, paint chips and debris near drum cage."
+      },
+      {
+        "problemId": "6",
+        "verified": true,
+        "reason": "Photo E shows chair and keyboard surrounded by tangled cords on dark stage floor."
+      }
+    ],
+    "summary": "All 6 problems are visible in their cited photos.",
+    "source": "model"
+  }
+}

@@ -289,7 +289,7 @@ export function Landing() {
 }
 
 /**
- * Hero visual: the REAL sanctuary run (src/lib/examples/sanctuary-run.json), the walkthrough frame the after picture was
+ * Hero visual: the REAL sanctuary run (src/lib/examples/sanctuary-walk-run.json), the walkthrough frame the after picture was
  * drawn from next to Muse Image's after picture, with that run's own numbers. Labeled "Real run"; the after picture is
  * labeled as an AI concept, as on the plan screen.
  */
@@ -300,10 +300,10 @@ function RealRunHero() {
         <div className="grid grid-cols-2 gap-px bg-ink/10">
           <div className="relative bg-ink">
             <Image
-              src="/examples/sanctuary/f6.webp"
-              alt="Frame from a real walkthrough of a church sanctuary stage: cables and cords across the floor."
-              width={1024}
-              height={576}
+              src="/examples/sanctuary-walk/f47.webp"
+              alt="Frame from a real walkthrough of a church sanctuary stage: a dark stage edge with no marking, cables on the floor."
+              width={576}
+              height={1024}
               sizes="(min-width: 1024px) 220px, 50vw"
               priority
               className="aspect-[4/5] h-full w-full object-cover"
@@ -312,8 +312,8 @@ function RealRunHero() {
           </div>
           <div className="relative bg-ink">
             <Image
-              src="/examples/sanctuary/after.webp"
-              alt="AI concept of the same stage after the work: cables cleared and the floor cleaned."
+              src="/examples/sanctuary-walk/after.webp"
+              alt="AI concept of the same stage after the work: cables cleared, the floor refinished and the stage edge and steps marked."
               width={1280}
               height={853}
               sizes="(min-width: 1024px) 220px, 50vw"
@@ -326,13 +326,13 @@ function RealRunHero() {
         <div className="p-4 sm:p-5">
           <p className="flex items-center gap-2 text-sm font-semibold">
             <span className="shrink-0 whitespace-nowrap rounded-full bg-safe-dark px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">Real run</span>
-            Church sanctuary stage, 44 s video
+            Church sanctuary stage, 2:28 video
           </p>
           <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
             {[
-              ["4", "problems, worst first"],
-              ["64", "chairs counted"],
-              ["$0.38", "in model calls"],
+              ["6", "problems, worst first"],
+              ["69", "chairs counted"],
+              ["$1.08", "in model calls"],
             ].map(([v, l]) => (
               <div key={l} className="rounded-xl bg-paper px-2 py-2.5">
                 <dt className="sr-only">{l}</dt>
@@ -344,7 +344,7 @@ function RealRunHero() {
             ))}
           </dl>
           <p className="mt-3 text-sm text-ink/75">
-            <span className="font-semibold text-ink">Top problem:</span> loose cables and extension cords across the stage floor, a trip hazard.
+            <span className="font-semibold text-ink">Top problem:</span> loose cables across the stage floor, a trip hazard.
           </p>
         </div>
       </div>

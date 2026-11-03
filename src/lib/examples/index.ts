@@ -4,7 +4,7 @@
  * for image hosting and a covered logo; "sample" plans are illustrative and never claim a model ran.
  */
 import type { WorkPlan } from "../types";
-import sanctuaryRun from "./sanctuary-run.json";
+import sanctuaryRun from "./sanctuary-walk-run.json";
 import { classroomSample, officeSample, warehouseSample } from "./samples";
 import { kitchenSample } from "./kitchen";
 import { withFrameSizes } from "./frameSizes";
@@ -27,7 +27,10 @@ export interface Example {
   credit?: { author: string; license: string; url: string };
 }
 
-/** Real run, Oct 29, 2026, 11:30 AM ET: frames and after picture re-hosted as files, church logo covered. */
+/**
+ * Real run, Nov 3, 2026, 4:05 PM ET, on the 2:28 walkthrough filmed Nov 2: frames and after picture re-hosted as files,
+ * church logo covered. It went through the reviewer, so its proof check is the model's own (review.source "model").
+ */
 const sanctuaryPlan = withFrameSizes({ ...(sanctuaryRun as unknown as WorkPlan) });
 
 export const EXAMPLES: Example[] = [
@@ -46,11 +49,11 @@ export const EXAMPLES: Example[] = [
     id: "sanctuary",
     kind: "real",
     title: "Church sanctuary stage",
-    blurb: "A real run on a 44-second walkthrough: 4 problems, 64 chairs counted, AI after picture.",
-    thumb: "/examples/thumbs/sanctuary.webp",
+    blurb: "A real run on a 2½-minute walkthrough: 6 problems, 69 chairs counted, each problem checked against its photo.",
+    thumb: "/examples/thumbs/sanctuary-walk.webp",
     plan: sanctuaryPlan,
     banner:
-      "Real SightWork run from a 44-second walkthrough filmed Oct 29, 2026. SAM counted the room, Muse Spark Open wrote the plan and Muse Image drew the after picture, in about 3 minutes for $0.38 in model calls. Nothing here was edited except covering the church logo.",
+      "Real SightWork run from a 2-minute 28-second narrated walkthrough filmed Nov 2, 2026. Muse Voice Transcribe wrote down the narration, SAM counted the room, Muse Spark Open wrote the plan and checked each problem against its photo, Muse Spark priced it for Sebring, FL, and Muse Image drew the after picture, in about 4 minutes for $1.08 in model calls. Nothing here was edited except covering the church logo.",
   },
   {
     id: "classroom",
@@ -84,8 +87,9 @@ export const EXAMPLES: Example[] = [
   },
 ];
 
-// Every example gets a precomputed proof check (src/lib/review.ts): it records only whether each problem points at a
-// real proof photo, says it was worked out ahead of time, and never claims a model reviewed it.
+// Every example without its own review gets a precomputed proof check (src/lib/review.ts): it records only whether each
+// problem points at a real proof photo, says it was worked out ahead of time, and never claims a model reviewed it.
+// The real sanctuary run keeps the review its run returned.
 for (const e of EXAMPLES) e.plan = withPrecomputedReview(e.plan);
 
 export const FEATURED_EXAMPLE = EXAMPLES[0];

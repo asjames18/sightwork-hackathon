@@ -1,9 +1,14 @@
 # Example image credits
 
-## Real run (public/examples/sanctuary/)
-Frames and the AI after picture come from a real SightWork run on a walkthrough filmed by the SightWork team
-in a church sanctuary on Oct 29, 2026, with the church's permission to film. The church's logo on the pulpit
-is covered in every frame. Not for reuse.
+## Real run (public/examples/sanctuary-walk/)
+Frames and the AI after picture come from a real SightWork run on a 2:28 narrated walkthrough filmed by the SightWork
+team in a church sanctuary on Nov 2, 2026, with the church's permission to film. The church's logo and sign lettering
+are covered in the one frame that shows them (f15). Not for reuse.
+
+## Earlier real run (public/examples/sanctuary/)
+Frames and the AI after picture from the first real SightWork run, on a 44-second walkthrough of the same sanctuary
+filmed Oct 29, 2026, with the church's permission. The church's logo on the pulpit is covered in every frame. The
+tests and the eval answer key still use this run. Not for reuse.
 
 ## Featured sample: kitchen renovation (public/examples/kitchen/)
 Seven photos of one older-home kitchen renovation, all CC0 1.0 by Tomwsulcer on Wikimedia Commons. Resized and

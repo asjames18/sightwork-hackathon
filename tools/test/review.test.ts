@@ -1,7 +1,7 @@
 /** Reviewer pass on the UI side: parsing, the summary line, precomputed example reviews, share text, the stream parser. No network. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseReview, precomputeReview, reviewLine, reviewTally, verdictFor, withPrecomputedReview } from "@/lib/review";
+import { parseReview, planReview, precomputeReview, reviewLine, reviewTally, verdictFor, withPrecomputedReview } from "@/lib/review";
 import { planToText } from "@/lib/client/planText";
 import { parseStatusLine } from "@/lib/client/apiPlanJob";
 import { EXAMPLES } from "@/lib/examples";
@@ -90,8 +90,17 @@ test("verdictFor matches by rank and ignores reviews that didn't run", () => {
   assert.equal(verdictFor({ ran: false, items: [] }, p.issues[0]), undefined);
 });
 
-test("every example carries an honest precomputed review", () => {
-  for (const e of EXAMPLES) {
+test("the real sanctuary run keeps the review its run returned", () => {
+  const real = EXAMPLES.find((e) => e.id === "sanctuary")!;
+  const r = real.plan.review!;
+  assert.equal(r.source, "model");
+  assert.equal(r.ran, true);
+  assert.deepEqual(r.items.map((i) => i.problemId), real.plan.issues.map((i) => String(i.rank)));
+  assert.equal(reviewLine(planReview(real.plan)), "Reviewed by a separate check: 6 of 6 problems backed by a photo.");
+});
+
+test("every hand-written example carries an honest precomputed review", () => {
+  for (const e of EXAMPLES.filter((x) => x.kind === "sample")) {
     const r = e.plan.review;
     assert.ok(r, e.id);
     assert.equal(r.source, "precomputed", e.id);
