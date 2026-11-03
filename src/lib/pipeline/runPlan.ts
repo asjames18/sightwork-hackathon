@@ -1370,6 +1370,15 @@ export function validateRunPlanRequest(request: PlanRequest): void {
     ) {
       throw new Error("runPlan: transcriptTurns given without transcript");
     }
+    // Parity with the route validator (src/lib/pipeline/planRequest.ts):
+    // turns must arrive in walkthrough order (non-decreasing
+    // startSec), like frames above: the reason step reads narration
+    // against frames in that order, so an out-of-order turn would
+    // misalign what was said with what was seen, while the route
+    // already fails fast on the same input. A direct runPlan caller
+    // gets the same fail-fast here instead of only via the route.
+    // Equal startSec passes, as with frames.
+    let prevTurnStartSec = -Infinity;
     request.transcriptTurns.forEach((turn, i) => {
       if (
         turn === null ||
@@ -1397,6 +1406,12 @@ export function validateRunPlanRequest(request: PlanRequest): void {
       ) {
         throw new Error(`runPlan: transcriptTurns[${i}].endSec must not be earlier than startSec`);
       }
+      if (turn.startSec < prevTurnStartSec) {
+        throw new Error(
+          `runPlan: transcriptTurns[${i}].startSec must not be earlier than the previous turn`,
+        );
+      }
+      prevTurnStartSec = turn.startSec;
     });
   }
   if (
@@ -2124,5 +2139,6 @@ export async function runPlan(request: PlanRequest, deps: RunPlanDeps): Promise<
   }
   return plan;
 }
+
 
 
