@@ -75,6 +75,19 @@ export function createUsageTracker(opts?: {
   spikeCapUsd?: number;
   creditTotalUsd?: number;
 }): UsageTracker {
+  // A non-object opts from a direct caller (a string, a number, an
+  // array, null) used to be silently ignored: opts?.spikeCapUsd
+  // reads undefined off it, so the tracker ran on defaults while
+  // the caller believed it had set a cap — the same silent-config
+  // failure the cap checks below already reject. Reject it here,
+  // before any field is read, the same named-error rule the
+  // record guard follows. Omitted opts still defaults.
+  if (
+    opts !== undefined &&
+    (opts === null || typeof opts !== "object" || Array.isArray(opts))
+  ) {
+    throw new Error("usage: opts must be an object when given");
+  }
   // A bad cap would silently break the spike accounting: a NaN cap
   // makes canSpend false and every record throw, a negative cap
   // throws on the first record with a misleading cap message, and a
