@@ -1158,17 +1158,25 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   // abort at all, since signal.aborted reads undefined and the stop
   // never reaches the in-flight call. A signal, when given, must
   // look like an AbortSignal (a boolean aborted plus
-  // addEventListener), so a bad one fails fast here, before any
+  // addEventListener and removeEventListener: every real AbortSignal
+  // carries both, and a two-method fake with only aborted and
+  // addEventListener used to pass here and still die in fetch with
+  // that bare TypeError), so a bad one fails fast here, before any
   // fetch. Omitted stays omitted, and a real AbortController signal
   // passes unchanged. Real runs are already clean (runPlan hands
   // over the route's request signal), so no current run changes.
+  // Duck-typing stops here on purpose: a fake implementing all three
+  // methods still is not a real AbortSignal, but an instanceof check
+  // would break a signal from another realm, so that last mile stays
+  // fetch's own error rather than a new rule.
   const signal = deps.signal as unknown;
   if (
     signal !== undefined &&
     (signal === null ||
       typeof signal !== "object" ||
       typeof (signal as { aborted?: unknown }).aborted !== "boolean" ||
-      typeof (signal as { addEventListener?: unknown }).addEventListener !== "function")
+      typeof (signal as { addEventListener?: unknown }).addEventListener !== "function" ||
+      typeof (signal as { removeEventListener?: unknown }).removeEventListener !== "function")
   ) {
     throw new Error("reason: signal must be an AbortSignal when given");
   }
