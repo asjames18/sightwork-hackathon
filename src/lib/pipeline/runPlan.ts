@@ -768,6 +768,14 @@ export function formatExplainedContractErrors(
 ): string | null {
   if (!Array.isArray(errs) || !Array.isArray(warnings)) return null;
   if (errs.length === 0) return null;
+  // The sibling diagnostic lines all stay quiet on malformed input,
+  // and this one did not: a non-string warning entry threw in key()
+  // (.startsWith on a number or null) instead of staying quiet, so
+  // a bad diagnostic input could throw out of the server log.
+  // Return null on a non-string warning side, the same quiet rule
+  // the siblings follow. Valid inputs are unchanged: errs are still
+  // filtered to strings and must all be explained to log.
+  if (warnings.some((w) => typeof w !== "string")) return null;
   const explained = errs.filter(
     (e) => typeof e === "string" && explainedByReasonWarnings(e, warnings),
   );
