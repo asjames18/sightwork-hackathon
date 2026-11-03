@@ -247,6 +247,14 @@ export function createSamSegmentCaller(opts: SamClientOptions = {}): SamSegmentC
   }
 
   return async (req) => {
+    // A direct caller bypassing the segment step used to get a raw
+    // TypeError here: a null request reading .model, with no step
+    // name. Fail fast with a named sam error, before any fetch,
+    // the same named-error rule the model/concept checks below
+    // follow. Valid requests are unchanged.
+    if (req === null || typeof req !== "object" || Array.isArray(req)) {
+      throw new Error("sam: request must be an object");
+    }
     // A bad request would otherwise spend a paid SAM call and only
     // fail downstream, when the segment step parses an empty or
     // garbage result. Reject it here, before any fetch, like the
