@@ -10,6 +10,7 @@ import { progressLine } from "@/lib/client/stepProgress";
 import { shareLabel, type CostShare } from "@/lib/costShares";
 import { crewSummary, hoursLabel, hoursLeft, hoursLeftLine, isVolunteerTrade, showCrewSummary, stepsLabel, type CrewRow } from "@/lib/client/crewSummary";
 import { CrewSizeLine } from "@/components/CrewSizeLine";
+import { VolunteerCallButton } from "@/components/VolunteerCallButton";
 import { crewHandoutText, crewHandoutTitle } from "@/lib/client/crewHandout";
 import { crewProgress, crewProgressDescription, crewProgressLabel } from "@/lib/client/crewProgress";
 import { stepShareTitle, stepToText } from "@/lib/client/stepText";
@@ -131,6 +132,7 @@ export function WorkSteps({
                     )}
                     <CrewSendButton plan={plan} crew={row} />
                     <CrewCalendarButton plan={plan} crew={row} />
+                    <VolunteerCallButton plan={plan} crew={row} />
                   </span>
                 </li>
               );
