@@ -153,3 +153,17 @@ html.sw-opening body > main {
     outline: none;
   }
 }
+
+/* High contrast (plan screen button): every softened ink tone becomes full ink, and borders and dividers turn solid,
+   so small gray text and hairlines stay readable in bright light. Set on the page root by the Contrast button. */
+html[data-contrast="high"] [class*="text-ink/"] {
+  color: var(--color-ink) !important;
+}
+html[data-contrast="high"] [class*="border-ink/"],
+html[data-contrast="high"] [class*="divide-ink/"] > * {
+  border-color: var(--color-ink) !important;
+}
+html[data-contrast="high"] :is(a, button, input, select, summary):focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+}
