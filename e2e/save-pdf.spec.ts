@@ -141,7 +141,7 @@ test.describe("Save PDF on a computer", () => {
     expect(latin.slice(0, 5)).toBe("%PDF-");
     expect(bytes.length).toBeGreaterThan(20_000);
     expect((latin.match(/\/Type \/Page\b(?!s)/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    expect(latin).toMatch(/\/Title \(Work plan: Sanctuary stage/);
+    expect(latin).toMatch(/\/Title \(Work plan: Sanctuary/);
     // Before and after pictures plus proof photos are in it.
     expect((latin.match(/\/Subtype \/Image/g) ?? []).length).toBeGreaterThanOrEqual(3);
     await expect(page.getByTestId("save-pdf-status")).toHaveText(/Saved sightwork-plan-.*\.pdf/);

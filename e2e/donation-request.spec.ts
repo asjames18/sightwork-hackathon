@@ -12,6 +12,9 @@ test("the shopping list can send a donation request for what is still needed", a
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/start?view=example&ex=sanctuary");
     const button = page.getByTestId("donation-request");
+    // Materials to the top (its scroll margin clears the sticky section chips), so no control above sits half under them
+    // while axe runs; then the button itself into view.
+    await page.locator("#materials").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
     await button.click();
