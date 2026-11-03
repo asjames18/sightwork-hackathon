@@ -6,11 +6,14 @@ Criteria and weights from the Official Rules embedded on the [Cerebral Valley ev
 - Who it helps: churches, schools and nonprofits that run on volunteers and have no facilities staff, plus small contractors scoping a job.
 - What changes: a one-minute phone walkthrough becomes a volunteer-ready plan in about 2 to 3 minutes, for under $1 in model calls on real runs: problems worst first with proof frames, who does each step, a shopping list, and a rough local cost.
 - It travels: Send to your team (share sheet or clipboard), Save PDF, ticks saved per plan for work day.
+- Built for the whole crew: Read it to me (the device's own voice, with a speed choice), Text size (Normal, Large, Extra large), a Contrast button, Windows High Contrast support, a Skip to main content link and axe checks at phone and desktop widths.
+- Built for work day, not just the demo: tick steps off, "If people share it evenly" turns total hours into hours each for 1 to 12 people, and Add to calendar downloads the steps as a calendar file.
 
 ## Demo (25%)
 - Live site with a real run on the landing page (a church sanctuary stage, nothing edited but a covered logo) and four labeled samples.
 - Processing screen names the Meta model behind each step with a running clock.
 - `/status` shows the live build and config at a glance, with no model calls.
+- Holds up live: a real run keeps the phone screen on, says so when the connection drops, asks before a reload or swipe back can throw the run away, and has a Stop this run button; a page that fails shows a plain message with Try again instead of a bare error.
 
 ## Use of Meta AI tooling (25%)
 - Four Meta models chained in one agent run, one job each: Muse Voice Transcribe, SAM 3.1, Muse Spark Open (Meta open weights on Baseten, the default plan engine) and Muse Image; Muse Spark with web search prices the work.
