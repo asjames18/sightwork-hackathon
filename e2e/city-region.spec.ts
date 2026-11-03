@@ -129,9 +129,12 @@ test("the run sends 'City, ST' as region and the plan says which area it priced 
 });
 
 test("example plans and the example preview are unaffected", async ({ page }) => {
-  await page.goto("/start?view=example&ex=sanctuary");
+  await page.goto("/start?view=example&ex=office");
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Cost range for/ })).toHaveCount(0);
+  // The real sanctuary run keeps the place it was priced for.
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("heading", { name: "Cost range for Sebring, FL" })).toBeVisible();
   await page.goto("/start?runner=mock");
   await page.getByTestId("choose-video-input").setInputFiles(WALKTHROUGH);
   const card = page.getByRole("group", { name: "Your walkthrough" });

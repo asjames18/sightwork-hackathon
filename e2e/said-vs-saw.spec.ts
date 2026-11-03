@@ -61,8 +61,8 @@ for (const width of [375, 768, 1280]) {
   });
 }
 
-test("the sanctuary example, whose rows are all unmentioned, shows no toggle", async ({ page }) => {
+test("the narrated sanctuary run, with said and unsaid rows, shows the toggle", async ({ page }) => {
   await page.goto("/start?view=example&ex=sanctuary");
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("said-vs-saw-only-unmentioned")).toHaveCount(0);
+  await expect(page.getByTestId("said-vs-saw-only-unmentioned")).toHaveCount(1);
 });

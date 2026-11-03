@@ -36,7 +36,7 @@ test("real run: the Powered by Meta panel shows the run's model cost", async ({ 
 
 test("the real Hope City example shows the cost recorded on its run; samples show none", async ({ page }) => {
   await page.goto("/start?view=example&ex=sanctuary");
-  await expect(page.getByTestId("run-cost")).toHaveText("The AI model calls for this plan cost about 38 cents.");
+  await expect(page.getByTestId("run-cost")).toHaveText("The AI model calls for this plan cost about $1.08.");
   await page.goto("/start?view=example&ex=kitchen");
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
   await expect(page.getByTestId("run-cost")).toHaveCount(0);

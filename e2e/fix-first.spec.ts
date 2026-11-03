@@ -10,9 +10,9 @@ test("Start here names the steps that fix the Fix now problems and links to them
   await page.goto("/start?view=example&ex=sanctuary");
   const card = page.getByTestId("fix-first");
   await expect(card.getByRole("heading", { name: "Start here" })).toBeVisible();
-  await expect(card.getByTestId("fix-first-lead")).toHaveText(/3 problems are Fix now\.\s*These 2 steps take care of them:/);
-  await expect(card.getByRole("listitem")).toHaveCount(2);
-  await expect(card.getByTestId("fix-first-facts")).toContainText("About 6–9 h of work");
+  await expect(card.getByTestId("fix-first-lead")).toHaveText(/4 problems are Fix now\.\s*These 4 steps take care of them:/);
+  await expect(card.getByRole("listitem")).toHaveCount(4);
+  await expect(card.getByTestId("fix-first-facts")).toContainText("About 3–5.5 h of work");
   await expect(card).toContainText("The other 2 steps can follow");
   await card.getByRole("link", { name: /Step 2:/ }).click();
   await expect(page).toHaveURL(/#step-2$/);
@@ -35,7 +35,7 @@ test("ticking work steps shows on Start here and the problem cards, and stays cl
   const card = page.getByTestId("fix-first");
   await expect(card.getByTestId("fix-first-progress")).toHaveCount(0);
   await page.getByRole("checkbox", { name: /^Step 2 done:/ }).check();
-  await expect(card.getByTestId("fix-first-progress")).toHaveText("Start here: 1 of 2 done.");
+  await expect(card.getByTestId("fix-first-progress")).toHaveText("Start here: 1 of 4 done.");
   await expect(card.getByRole("link", { name: /Step 2:.*\(done\)/ })).toBeVisible();
   const boxes = page.getByRole("checkbox", { name: /^Step \d+ done:/ });
   for (let i = 0; i < (await boxes.count()); i++) await boxes.nth(i).check();

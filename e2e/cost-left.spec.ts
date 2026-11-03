@@ -69,8 +69,11 @@ test("ticking steps shows what is still to spend on the cost card, then hides it
   await expect(left).toHaveText("");
 });
 
-test("the sanctuary example has no step costs, so no line", async ({ page }) => {
-  await page.goto("/start?view=example&ex=sanctuary");
+test("a sample with no step costs has no line; the priced real run says what is left", async ({ page }) => {
+  await page.goto("/start?view=example&ex=office");
   await page.getByRole("checkbox", { name: /^Step 1 done:/ }).check();
   await expect(page.getByTestId("cost-left")).toHaveCount(0);
+  await page.goto("/start?view=example&ex=sanctuary");
+  await page.getByRole("checkbox", { name: /^Step 1 done:/ }).check();
+  await expect(page.getByTestId("cost-left")).toHaveText("About $240–$421 of this is for the 5 steps not ticked yet.");
 });

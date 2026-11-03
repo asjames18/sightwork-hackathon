@@ -52,8 +52,8 @@ test("real run with prices: the list shows what the materials still to buy cost,
   }
 });
 
-test("example plans have no prices, so no spend line", async ({ page }) => {
-  await page.goto("/start?view=example&ex=sanctuary");
+test("hand-written samples have no prices, so no spend line", async ({ page }) => {
+  await page.goto("/start?view=example&ex=office");
   await expect(page.getByRole("heading", { name: "Problems, worst first" })).toBeVisible();
   await expect(page.getByTestId("materials-spend")).toHaveCount(0);
 });

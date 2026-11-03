@@ -14,7 +14,7 @@ test("ticking steps shows the hours of work left, then hides it when everything 
   await expect(left).toHaveCount(0);
 
   await page.getByRole("checkbox", { name: /^Step 1 done:/ }).check();
-  await expect(left).toHaveText("About 12–17 h of work left on the 3 steps not ticked yet.");
+  await expect(left).toHaveText("About 6.5–11.5 h of work left on the 5 steps not ticked yet.");
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
@@ -25,13 +25,12 @@ test("ticking steps shows the hours of work left, then hides it when everything 
     await expectNoAxeViolations(page, `hours left ${width}`);
   }
 
-  await page.getByRole("checkbox", { name: /^Step 2 done:/ }).check();
-  await page.getByRole("checkbox", { name: /^Step 3 done:/ }).check();
-  await expect(left).toHaveText("About 6–8 h of work left on the last step.");
+  for (const n of [2, 3, 4, 5]) await page.getByRole("checkbox", { name: new RegExp(`^Step ${n} done:`) }).check();
+  await expect(left).toHaveText("About 1–2 h of work left on the last step.");
 
   await page.reload();
-  await expect(steps.getByTestId("hours-left")).toHaveText("About 6–8 h of work left on the last step.");
+  await expect(steps.getByTestId("hours-left")).toHaveText("About 1–2 h of work left on the last step.");
 
-  await page.getByRole("checkbox", { name: /^Step 4 done:/ }).check();
+  await page.getByRole("checkbox", { name: /^Step 6 done:/ }).check();
   await expect(steps.getByTestId("hours-left")).toHaveCount(0);
 });

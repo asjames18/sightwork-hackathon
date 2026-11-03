@@ -81,8 +81,11 @@ test("typing a budget says what it covers, follows ticks, is kept on this device
   expect(await page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.endsWith(":budget")))).toEqual([]);
 });
 
-test("the sanctuary example has no step costs, so no budget box", async ({ page }) => {
-  await page.goto("/start?view=example&ex=sanctuary");
+test("a sample with no step costs has no budget box; the priced real run has one", async ({ page }) => {
+  await page.goto("/start?view=example&ex=office");
   await expect(page.getByRole("checkbox", { name: /^Step 1 done:/ })).toBeVisible();
   await expect(page.getByTestId("budget-fit")).toHaveCount(0);
+  await page.goto("/start?view=example&ex=sanctuary");
+  await expect(page.getByRole("checkbox", { name: /^Step 1 done:/ })).toBeVisible();
+  await expect(page.getByTestId("budget-fit")).toHaveCount(1);
 });

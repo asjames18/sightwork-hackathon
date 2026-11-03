@@ -28,9 +28,9 @@ test("the marked chip stays inside the chip row and the page fits at 375, 768 an
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/start?view=example&ex=sanctuary");
     const nav = page.getByTestId("section-nav");
-    await nav.getByRole("link", { name: "Materials" }).click();
+    await nav.getByRole("link", { name: /^Steps/ }).click();
     const current = nav.locator('[aria-current="location"]');
-    await expect(current).toHaveText(/^Materials(\d+)?$/);
+    await expect(current).toHaveText(/^Steps ?(\d+)?$/);
     await expect
       .poll(async () => {
         const [chip, row] = await Promise.all([current.boundingBox(), nav.locator("ul").boundingBox()]);
@@ -61,7 +61,7 @@ test("the chips say how many problems, counts, steps and materials the plan hold
     await expect(nav.getByRole("link", { name: /^Counts \d+$/ })).toBeVisible();
     await expect(nav.getByRole("link", { name: /^Materials \d+$/ })).toBeVisible();
     // The chip on screen keeps a readable count (white on dark).
-    await nav.getByRole("link", { name: /^Materials/ }).click();
+    await nav.getByRole("link", { name: /^Steps/ }).click();
     await expect(nav.locator('[aria-current="location"]').getByTestId("chip-count")).toBeVisible();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `section chip counts ${width}`);

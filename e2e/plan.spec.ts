@@ -67,7 +67,7 @@ test.describe("plan screen", () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(REAL_RUN);
       const slider = page.getByRole("slider", { name: "Compare before and after" });
-      const show = page.getByRole("group", { name: "Show" });
+      const show = page.getByRole("group", { name: "Show" }).filter({ has: page.getByRole("button", { name: "Compare" }) });
       const before = show.getByRole("button", { name: "Before" });
       const compare = show.getByRole("button", { name: "Compare" });
       const after = show.getByRole("button", { name: "After" });

@@ -221,17 +221,16 @@ test("no problems, only closer-look finds: the empty state and the list together
   await shot(page, "problems-empty", problems);
 });
 
-test("today's plans render as before: tiers from severity, no closer-look list, no checklist, no cost shares", async ({ page }) => {
-  // The real Oct 29 run predates the richer fields (the featured kitchen sample now carries them).
+test("the real sanctuary run carries the richer fields: tiers, a checklist and a cost share on every problem, no closer-look list", async ({ page }) => {
   await page.goto("/start?view=example&ex=sanctuary");
   const problems = page.locator("#problems");
   await expect(problems.getByRole("heading", { name: /^Fix now/ })).toBeVisible();
   await expect(page.getByTestId("watch-list")).toHaveCount(0);
-  await expect(page.getByTestId("checklist")).toHaveCount(0);
-  await expect(page.getByTestId("issue-cost")).toHaveCount(0);
+  await expect(page.getByTestId("checklist")).toHaveCount(1);
+  await expect(page.getByTestId("issue-cost")).toHaveCount(6);
   await expect(page.getByText("Partly backed", { exact: true })).toHaveCount(0);
   await expectNoSideScroll(page);
-  await expectNoAxeViolations(page, "real run without the richer fields");
+  await expectNoAxeViolations(page, "real run with the richer fields");
 });
 
 test("featured kitchen sample (the public default) shows tiers, where and what, the closer-look list and the checklist at 375, 768 and 1280", async ({ page }) => {

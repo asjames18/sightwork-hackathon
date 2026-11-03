@@ -94,7 +94,7 @@ test.describe("Save PDF on a phone", () => {
     await expect.poll(async () => (await shared(page)).length).toBe(1);
     const [s] = await shared(page);
     expect(s.head).toBe("%PDF-");
-    expect(s.title).toContain("Sanctuary stage");
+    expect(s.title).toContain("Work plan: Sanctuary");
     await expect(page.getByTestId("save-pdf-status")).toHaveText("");
   });
 
@@ -133,7 +133,7 @@ test.describe("Save PDF on a computer", () => {
     await save.click();
     const d = await download;
     expect(d.suggestedFilename()).toMatch(NAME);
-    expect(d.suggestedFilename()).toMatch(/^sightwork-plan-sanctuary-stage-/);
+    expect(d.suggestedFilename()).toMatch(/^sightwork-plan-sanctuary-\d{4}-/);
     const path = await d.path();
     const { readFileSync } = await import("node:fs");
     const bytes = readFileSync(path);

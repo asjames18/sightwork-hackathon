@@ -44,8 +44,8 @@ test.describe("on a phone", () => {
     expect(file.type).toBe("image/jpeg");
     expect(file.name).toMatch(/^sightwork-before-after(-[a-z0-9-]+)?\.jpg$/);
     expect(file.size).toBeGreaterThan(10_000);
-    // Two panels side by side plus the caption strip: clearly wider than tall, never above the cap.
-    expect(file.width).toBeGreaterThan(file.height);
+    // The real run was filmed upright, so the two panels stack (before on top) above the caption strip; never above the cap.
+    expect(file.height).toBeGreaterThan(file.width);
     expect(Math.max(file.width, file.height)).toBeLessThanOrEqual(1280);
     expect(shared.text).toContain("Before: a frame from the walkthrough video.");
     expect(shared.text).toContain("After: ");

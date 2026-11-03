@@ -15,7 +15,8 @@ test("ticking steps adds fixed progress to the problem tier headings", async ({ 
 
   for (const width of [375, 768, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    await tags.first().scrollIntoViewIfNeeded();
+    // Centered, so the problem filter row above it never sits half under the sticky section chips while axe runs.
+    await tags.first().evaluate((el) => el.scrollIntoView({ block: "center" }));
     await expect(tags.first()).toBeInViewport();
     await expectNoSideScroll(page);
     await expectNoAxeViolations(page, `tier fixed ${width}`);

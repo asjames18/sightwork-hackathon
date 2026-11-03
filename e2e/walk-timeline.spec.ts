@@ -10,12 +10,12 @@ test("the real run shows its problems along the walk, and a marker jumps to its 
   await page.goto("/start?view=example&ex=sanctuary");
   const timeline = page.getByTestId("walk-timeline");
   await expect(timeline.getByRole("heading", { name: "Along your walk" })).toBeVisible();
-  await expect(timeline.getByTestId("walk-summary")).toHaveText("4 problems spotted across the 44 s walk.");
-  await expect(timeline.getByTestId("walk-mark")).toHaveText(["3", "2, 4", "1"]);
-  const mark = timeline.getByRole("link", { name: /^Problems 2, 4: seen at 32 s/ });
+  await expect(timeline.getByTestId("walk-summary")).toHaveText("6 problems spotted across the 148 s walk, 3 of them never mentioned.");
+  await expect(timeline.getByTestId("walk-mark")).toHaveText(["2", "3", "5, 1", "6", "4"]);
+  const mark = timeline.getByRole("link", { name: /^Problem 3: seen at 47 s, Fix now, never mentioned/ });
   await mark.click();
-  await expect(page).toHaveURL(/#problem-2$/);
-  await expect(page.locator("#problem-2")).toBeInViewport();
+  await expect(page).toHaveURL(/#problem-3$/);
+  await expect(page.locator("#problem-3")).toBeInViewport();
 });
 
 test("a hand-written single-photo sample has no timeline", async ({ page }) => {

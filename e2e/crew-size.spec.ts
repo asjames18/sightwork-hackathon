@@ -14,12 +14,12 @@ test("crew size stepper turns the total hours into hours each", async ({ page })
     await box.scrollIntoViewIfNeeded();
     const line = box.getByTestId("crew-size-line");
     await expect(box.getByTestId("crew-size-count")).toHaveText("2");
-    await expect(line).toContainText("2 people: about 7–10 h each, roughly 2 working days.");
+    await expect(line).toContainText("2 people: about 3.5–6.5 h each, roughly 1 working day.");
     await box.getByTestId("crew-size-more").click();
-    await expect(line).toContainText("3 people: about 4.5–6.5 h each, roughly 1 working day.");
+    await expect(line).toContainText("3 people: about 2.5–4 h each.");
     await box.getByTestId("crew-size-less").click();
     await box.getByTestId("crew-size-less").click();
-    await expect(line).toContainText("1 person: about 14–20 h, roughly 3 working days.");
+    await expect(line).toContainText("1 person: about 7–12.5 h, roughly 2 working days.");
     await expect(box.getByTestId("crew-size-less")).toBeDisabled();
     for (let i = 0; i < 11; i++) await box.getByTestId("crew-size-more").click();
     await expect(box.getByTestId("crew-size-count")).toHaveText("12");
