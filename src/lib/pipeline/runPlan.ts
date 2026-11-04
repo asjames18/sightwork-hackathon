@@ -1285,6 +1285,34 @@ export function validateRunPlanRequest(request: PlanRequest): void {
   if (typeof request.region === "string" && /\{\{[a-z_]+\}\}/.test(request.region)) {
     throw new Error("runPlan: region must not contain a {{...}} placeholder");
   }
+  // Parity with buildReasonPrompt (src/lib/pipeline/planPrompts.ts):
+  // the reason step builds its prompt after the listening and
+  // looking/counting steps, so a spaceName or spaceType carrying a
+  // newline or a {{...}} placeholder, or a spaceName carrying a
+  // double quote, used to pass here, spend the transcribe and
+  // segment calls, and only fail when the reason prompt was built
+  // — a newline splits the prompt line carrying it, a placeholder
+  // would be expanded by a later fill, and a quote in spaceName
+  // closes the quoted name in the template. A direct runPlan
+  // caller gets the same fail-fast here, before any step runs.
+  // Only given strings are checked, so an omitted label keeps its
+  // behavior, and a blank one keeps its message from the loop
+  // above. Real runs are already clean (the route hands runPlan
+  // the labels the user typed), so no current run changes.
+  for (const field of ["spaceName", "spaceType"] as const) {
+    if (typeof request[field] === "string" && /[\r\n]/.test(request[field])) {
+      throw new Error(`runPlan: ${field} must not contain a newline`);
+    }
+    if (
+      typeof request[field] === "string" &&
+      /\{\{[a-z_]+\}\}/.test(request[field])
+    ) {
+      throw new Error(`runPlan: ${field} must not contain a {{...}} placeholder`);
+    }
+  }
+  if (typeof request.spaceName === "string" && request.spaceName.includes('"')) {
+    throw new Error('runPlan: spaceName must not contain a double quote');
+  }
   if (request.audioWavBase64 !== undefined && typeof request.audioWavBase64 !== "string") {
     throw new Error("runPlan: audioWavBase64 must be a string when given");
   }
