@@ -1267,6 +1267,24 @@ export function validateRunPlanRequest(request: PlanRequest): void {
       throw new Error(`runPlan: ${field} must not be blank when given`);
     }
   }
+  // Parity with validateCostPromptInput (src/lib/pipeline/planPrompts.ts):
+  // the cost step runs after the reason step, so a region carrying a
+  // newline or a {{...}} placeholder used to pass here, spend the paid
+  // reason call, and only fail when the cost prompt was built — the
+  // cost prompt rejects both, since a newline breaks its one-line
+  // region slot and a placeholder would be expanded by a later fill.
+  // A direct runPlan caller gets the same fail-fast here, before any
+  // step runs. Only a given string is checked, so an omitted or empty
+  // region (no cost step) keeps its behavior, and a blank one keeps
+  // its message from the loop above. Real runs are already clean
+  // (the route hands runPlan the region the user typed), so no
+  // current run changes.
+  if (typeof request.region === "string" && /[\r\n]/.test(request.region)) {
+    throw new Error("runPlan: region must not contain a newline");
+  }
+  if (typeof request.region === "string" && /\{\{[a-z_]+\}\}/.test(request.region)) {
+    throw new Error("runPlan: region must not contain a {{...}} placeholder");
+  }
   if (request.audioWavBase64 !== undefined && typeof request.audioWavBase64 !== "string") {
     throw new Error("runPlan: audioWavBase64 must be a string when given");
   }
