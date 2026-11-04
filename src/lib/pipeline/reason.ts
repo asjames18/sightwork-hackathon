@@ -1144,6 +1144,18 @@ export function validateReasonRequest(input: ReasonInput, deps: ReasonDeps): voi
   if (!isRecord(deps.schema)) {
     throw new Error("reason: schema must be an object");
   }
+  // Parity with runReason's own normalization below (inlineSchemaRefs
+  // on deps.schema, before any callSpark): a schema whose $ref cannot
+  // be resolved, whose $defs is not an object, or whose $ref is
+  // circular used to pass this validator and only fail at that
+  // normalization step, so a direct validateReasonRequest caller
+  // learned the request was bad only by running it. The dry-run
+  // inlining here (result discarded; inlineSchemaRefs is pure and
+  // builds new objects) throws the same named error up front, before
+  // any paid Spark call. Valid schemas are unchanged ({} and any
+  // resolvable $ref pass), and runReason still normalizes again for
+  // the call itself, so no current run changes.
+  inlineSchemaRefs(deps.schema);
   if (typeof deps.callSpark !== "function") {
     throw new Error("reason: callSpark must be a function");
   }
