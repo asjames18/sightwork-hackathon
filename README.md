@@ -4,6 +4,36 @@
 
 **Built by Antonio James** for the Meta AI Developer Hackathon (Oct 26 – Nov 4, 2026), Startup track.
 
+## Try it
+**Live app: [sightwork.melanatedintech.com](https://sightwork.melanatedintech.com)**
+
+- Open the **sanctuary example plan** (a real run on a narrated walkthrough, no code or sign-in needed): [sightwork.melanatedintech.com/start?view=example&ex=sanctuary](https://sightwork.melanatedintech.com/start?view=example&ex=sanctuary).
+- Running a new walkthrough through the models needs a tester code (this keeps model spend under control). Judges and reviewers who need one can ask Antonio James.
+- **Demo video:** _[link to be added]_
+
+![SightWork plan screen showing the sanctuary example](docs/screenshot.png)
+
+## Meta AI models used
+Every model in SightWork is a Meta model:
+- **Muse Voice Transcribe** turns the narration into timestamped text.
+- **SAM 3.1** outlines and counts what's in the room, frame by frame.
+- **Muse Spark Open** compares what was said with what the frames show, ranks the problems, and writes the materials and the ordered work steps (it also runs the review-only pass that checks each problem against its proof photo).
+- **Muse Spark** (with web search) prices materials and labor for the city and state.
+- **Muse Image** draws the "after" picture of the finished space.
+
+The full step-by-step table is in [How it works](#how-it-works).
+
+## Run it yourself
+You need Node.js 20.9 or newer.
+
+```bash
+git clone https://github.com/asjames18/sightwork-hackathon.git
+cd sightwork-hackathon
+npm install
+npm run dev
+```
+Open http://localhost:3000. Add `?runner=mock` to `/start` to walk the whole flow with example data and no keys. For real runs, copy `.env.example` to `.env.local` and add your own Meta Model API and Baseten keys (see [Real runs](#real-runs)). Keys are read from the environment only and are never committed.
+
 SightWork turns a short phone walkthrough of a property into a work plan you can act on. How long to film depends on how big the space is (see [Video length by room size](#video-length-by-room-size)).
 
 ## What it does
