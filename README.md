@@ -9,7 +9,7 @@
 
 - Open the **sanctuary example plan** (a real run on a narrated walkthrough, no code or sign-in needed): [sightwork.melanatedintech.com/start?view=example&ex=sanctuary](https://sightwork.melanatedintech.com/start?view=example&ex=sanctuary).
 - Running a new walkthrough through the models needs a tester code (this keeps model spend under control). Judges and reviewers who need one can ask Antonio James.
-- **Demo video:** _[link to be added]_
+- **Demo video:** [Watch the 2:24 demo on YouTube](https://youtu.be/8ws8nVdm9T8)
 
 ![SightWork plan screen showing the sanctuary example](docs/screenshot.png)
 
